@@ -263,6 +263,11 @@ $_gdm_dialog_width: 25em;
 
     &.critical { background-color: transparentize($_gdm_fg,0.8) }
   }
+
+  .unlock-dialog-notification-source .message {
+    background-color: transparent;
+    &:hover,&:focus { background-color: transparent; }
+  }
 }
 
 .unlock-dialog-notification-icon {
