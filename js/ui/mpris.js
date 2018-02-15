@@ -151,7 +151,7 @@ export class MprisPlayer extends Signals.EventEmitter {
             this._mprisProxy.RaiseAsync().catch(logError);
     }
 
-    _close() {
+    close() {
         this._mprisProxy.disconnectObject(this);
         this._mprisProxy = null;
 
@@ -165,13 +165,13 @@ export class MprisPlayer extends Signals.EventEmitter {
         this._mprisProxy.connectObject('notify::g-name-owner',
             () => {
                 if (!this._mprisProxy.g_name_owner)
-                    this._close();
+                    this.close();
             }, this);
         // It is possible for the bus to disappear before the previous signal
         // is connected, so we must ensure that the bus still exists at this
         // point.
         if (!this._mprisProxy.g_name_owner)
-            this._close();
+            this.close();
     }
 
     _onPlayerProxyReady() {
