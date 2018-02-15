@@ -49,6 +49,9 @@ class MediaMessage extends MessageList.Message {
     }
 
     vfunc_clicked() {
+        if (Main.sessionMode.isLocked)
+            return;
+
         this._player.raise();
         Main.panel.closeCalendar();
     }
