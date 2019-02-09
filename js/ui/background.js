@@ -715,6 +715,7 @@ export class BackgroundManager extends Signals.EventEmitter {
         this._controlPosition = params.controlPosition;
         this._useContentSize = params.useContentSize;
 
+        this.isLoaded = false;
         this.backgroundActor = this._createBackgroundActor();
         this._newBackgroundActor = null;
     }
@@ -844,6 +845,21 @@ export class BackgroundManager extends Signals.EventEmitter {
             if (backgroundActor.loadedSignalId)
                 background.disconnect(backgroundActor.loadedSignalId);
         });
+
+        if (!this.backgroundActor) {
+            if (background.isLoaded) {
+                this.isLoaded = true;
+            } else {
+                let id = background.connect('loaded', () => {
+                    if (background) {
+                        background.disconnect(id);
+
+                        this.isLoaded = true;
+                        this.emit('changed');
+                    }
+                });
+            }
+        }
 
         return backgroundActor;
     }
