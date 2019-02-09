@@ -51,6 +51,8 @@ const N_QUICK_SETTINGS_COLUMNS = 2;
 
 const INACTIVE_WORKSPACE_DOT_SCALE = 0.75;
 
+var BACKGROUND_CHECK_AREA_WIDTH = 300;
+
 /**
  * AppMenuButton:
  *
@@ -700,9 +702,46 @@ class Panel extends St.Widget {
 
         Main.overview.connect('showing', () => {
             this.add_style_pseudo_class('overview');
+            this._updateWindowNearState();
         });
         Main.overview.connect('hiding', () => {
             this.remove_style_pseudo_class('overview');
+            this._updateWindowNearState();
+        });
+
+        if (Main.screenShield) {
+            Main.screenShield.connect('shield-visible', () => {
+                this._addStyleClassName('screen-shield');
+                if (Main.layoutManager.primaryMonitor) {
+                    let bgManager = Main.screenShield.getBgManagerForMonitor(Main.layoutManager.primaryMonitor);
+                    this._onBackgroundChanged(bgManager);
+                }
+            });
+            Main.screenShield.connect('shield-hidden', () => {
+                this._removeStyleClassName('screen-shield');
+                if (Main.layoutManager.primaryMonitor) {
+                    let bgManager = Main.layoutManager._bgManagers[Main.layoutManager.primaryIndex];
+                    this._onBackgroundChanged(bgManager);
+                }
+            });
+        }
+
+        Main.layoutManager.connect('monitors-changed', () => {
+            if (Main.layoutManager.primaryMonitor) {
+                let bgManager = Main.layoutManager._bgManagers[Main.layoutManager.primaryIndex];
+                bgManager.connect('changed', () => this._onBackgroundChanged(bgManager));
+                if (bgManager.isLoaded)
+                    this._onBackgroundChanged(bgManager);
+            }
+        });
+
+        Main.layoutManager.connect('startup-complete', () => {
+            if (Main.layoutManager.primaryMonitor) {
+                let bgManager = Main.layoutManager._bgManagers[Main.layoutManager.primaryIndex];
+                bgManager.connect('changed', () => this._onBackgroundChanged(bgManager));
+                if (bgManager.isLoaded)
+                    this._onBackgroundChanged(bgManager);
+            }
         });
 
         Main.layoutManager.panelBox.add(this);
@@ -712,8 +751,43 @@ class Panel extends St.Widget {
 
         Main.sessionMode.connect('updated', this._updatePanel.bind(this));
 
+        this._trackedWindows = new Map();
+        global.display.connect('window-created', this._onWindowAdded.bind(this));
+        global.window_manager.connect('switch-workspace', this._updateWindowNearState.bind(this));
+
         global.display.connect('workareas-changed', () => this.queue_relayout());
         this._updatePanel();
+    }
+
+    _onWindowAdded(metaDisplay, metaWindow) {
+        let signalIds = [];
+        let metaWindowActor = metaWindow.get_compositor_private();
+
+        // Workaround for https://gitlab.gnome.org/GNOME/mutter/issues/156
+        if (!metaWindowActor) {
+            let id = Mainloop.idle_add(() => {
+                if (metaWindow.get_compositor_private())
+                    this._onWindowAdded(metaDisplay, metaWindow);
+                return GLib.SOURCE_REMOVE;
+            });
+            GLib.Source.set_name_by_id(id, '[gnome-shell] this._onWindowAdded');
+            return;
+        }
+
+        ['notify::allocation', 'notify::visible'].forEach(s => {
+            signalIds.push(metaWindowActor.connect(s, this._updateWindowNearState.bind(this)));
+        });
+        this._trackedWindows.set(metaWindowActor, signalIds);
+
+        metaWindowActor.connect('destroy', this._onWindowRemoved.bind(this));
+    }
+
+    _onWindowRemoved(metaWindowActor) {
+        this._trackedWindows.get(metaWindowActor).forEach(id => {
+            metaWindowActor.disconnect(id);
+        });
+        this._trackedWindows.delete(metaWindowActor);
+        this._updateWindowNearState();
     }
 
     vfunc_get_preferred_width(_forHeight) {
@@ -897,12 +971,108 @@ class Panel extends St.Widget {
         else
             Main.messageTray.bannerAlignment = Clutter.ActorAlign.CENTER;
 
+        this._updateWindowNearState();
+
         if (this._sessionStyle)
             this.remove_style_class_name(this._sessionStyle);
 
         this._sessionStyle = Main.sessionMode.panelStyle;
         if (this._sessionStyle)
             this.add_style_class_name(this._sessionStyle);
+    }
+
+    _updateWindowNearState() {
+        // We don't want to do any style changes to the panel while we're showing the overview.
+        // Windows opened from the overview might be placed near the panel, but the style should
+        // only be updated later.
+        if (this.has_style_pseudo_class('overview'))
+            return;
+
+        // Get all the windows in the active workspace that are in the primary monitor and visible
+        let workspaceManager = global.workspace_manager;
+        let activeWorkspace = workspaceManager.get_active_workspace();
+        let windows = activeWorkspace.list_windows().filter(metaWindow => {
+            return metaWindow.is_on_primary_monitor() &&
+                   metaWindow.showing_on_its_workspace() &&
+                   metaWindow.get_window_type() != Meta.WindowType.DESKTOP;
+        });
+
+        // Check if at least one window is near enough to the panel
+        let [, panelTop] = this.get_transformed_position();
+        let panelBottom = panelTop + this.get_height();
+        let scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+
+        let windowNearPanel = windows.some(metaWindow => {
+            let verticalPosition = metaWindow.get_frame_rect().y;
+            return verticalPosition < panelBottom + 5 * scale;
+        });
+
+        if (windowNearPanel)
+            this._addStyleClassName('window-near');
+        else
+            this._removeStyleClassName('window-near');
+    }
+
+    _onBackgroundChanged(bgManager) {
+        let allStyleClassNames = ['background-noisy', 'background-dark', 'background-bright'];
+
+        // Reset the size cache since the panel relayout might not have
+        // happened yet after a monitor change.
+        this.queue_relayout();
+
+        const transformedAllocation = this.get_transformed_allocation();
+
+        // We use a slightly bigger height to make sure the algorithm
+        // can factor in sudden color changes right beneath the panel.
+        let height = parseInt(this.get_height() * 1.2);
+
+        let [success, bgIsNoisy, bgIsDark, bgIsBright, meanLuminance] =
+            bgManager.getCharacteristicsForArea(transformedAllocation.x1, transformedAllocation.y1, transformedAllocation.get_width(), transformedAllocation.get_height(), true);
+
+        let styleClassNames = [];
+        if (success) {
+            const centerBoxTransformedAllocation =
+                this._centerBox.get_transformed_allocation();
+            const rightBoxTransformedAllocation =
+                this._rightBox.get_transformed_allocation();
+
+            // Additionally, check the areas where widgets are most likely to be in, we
+            // want to have a stricter check for noisy wallpapers in these areas.
+            // Also make sure that if one area should have the opposite text color of the
+            // color we decided to use, we always call the image noisy.
+            let additionalCheckAreas =
+                [{ start: transformedAllocation.x1, width: BACKGROUND_CHECK_AREA_WIDTH },
+                 { start: centerBoxTransformedAllocation.x1,
+                   width: centerBoxTransformedAllocation.get_width() },
+                 { start: rightBoxTransformedAllocation.x1,
+                   width: rightBoxTransformedAllocation.get_width() }];
+
+            for (let point of additionalCheckAreas) {
+                let [boxSuccess, boxBgIsNoisy, boxBgIsDark, boxBgIsBright, boxMeanLuminance] =
+                    bgManager.getCharacteristicsForArea(point.start, transformedAllocation.y1, point.width, transformedAllocation.get_height(), true);
+
+                if (boxSuccess)
+                    bgIsNoisy |= boxBgIsNoisy ||
+                                 (bgIsBright != boxBgIsBright && Math.abs(meanLuminance - boxMeanLuminance) > 15);
+            }
+
+            if (bgIsNoisy)
+                styleClassNames.push('background-noisy');
+            if (bgIsDark)
+                styleClassNames.push('background-dark');
+            if (bgIsBright)
+                styleClassNames.push('background-bright');
+        } else {
+            // Always assume the background is noisy if the color check failed
+            styleClassNames.push('background-noisy');
+        }
+
+        allStyleClassNames.forEach(name => {
+            if (styleClassNames.includes(name))
+                this._addStyleClassName(name);
+            else
+                this._removeStyleClassName(name);
+        });
     }
 
     _hideIndicators() {
