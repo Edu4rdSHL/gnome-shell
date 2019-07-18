@@ -354,6 +354,39 @@ switcheroo_vanished_cb (GDBusConnection *connection,
 }
 
 static void
+shell_global_profiler_init (ShellGlobal *global)
+{
+  GjsProfiler *profiler;
+  const char *enabled;
+  const char *fd_str;
+  int fd = -1;
+
+  /* Sysprof uses the "GJS_TRACE_FD=N" environment variable to connect GJS
+   * profiler data to the combined Sysprof capture. Since we are in control of
+   * the GjsContext, we need to proxy this FD across to the GJS profiler.
+   */
+
+  fd_str = g_getenv ("GJS_TRACE_FD");
+  enabled = g_getenv ("GJS_ENABLE_PROFILER");
+  if (fd_str == NULL || enabled == NULL)
+    return;
+
+  profiler = gjs_context_get_profiler (global->js_context);
+  g_return_if_fail (profiler);
+
+  if (fd_str)
+    {
+      fd = atoi (fd_str);
+
+      if (fd > 2)
+        {
+          gjs_profiler_set_fd (profiler, fd);
+          gjs_profiler_start (profiler);
+        }
+    }
+}
+
+static void
 shell_global_init (ShellGlobal *global)
 {
   const char *datadir = g_getenv ("GNOME_SHELL_DATADIR");
@@ -455,6 +488,8 @@ shell_global_init (ShellGlobal *global)
                     switcheroo_vanished_cb,
                     global,
                     NULL);
+
+  shell_global_profiler_init (global);
 }
 
 static void
