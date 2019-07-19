@@ -514,8 +514,7 @@ main (int argc, char **argv)
   meta_context_destroy (g_steal_pointer (&context));
 
   g_debug ("Doing final cleanup");
-  _shell_global_destroy_gjs_context (shell_global_get ());
-  g_object_unref (shell_global_get ());
+  _shell_global_destroy (shell_global_get ());
 
   return ecode;
 }
