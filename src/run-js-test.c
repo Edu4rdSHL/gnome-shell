@@ -69,8 +69,7 @@ main(int argc, char **argv)
 
   setlocale (LC_ALL, "");
 
-  _shell_global_init (NULL);
-  global = shell_global_get ();
+  global = _shell_global_set (g_object_new (SHELL_TYPE_GLOBAL, NULL));
   js_context = _shell_global_get_gjs_context (global);
 
   /* prepare command line arguments */
