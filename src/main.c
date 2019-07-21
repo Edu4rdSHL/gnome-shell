@@ -327,8 +327,7 @@ list_modes (const char  *option_name,
   g_log_set_default_handler (shut_up, NULL);
   gtk_init_check (NULL, NULL);
 
-  _shell_global_init (NULL);
-  global = shell_global_get ();
+  global = _shell_global_new (NULL);
   context = _shell_global_get_gjs_context (global);
 
   shell_introspection_init ();
@@ -386,6 +385,7 @@ main (int argc, char **argv)
 {
   GOptionContext *ctx;
   GError *error = NULL;
+  ShellGlobal *global;
   int ecode;
 
   bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
@@ -432,7 +432,7 @@ main (int argc, char **argv)
   if (session_mode == NULL)
     session_mode = is_gdm_mode ? (char *)"gdm" : (char *)"user";
 
-  _shell_global_init ("session-mode", session_mode, NULL);
+  global = _shell_global_new ("session-mode", session_mode, NULL);
 
   dump_gjs_stack_on_signal (SIGABRT);
   dump_gjs_stack_on_signal (SIGFPE);
@@ -447,7 +447,7 @@ main (int argc, char **argv)
 
   ecode = meta_run ();
   g_debug ("Doing final cleanup");
-  _shell_global_destroy (shell_global_get ());
+  _shell_global_destroy (global);
 
   return ecode;
 }
