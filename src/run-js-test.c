@@ -46,10 +46,10 @@ static GOptionEntry entries[] = {
 int
 main(int argc, char **argv)
 {
+  g_autoptr (ShellGlobalSingleton) global = NULL;
   g_autoptr (GError) error = NULL;
   g_autofree char *script  = NULL;
   g_autofree char *title  = NULL;
-  ShellGlobal *global;
   GOptionContext *context;
   GjsContext *js_context;
   const char *filename;
@@ -69,7 +69,7 @@ main(int argc, char **argv)
 
   setlocale (LC_ALL, "");
 
-  global = _shell_global_new (NULL);
+  global = _shell_create_global_singleton (NULL);
   js_context = _shell_global_get_gjs_context (global);
 
   /* prepare command line arguments */
@@ -77,7 +77,6 @@ main(int argc, char **argv)
                                         argc - 2, (const char**)argv + 2,
                                         &error)) {
     g_printerr ("Failed to defined ARGV: %s", error->message);
-    _shell_global_destroy (global);
     return 1;
   }
 
@@ -92,7 +91,6 @@ main(int argc, char **argv)
   } else /*if (argc >= 2)*/ {
     if (!g_file_get_contents (argv[1], &script, &len, &error)) {
       g_printerr ("%s\n", error->message);
-      _shell_global_destroy (global);
       return 1;
     }
     filename = argv[1];
@@ -110,8 +108,6 @@ main(int argc, char **argv)
 
   gjs_context_gc (js_context);
   gjs_context_gc (js_context);
-
-  _shell_global_destroy (global);
 
   return code;
 }

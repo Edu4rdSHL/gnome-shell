@@ -313,7 +313,7 @@ list_modes (const char  *option_name,
             gpointer     data,
             GError     **error)
 {
-  ShellGlobal *global;
+  ShellGlobalSingleton *global;
   GjsContext *context;
   const char *script;
   int status;
@@ -327,7 +327,7 @@ list_modes (const char  *option_name,
   g_log_set_default_handler (shut_up, NULL);
   gtk_init_check (NULL, NULL);
 
-  global = _shell_global_new (NULL);
+  global = _shell_create_global_singleton (NULL);
   context = _shell_global_get_gjs_context (global);
 
   shell_introspection_init ();
@@ -383,9 +383,9 @@ GOptionEntry gnome_shell_options[] = {
 int
 main (int argc, char **argv)
 {
+  g_autoptr (ShellGlobalSingleton) global = NULL;
   GOptionContext *ctx;
   GError *error = NULL;
-  ShellGlobal *global;
   int ecode;
 
   bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
@@ -432,7 +432,7 @@ main (int argc, char **argv)
   if (session_mode == NULL)
     session_mode = is_gdm_mode ? (char *)"gdm" : (char *)"user";
 
-  global = _shell_global_new ("session-mode", session_mode, NULL);
+  global = _shell_create_global_singleton ("session-mode", session_mode, NULL);
 
   dump_gjs_stack_on_signal (SIGABRT);
   dump_gjs_stack_on_signal (SIGFPE);
@@ -447,7 +447,6 @@ main (int argc, char **argv)
 
   ecode = meta_run ();
   g_debug ("Doing final cleanup");
-  _shell_global_destroy (global);
 
   return ecode;
 }

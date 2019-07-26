@@ -691,9 +691,9 @@ shell_global_class_init (ShellGlobalClass *klass)
  *
  * Return value: (transfer none): the singleton #ShellGlobal object
  */
-ShellGlobal *
-_shell_global_new (const char *first_property_name,
-                   ...)
+ShellGlobalSingleton *
+_shell_create_global_singleton (const char *first_property_name,
+                                ...)
 {
   va_list argument_list;
 
@@ -705,7 +705,7 @@ _shell_global_new (const char *first_property_name,
                                                   argument_list));
   va_end (argument_list);
 
-  return the_object;
+  return (ShellGlobalSingleton *) the_object;
 }
 
 /**
