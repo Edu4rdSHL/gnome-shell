@@ -386,7 +386,6 @@ main (int argc, char **argv)
   g_autoptr (ShellGlobalSingleton) global = NULL;
   g_autoptr (GOptionContext) ctx = NULL;
   g_autoptr (GError) error = NULL;
-  int ecode;
 
   bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
@@ -443,8 +442,11 @@ main (int argc, char **argv)
       dump_gjs_stack_on_signal (SIGSEGV);
     }
 
-  ecode = meta_run ();
+  meta_start ();
+  meta_run_main_loop ();
+  shell_global_emit_closing (global);
+  meta_finalize ();
   g_debug ("Doing final cleanup");
 
-  return ecode;
+  return meta_get_exit_code ();
 }

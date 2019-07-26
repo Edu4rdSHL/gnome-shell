@@ -120,6 +120,7 @@ enum
 {
  NOTIFY_ERROR,
  LOCATE_POINTER,
+ CLOSING,
  LAST_SIGNAL
 };
 
@@ -473,6 +474,12 @@ shell_global_init (ShellGlobal *global)
   shell_global_profiler_init (global);
 }
 
+void
+shell_global_emit_closing (ShellGlobal *global)
+{
+  g_signal_emit (the_object, shell_global_signals[CLOSING], 0);
+}
+
 static void
 destroy_gjs_context (GjsContext *context)
 {
@@ -534,6 +541,13 @@ shell_global_class_init (ShellGlobalClass *klass)
                     G_TYPE_STRING);
   shell_global_signals[LOCATE_POINTER] =
       g_signal_new ("locate-pointer",
+                    G_TYPE_FROM_CLASS (klass),
+                    G_SIGNAL_RUN_LAST,
+                    0,
+                    NULL, NULL, NULL,
+                    G_TYPE_NONE, 0);
+  shell_global_signals[CLOSING] =
+      g_signal_new ("closing",
                     G_TYPE_FROM_CLASS (klass),
                     G_SIGNAL_RUN_LAST,
                     0,
