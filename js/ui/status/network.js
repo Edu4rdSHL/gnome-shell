@@ -1640,6 +1640,8 @@ class Indicator extends PanelMenu.SystemIndicator {
     _init() {
         super._init();
 
+        this._cancellable = new Gio.Cancellable();
+
         this._primaryIndicator = this._addIndicator();
         this._vpnIndicator = this._addIndicator();
 
@@ -1677,7 +1679,13 @@ class Indicator extends PanelMenu.SystemIndicator {
     }
 
     async _getClient() {
-        this._client = await NM.Client.new_async(null);
+        try {
+            this._client = await NM.Client.new_async(this._cancellable);
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
+            return;
+        }
 
         this._activeConnections = [];
         this._connections = [];
@@ -2039,10 +2047,14 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._closeConnectivityCheck(path);
         } else if (result == PortalHelperResult.RECHECK) {
             try {
-                const state = await this._client.check_connectivity_async(null);
+                const state = await this._client.check_connectivity_async(
+                    this._cancellable);
                 if (state >= NM.ConnectivityState.FULL)
                     this._closeConnectivityCheck(path);
-            } catch (e) { }
+            } catch (e) {
+                if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                    log('Failed to check connectivity status: %s'.format(e.toString()));
+            }
         } else {
             log('Invalid result from portal helper: %s'.format(result));
         }
@@ -2076,7 +2088,6 @@ class Indicator extends PanelMenu.SystemIndicator {
         if (this._portalHelperProxy) {
             this._portalHelperProxy.AuthenticateRemote(path, '', timestamp);
         } else {
-            this._cancellable = new Gio.Cancellable();
             new PortalHelperProxy(Gio.DBus.session, 'org.gnome.Shell.PortalHelper',
                                   '/org/gnome/Shell/PortalHelper', (proxy, error) => {
                                       if (error) {
