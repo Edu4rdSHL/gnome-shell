@@ -1126,6 +1126,62 @@ var Keypad = GObject.registerClass({
     }
 });
 
+var Numberpad = GObject.registerClass({
+    Signals: {
+        'keyval': { param_types: [GObject.TYPE_UINT] },
+    },
+}, class Numberpad extends AspectContainer {
+    _init() {
+        let keys = [
+            { label: '1', keyval: Clutter.KEY_1, left: 0, top: 0 },
+            { label: '2', keyval: Clutter.KEY_2, left: 1, top: 0 },
+            { label: '3', keyval: Clutter.KEY_3, left: 2, top: 0 },
+            { label: '4', keyval: Clutter.KEY_4, left: 0, top: 1 },
+            { label: '5', keyval: Clutter.KEY_5, left: 1, top: 1 },
+            { label: '6', keyval: Clutter.KEY_6, left: 2, top: 1 },
+            { label: '7', keyval: Clutter.KEY_7, left: 0, top: 2 },
+            { label: '8', keyval: Clutter.KEY_8, left: 1, top: 2 },
+            { label: '9', keyval: Clutter.KEY_9, left: 2, top: 2 },
+            { label: '-', keyval: Clutter.KEY_minus, left: 0, top: 3 },
+            { label: '0', keyval: Clutter.KEY_0, left: 1, top: 3 },
+            { label: '+', keyval: Clutter.KEY_plus, left: 2, top: 3 },
+            { keyval: Clutter.KEY_BackSpace, icon: 'edit-clear-symbolic', left: 3, top: 0 },
+            { label: ',', keyval: Clutter.KEY_comma, left: 3, top: 1 },
+            { label: '.', keyval: 46, left: 3, top: 2 },
+            { keyval: Clutter.KEY_Return, extraClassName: 'enter-key', icon: 'keyboard-enter-symbolic', left: 3, top: 3 },
+        ];
+
+        super._init({
+            layout_manager: new Clutter.BinLayout(),
+            x_expand: true,
+            y_expand: true,
+        });
+
+        let gridLayout = new Clutter.GridLayout({ orientation: Clutter.Orientation.HORIZONTAL,
+                                                  column_homogeneous: true,
+                                                  row_homogeneous: true });
+        this._box = new St.Widget({ layout_manager: gridLayout, x_expand: true, y_expand: true });
+        this.add_child(this._box);
+
+        for (let i = 0; i < keys.length; i++) {
+            let cur = keys[i];
+            let key = new Key(cur.label || "", [], cur.icon);
+
+            if (keys[i].extraClassName)
+                key.keyButton.add_style_class_name(cur.extraClassName);
+
+            let w, h;
+            w = cur.width || 1;
+            h = cur.height || 1;
+            gridLayout.attach(key, cur.left, cur.top, w, h);
+
+            key.connect('released', () => {
+                this.emit('keyval', cur.keyval);
+            });
+        }
+    }
+});
+
 var KeyboardManager = class KeyBoardManager {
     constructor() {
         this._keyboard = null;
@@ -1338,6 +1394,15 @@ class Keyboard extends St.BoxLayout {
         this._keypad.hide();
         this._keypadVisible = false;
 
+        this._numberpad = new Numberpad();
+        this._connectSignal(this._numberpad, 'keyval', (_numberpad, keyval) => {
+            this._keyboardController.keyvalPress(keyval);
+            this._keyboardController.keyvalRelease(keyval);
+        });
+        this._aspectContainer.add_child(this._numberpad);
+        this._numberpad.hide();
+        this._numberpadVisible = false;
+
         this._ensureKeysForGroup(this._keyboardController.getCurrentGroup());
         this._setActiveLayer(0);
 
@@ -1354,6 +1419,8 @@ class Keyboard extends St.BoxLayout {
             this._onKeyboardStateChanged.bind(this));
         this._connectSignal(this._keyboardController, 'keypad-visible',
             this._onKeypadVisible.bind(this));
+        this._connectSignal(this._keyboardController, 'numberpad-visible',
+            this._onNumberpadVisible.bind(this));
         this._connectSignal(global.stage, 'notify::key-focus',
             this._onKeyFocusChanged.bind(this));
 
@@ -1539,7 +1606,7 @@ class Keyboard extends St.BoxLayout {
 
     _updateCurrentPageVisible() {
         if (this._currentPage)
-            this._currentPage.visible = !this._emojiActive && !this._keypadVisible;
+            this._currentPage.visible = !this._emojiActive && !this._keypadVisible && !this._numberpadVisible;
     }
 
     _setEmojiActive(active) {
@@ -1638,7 +1705,7 @@ class Keyboard extends St.BoxLayout {
     }
 
     _onKeyboardGroupsChanged() {
-        let nonGroupActors = [this._emojiSelection, this._keypad];
+        let nonGroupActors = [this._emojiSelection, this._keypad, this._numberpad];
         this._aspectContainer.get_children().filter(c => !nonGroupActors.includes(c)).forEach(c => {
             c.destroy();
         });
@@ -1653,6 +1720,15 @@ class Keyboard extends St.BoxLayout {
 
         this._keypadVisible = visible;
         this._keypad.visible = this._keypadVisible;
+        this._updateCurrentPageVisible();
+    }
+
+    _onNumberpadVisible(controller, visible) {
+        if (visible == this._numberpadVisible)
+            return;
+
+        this._numberpadVisible = visible;
+        this._numberpad.visible = this._numberpadVisible;
         this._updateCurrentPageVisible();
     }
 
@@ -1912,6 +1988,7 @@ var KeyboardController = class {
         let purpose = method.content_purpose;
         let emojiVisible = false;
         let keypadVisible = false;
+        let numberpadVisible = false;
 
         if (purpose == Clutter.InputContentPurpose.NORMAL ||
             purpose == Clutter.InputContentPurpose.ALPHA ||
@@ -1919,12 +1996,14 @@ var KeyboardController = class {
             purpose == Clutter.InputContentPurpose.TERMINAL)
             emojiVisible = true;
         if (purpose == Clutter.InputContentPurpose.DIGITS ||
-            purpose == Clutter.InputContentPurpose.NUMBER ||
             purpose == Clutter.InputContentPurpose.PHONE)
             keypadVisible = true;
+        if (purpose == Clutter.InputContentPurpose.NUMBER)
+            numberpadVisible = true;
 
         this.emit('emoji-visible', emojiVisible);
         this.emit('keypad-visible', keypadVisible);
+        this.emit('numberpad-visible', numberpadVisible);
     }
 
     getGroups() {
