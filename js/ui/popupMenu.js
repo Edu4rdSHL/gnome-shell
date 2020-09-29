@@ -396,7 +396,6 @@ var PopupSwitchMenuItem = GObject.registerClass({
     activate(event) {
         if (this._switch.mapped)
             this.toggle();
-             
         // The accessibility menu inherits its behaviour from popupMenu, and
         // needs to behave similarly to other popup menus in the top bar.
         // An example is the toggle switch/button in the Notifications
@@ -408,9 +407,7 @@ var PopupSwitchMenuItem = GObject.registerClass({
         // events, improving human-computer interaction slightly.
         if (event.type() == Clutter.EventType.KEY_PRESS &&
             event.get_key_symbol() == Clutter.KEY_Return)
-        super.activate(event);
-
-        return;
+            super.activate(event);
     }
 
     toggle() {
