@@ -396,14 +396,21 @@ var PopupSwitchMenuItem = GObject.registerClass({
     activate(event) {
         if (this._switch.mapped)
             this.toggle();
-
-        // we allow pressing space to toggle the switch
-        // without closing the menu
+             
+        // The accessibility menu inherits its behaviour from popupMenu, and
+        // needs to behave similarly to other popup menus in the top bar.
+        // An example is the toggle switch/button in the Notifications
+        // (Calendar) popup menu, which can be interacted with through click-
+        // events or key-presses. We want the menu to remain open if we press
+        // the space key, which still occurs with this commit, but to close if
+        // the toggle is issued with the return key. This ensures the menu does
+        // not close if a toggle switch is activated or deactivated with click-
+        // events and improves mechanical accessibility.
         if (event.type() == Clutter.EventType.KEY_PRESS &&
-            event.get_key_symbol() == Clutter.KEY_space)
-            return;
-
+            event.get_key_symbol() == Clutter.KEY_Return)
         super.activate(event);
+
+        return;
     }
 
     toggle() {
