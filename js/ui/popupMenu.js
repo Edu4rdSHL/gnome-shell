@@ -405,9 +405,11 @@ var PopupSwitchMenuItem = GObject.registerClass({
         // the toggle is issued with the return key. This ensures the menu does
         // not close if a toggle switch is activated or deactivated with click-
         // events.
-        if (event.type() == Clutter.EventType.KEY_PRESS &&
-            event.get_key_symbol() == Clutter.KEY_Return)
-            super.activate(event);
+        if (event.type() !== Clutter.EventType.KEY_PRESS ||
+            event.get_key_symbol() === Clutter.KEY_Space)
+            return;
+
+        super.activate(event);
     }
 
     toggle() {
