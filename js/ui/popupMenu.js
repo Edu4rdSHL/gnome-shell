@@ -405,7 +405,7 @@ var PopupSwitchMenuItem = GObject.registerClass({
         // the space key, which still occurs with this commit, but to close if
         // the toggle is issued with the return key. This ensures the menu does
         // not close if a toggle switch is activated or deactivated with click-
-        // events and improves mechanical accessibility.
+        // events, improving human-computer interaction slightly.
         if (event.type() == Clutter.EventType.KEY_PRESS &&
             event.get_key_symbol() == Clutter.KEY_Return)
         super.activate(event);
