@@ -1151,6 +1151,7 @@ class AppDisplay extends BaseAppView {
 
             // Don't try to display empty folders
             if (!icon.visible) {
+                this._removeItem(icon);
                 icon.destroy();
                 return;
             }
