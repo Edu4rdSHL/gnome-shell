@@ -778,7 +778,7 @@ var IconGridLayout = GObject.registerClass({
 
     vfunc_allocate() {
         if (this._pageWidth === 0 || this._pageHeight === 0)
-            throw new Error('IconGridLayout.adaptToSize wasn\'t called before allocation');
+            throw new Error("IconGridLayout.adaptToSize wasn't called before allocation");
 
         this._updatePages();
 

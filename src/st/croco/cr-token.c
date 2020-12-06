@@ -148,7 +148,7 @@ cr_token_new (void)
 }
 
 /**
- *Sets the type of curren instance of
+ *Sets the type of current instance of
  *#CRToken to 'S_TK' (S in the css2 spec)
  *@param a_this the current instance of #CRToken.
  *@return CR_OK upon successful completion, an error

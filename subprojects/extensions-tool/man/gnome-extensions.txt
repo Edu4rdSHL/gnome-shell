@@ -148,7 +148,7 @@ If the extension includes one or more GSettings schemas, they can
 either be placed in a schemas/ folder to be picked up automatically,
 or be specified with *--schema*.
 +
-Similarily, translations are included automatically when they are
+Similarly, translations are included automatically when they are
 located in a po/ folder, otherwise the *--podir* option can be
 used to point to the correct directory. If no gettext domain is
 provided on the command line, the value of the *gettext-domain*

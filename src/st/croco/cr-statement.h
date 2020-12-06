@@ -215,7 +215,7 @@ struct _CRStatement
         CRParsingLocation location ;
 
         /**
-         *a custom pointer useable by
+         *a custom pointer usable by
          *applications that use libcroco.
          *libcroco itself will never modify
          *this pointer.

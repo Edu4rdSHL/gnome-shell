@@ -5,7 +5,7 @@ Shew is a small support library for dealing with external windows.
 The code for creating external windows from a handle that are suitable for
 setting a transient parent was copied from [xdg-desktop-portal-gtk].
 
-The code for exporting a handle for a GtkWindow is losely based on code
+The code for exporting a handle for a GtkWindow is loosely based on code
 from GTK/[libportal].
 
 ## Stability

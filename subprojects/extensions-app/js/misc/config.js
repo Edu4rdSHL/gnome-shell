@@ -1,1 +1,1 @@
-/* Fake module to satify import in ExtensionUtils */
+/* Fake module to satisfy import in ExtensionUtils */
