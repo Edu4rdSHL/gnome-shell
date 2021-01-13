@@ -376,6 +376,7 @@ var AuthPrompt = GObject.registerClass({
 
     setQuestion(question) {
         this._entry.hint_text = question;
+        this._entry.set_accessible_name(question);
 
         this._entry.show();
         this._entry.grab_key_focus();
