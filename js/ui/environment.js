@@ -13,6 +13,7 @@ imports.gi.versions.TelepathyLogger = '0.2';
 
 const { Clutter, Gio, GLib, GObject, Meta, Polkit, Shell, St } = imports.gi;
 const Gettext = imports.gettext;
+const PromiseUtils = imports.misc.promiseUtils;
 const System = imports.system;
 
 Gio._promisify(Gio.DataInputStream.prototype, 'fill_async', 'fill_finish');
@@ -275,6 +276,20 @@ function init() {
     GObject.gtypeNameBasedOnJSPath = true;
 
     // Miscellaneous monkeypatching
+    const Signals = imports.signals;
+    const addSignalMethods = Signals.addSignalMethods;
+    Signals.addSignalMethods = proto => {
+        addSignalMethods(proto);
+
+        proto.connect_once = function (signal, cancellable) {
+            return new PromiseUtils.SignalConnectionPromise(this, signal, cancellable);
+        };
+    };
+
+    GObject.Object.prototype.connect_once = function (signal, cancellable) {
+        return new PromiseUtils.SignalConnectionPromise(this, signal, cancellable);
+    };
+
     _patchContainerClass(St.BoxLayout);
 
     _patchLayoutClass(Clutter.GridLayout, { row_spacing: 'spacing-rows',
