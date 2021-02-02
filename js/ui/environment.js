@@ -46,6 +46,8 @@ try {
 const { Clutter, Gio, GLib, GObject, Meta, Polkit, Shell, St } = imports.gi;
 const Gettext = imports.gettext;
 const System = imports.system;
+const PromiseUtils = imports.misc.promiseUtils;
+const Signals = imports.signals;
 const SignalTracker = imports.misc.signalTracker;
 
 Gio._promisify(Gio.DataInputStream.prototype, 'fill_async');
@@ -343,6 +345,19 @@ function init() {
     SignalTracker.registerDestroyableType(Clutter.Actor);
 
     // Miscellaneous monkeypatching
+    const addSignalMethods = Signals.addSignalMethods;
+    Signals.addSignalMethods = proto => {
+        addSignalMethods(proto);
+
+        proto.connect_once = function (signal, cancellable) {
+            return new PromiseUtils.SignalConnectionPromise(this, signal, cancellable);
+        };
+    };
+
+    GObject.Object.prototype.connect_once = function (signal, cancellable) {
+        return new PromiseUtils.SignalConnectionPromise(this, signal, cancellable);
+    };
+
     _patchContainerClass(St.BoxLayout);
 
     _patchLayoutClass(Clutter.GridLayout, {

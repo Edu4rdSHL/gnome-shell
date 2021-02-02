@@ -1,5 +1,5 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
-/* exported CancellablePromise */
+/* exported CancellablePromise, SignalConnectionPromise */
 
 const { Gio, GLib, GObject } = imports.gi;
 
@@ -111,5 +111,72 @@ var CancellablePromise = class extends Promise {
             Gio.IOErrorEnum.CANCELLED, 'Promise cancelled'));
 
         return this;
+    }
+};
+
+var SignalConnectionPromise = class extends CancellablePromise {
+    constructor(object, signal, cancellable) {
+        if (arguments.length === 1 && arguments[0] instanceof Function) {
+            super(object);
+            return;
+        }
+
+        if (!(object.connect instanceof Function))
+            throw new TypeError('Not a valid object');
+
+        if (object instanceof GObject.Object &&
+            !GObject.signal_lookup(signal.split(':')[0], object.constructor.$gtype))
+            throw new TypeError(`Signal ${signal} not found on object ${object}`);
+
+        let id;
+        let destroyId;
+        super(resolve => {
+            let connectSignal;
+            if (object instanceof GObject.Object)
+                connectSignal = (sig, cb) => GObject.signal_connect(object, sig, cb);
+            else
+                connectSignal = (sig, cb) => object.connect(sig, cb);
+
+            id = connectSignal(signal, (_obj, ...args) => {
+                if (!args.length)
+                    resolve();
+                else
+                    resolve(args.length === 1 ? args[0] : args);
+            });
+
+            if (signal !== 'destroy' &&
+                (!(object instanceof GObject.Object) ||
+                 GObject.signal_lookup('destroy', object.constructor.$gtype)))
+                destroyId = connectSignal('destroy', () => this.cancel());
+        }, cancellable);
+
+        this._object = object;
+        this._id = id;
+        this._destroyId = destroyId;
+    }
+
+    _cleanup() {
+        if (this._id) {
+            let disconnectSignal;
+
+            if (this._object instanceof GObject.Object)
+                disconnectSignal = id => GObject.signal_handler_disconnect(this._object, id);
+            else
+                disconnectSignal = id => this._object.disconnect(id);
+
+            disconnectSignal(this._id);
+            if (this._destroyId) {
+                disconnectSignal(this._destroyId);
+                this._destroyId = 0;
+            }
+            this._object = null;
+            this._id = 0;
+        }
+
+        super._cleanup();
+    }
+
+    get object() {
+        return this._chainRoot._object;
     }
 };
