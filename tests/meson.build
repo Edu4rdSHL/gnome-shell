@@ -16,6 +16,7 @@ tests = [
     'jsParse',
     'markup',
     'params',
+    'promiseUtils',
     'signalTracker',
     'url',
     'versionCompare',
