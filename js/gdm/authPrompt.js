@@ -524,12 +524,12 @@ var AuthPrompt = GObject.registerClass({
     }
 
     async begin(params) {
-        params = Params.parse(params, { userName: null });
+        params = Params.parse(params, { userName: null, cancellable: null });
 
         this.updateSensitivity(false);
 
         this.verificationStatus = AuthPromptStatus.VERIFYING;
-        await this._userVerifier.begin(params.userName);
+        await this._userVerifier.begin(params.userName, params.cancellable);
     }
 
     finish(onComplete) {

@@ -401,6 +401,7 @@ var LoginDialog = GObject.registerClass({
         this.connect('destroy', this._onDestroy.bind(this));
         parentActor.add_child(this);
 
+        this._cancellable = new Gio.Cancellable();
         this._userManager = AccountsService.UserManager.get_default();
         this._gdmClient = new Gdm.Client();
 
@@ -838,6 +839,9 @@ var LoginDialog = GObject.registerClass({
     }
 
     _onReset(authPrompt, beginRequest) {
+        if (this._cancellable)
+            this._cancellable.cancel();
+
         this._resetGreeterProxy();
         this._sessionMenuButton.updateSensitivity(true);
 
@@ -920,7 +924,9 @@ var LoginDialog = GObject.registerClass({
                 let answer = this._authPrompt.getAnswer();
                 this._user = this._userManager.get_user(answer);
                 this._authPrompt.clear();
-                this._authPrompt.begin({ userName: answer });
+                this._cancellable.cancel();
+                this._cancellable = new Gio.Cancellable();
+                this._authPrompt.begin({ userName: answer, cancellable: this._cancellable });
                 this._updateCancelButton();
             });
         this._updateCancelButton();
@@ -1130,12 +1136,12 @@ var LoginDialog = GObject.registerClass({
         this._userList.grab_key_focus();
     }
 
-    _beginVerificationForItem(item) {
+    _beginVerificationForItem(item, cancellable) {
         this._authPrompt.setUser(item.user);
 
         let userName = item.user.get_user_name();
 
-        return this._authPrompt.begin({ userName });
+        return this._authPrompt.begin({ userName, cancellable });
     }
 
     _onUserListActivated(activatedItem) {
@@ -1143,16 +1149,23 @@ var LoginDialog = GObject.registerClass({
 
         this._updateCancelButton();
 
+        this._cancellable.cancel();
+        this._cancellable = new Gio.Cancellable();
         Promise.all([
-            GdmUtil.cloneAndFadeOutActor(this._userSelectionBox),
-            this._beginVerificationForItem(activatedItem),
+            GdmUtil.cloneAndFadeOutActor(this._userSelectionBox, this._cancellable),
+            this._beginVerificationForItem(activatedItem, this._cancellable),
         ]).catch(e => {
-            logError(e, 'Failed loading user %s item'.format(
-                activatedItem.user.get_user_name()));
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
+                logError(e, 'Failed loading user %s item'.format(
+                    activatedItem.user.get_user_name()));
+            }
         });
     }
 
     _onDestroy() {
+        if (this._cancellable)
+            this._cancellable.cancel();
+
         if (this._timedLoginCancellable)
             this._timedLoginCancellable.cancel();
 

@@ -11,6 +11,7 @@ const Main = imports.ui.main;
 const { loadInterfaceXML } = imports.misc.fileUtils;
 const Params = imports.misc.params;
 const SmartcardManager = imports.misc.smartcardManager;
+const PromiseUtils = imports.misc.promiseUtils;
 
 const FprintManagerIface = loadInterfaceXML('net.reactivated.Fprint.Manager');
 const FprintManagerProxy = Gio.DBusProxy.makeProxyWrapper(FprintManagerIface);
@@ -58,7 +59,7 @@ const FingerprintReaderType = {
     SWIPE: 2,
 };
 
-async function cloneAndFadeOutActor(actor) {
+async function cloneAndFadeOutActor(actor, cancellable) {
     // Immediately hide actor so its sibling can have its space
     // and position, but leave a non-reactive clone on-screen,
     // so from the user's point of view it smoothly fades away
@@ -74,7 +75,7 @@ async function cloneAndFadeOutActor(actor) {
     clone.set_position(x, y);
 
     try {
-        await new Promise((resolve, reject) => {
+        await new PromiseUtils.CancellablePromise((resolve, reject) => {
             clone.ease({
                 opacity: 0,
                 duration: CLONE_FADE_ANIMATION_TIME,
@@ -82,7 +83,7 @@ async function cloneAndFadeOutActor(actor) {
                 onComplete: () => resolve(),
                 onStopped: () => reject(new Error('Animation stopped')),
             });
-        });
+        }, cancellable);
     } catch (e) {}
 
     clone.destroy();
@@ -150,8 +151,8 @@ var ShellUserVerifier = class {
         return this._settings.get_int(ALLOWED_FAILURES_KEY);
     }
 
-    async begin(userName) {
-        this._cancellable = new Gio.Cancellable();
+    async begin(userName, cancellable) {
+        this._cancellable = cancellable || new Gio.Cancellable();
         this._userName = userName;
         this.reauthenticating = false;
 
