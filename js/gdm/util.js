@@ -1,6 +1,6 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported BANNER_MESSAGE_KEY, BANNER_MESSAGE_TEXT_KEY, LOGO_KEY,
-            DISABLE_USER_LIST_KEY, fadeInActor, fadeOutActor, cloneAndFadeOutActor */
+            DISABLE_USER_LIST_KEY, cloneAndFadeOutActor */
 
 const { Clutter, Gdm, Gio, GLib } = imports.gi;
 const Signals = imports.signals;
@@ -30,7 +30,6 @@ Gio._promisify(Gdm.UserVerifierProxy.prototype,
 var PASSWORD_SERVICE_NAME = 'gdm-password';
 var FINGERPRINT_SERVICE_NAME = 'gdm-fingerprint';
 var SMARTCARD_SERVICE_NAME = 'gdm-smartcard';
-var FADE_ANIMATION_TIME = 160;
 var CLONE_FADE_ANIMATION_TIME = 250;
 
 var LOGIN_SCREEN_SCHEMA = 'org.gnome.login-screen';
@@ -59,52 +58,6 @@ const FingerprintReaderType = {
     PRESS: 1,
     SWIPE: 2,
 };
-
-function fadeInActor(actor) {
-    if (actor.opacity == 255 && actor.visible)
-        return null;
-
-    let hold = new Batch.Hold();
-    actor.show();
-    let [, naturalHeight] = actor.get_preferred_height(-1);
-
-    actor.opacity = 0;
-    actor.set_height(0);
-    actor.ease({
-        opacity: 255,
-        height: naturalHeight,
-        duration: FADE_ANIMATION_TIME,
-        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        onComplete: () => {
-            this.set_height(-1);
-            hold.release();
-        },
-    });
-
-    return hold;
-}
-
-function fadeOutActor(actor) {
-    if (!actor.visible || actor.opacity == 0) {
-        actor.opacity = 0;
-        actor.hide();
-        return null;
-    }
-
-    let hold = new Batch.Hold();
-    actor.ease({
-        opacity: 0,
-        height: 0,
-        duration: FADE_ANIMATION_TIME,
-        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        onComplete: () => {
-            this.hide();
-            this.set_height(-1);
-            hold.release();
-        },
-    });
-    return hold;
-}
 
 function cloneAndFadeOutActor(actor) {
     // Immediately hide actor so its sibling can have its space
