@@ -452,7 +452,6 @@ var ShellUserVerifier = class {
                 return;
             if (!this.serviceIsForeground(serviceName)) {
                 logError(e, 'Failed to start %s for %s'.format(serviceName, this._userName));
-                this._hold.release();
                 return;
             }
             this._reportInitError(this._userName
@@ -542,7 +541,6 @@ var ShellUserVerifier = class {
     }
 
     _retry(serviceName) {
-        this._hold = new Batch.Hold();
         this._connectSignals();
         this._startService(serviceName);
     }

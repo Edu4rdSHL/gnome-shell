@@ -21,7 +21,6 @@ const { AccountsService, Atk, Clutter, Gdm, Gio,
         GLib, GObject, Meta, Pango, Shell, St } = imports.gi;
 
 const AuthPrompt = imports.gdm.authPrompt;
-const Batch = imports.gdm.batch;
 const BoxPointer = imports.ui.boxpointer;
 const CtrlAltTab = imports.ui.ctrlAltTab;
 const GdmUtil = imports.gdm.util;
@@ -29,6 +28,7 @@ const Layout = imports.ui.layout;
 const LoginManager = imports.misc.loginManager;
 const Main = imports.ui.main;
 const PopupMenu = imports.ui.popupMenu;
+const PromiseUtils = imports.misc.promiseUtils;
 const Realmd = imports.gdm.realmd;
 const UserWidget = imports.ui.userWidget;
 
@@ -113,40 +113,26 @@ var UserListItem = GObject.registerClass({
         }
     }
 
-    showTimedLoginIndicator(time) {
-        let hold = new Batch.Hold();
-
+    async showTimedLoginIndicator(animationTime, cancellable) {
         this.hideTimedLoginIndicator();
 
-        this._timedLoginIndicator.visible = true;
-
-        let startTime = GLib.get_monotonic_time();
-
-        this._timedLoginTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 33,
-            () => {
-                let currentTime = GLib.get_monotonic_time();
-                let elapsedTime = (currentTime - startTime) / GLib.USEC_PER_SEC;
-                this._timedLoginIndicator.scale_x = elapsedTime / time;
-                if (elapsedTime >= time) {
-                    this._timedLoginTimeoutId = 0;
-                    hold.release();
-                    return GLib.SOURCE_REMOVE;
-                }
-
-                return GLib.SOURCE_CONTINUE;
-            });
-
-        GLib.Source.set_name_by_id(this._timedLoginTimeoutId, '[gnome-shell] this._timedLoginTimeoutId');
-
-        return hold;
+        try {
+            await new PromiseUtils.CancellablePromise(resolve => {
+                this._timedLoginIndicator.visible = true;
+                this._timedLoginIndicator.ease({
+                    scale_x: 1,
+                    duration: animationTime * 1000,
+                    onComplete: () => resolve(),
+                });
+            }, cancellable);
+        } catch (e) {
+            this.hideTimedLoginIndicator();
+            throw e;
+        }
     }
 
     hideTimedLoginIndicator() {
-        if (this._timedLoginTimeoutId) {
-            GLib.source_remove(this._timedLoginTimeoutId);
-            this._timedLoginTimeoutId = 0;
-        }
-
+        this._timedLoginIndicator.remove_all_transitions();
         this._timedLoginIndicator.visible = false;
         this._timedLoginIndicator.scale_x = 0.;
     }
@@ -996,114 +982,108 @@ var LoginDialog = GObject.registerClass({
         this._authPrompt.finish(() => this._startSession(serviceName));
     }
 
-    _waitForItemForUser(userName) {
+    async _waitForItemForUser(userName, cancellable) {
         let item = this._userList.getItemFromUserName(userName);
 
         if (item)
-            return null;
+            return item;
 
-        let hold = new Batch.Hold();
-        let signalId = this._userList.connect('item-added',
-            () => {
-                item = this._userList.getItemFromUserName(userName);
+        let signalId;
+        try {
+            item = await new PromiseUtils.CancellablePromise(resolve => {
+                signalId = this._userList.connect('item-added', () => {
+                    const userItem = this._userList.getItemFromUserName(userName);
 
-                if (item)
-                    hold.release();
-            });
+                    if (userItem) {
+                        this._userList.disconnect(signalId);
+                        signalId = 0;
+                        resolve(userItem);
+                    }
+                });
+            }, cancellable);
+        } catch (e) {
+            if (signalId)
+                this._userList.disconnect(signalId);
 
-        hold.connect('release', () => this._userList.disconnect(signalId));
+            throw e;
+        }
 
-        return hold;
+        return item;
     }
 
-    _blockTimedLoginUntilIdle() {
-        let hold = new Batch.Hold();
+    async _blockTimedLoginUntilIdle(delay, cancellable) {
+        let id;
 
-        this._timedLoginIdleTimeOutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, _TIMED_LOGIN_IDLE_THRESHOLD,
-            () => {
-                this._timedLoginIdleTimeOutId = 0;
-                hold.release();
-                return GLib.SOURCE_REMOVE;
-            });
-        GLib.Source.set_name_by_id(this._timedLoginIdleTimeOutId, '[gnome-shell] this._timedLoginIdleTimeOutId');
-        return hold;
+        // We skip this step if the timed login delay is very short.
+        if (delay <= _TIMED_LOGIN_IDLE_THRESHOLD)
+            return [delay, false];
+
+        try {
+            await new PromiseUtils.CancellablePromise(resolve => {
+                id = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT,
+                    _TIMED_LOGIN_IDLE_THRESHOLD, () => {
+                        id = 0;
+                        resolve();
+                        return GLib.SOURCE_REMOVE;
+                    });
+
+                GLib.Source.set_name_by_id(id, '[gnome-shell] blockTimedLoginUntilIdle');
+            }, cancellable);
+        } catch (e) {
+            if (id)
+                GLib.source_remove(id);
+            throw e;
+        }
+
+        return [delay - _TIMED_LOGIN_IDLE_THRESHOLD, true];
     }
 
-    _startTimedLogin(userName, delay) {
+    async _startTimedLogin(userName, delay) {
         let firstRun = true;
 
         // Cancel execution of old batch
-        if (this._timedLoginBatch) {
-            this._timedLoginBatch.cancel();
-            this._timedLoginBatch = null;
+        if (this._timedLoginCancellable) {
+            this._timedLoginCancellable.cancel();
             firstRun = false;
         }
 
-        // Reset previous idle-timeout
-        if (this._timedLoginIdleTimeOutId) {
-            GLib.source_remove(this._timedLoginIdleTimeOutId);
-            this._timedLoginIdleTimeOutId = 0;
+        this._timedLoginCancellable = new Gio.Cancellable();
+        try {
+            // Do a copy of the cancellable as it may be reset while on async calls
+            const cancellable =  this._timedLoginCancellable;
+
+            let loginItem = await this._waitForItemForUser(userName, cancellable);
+
+            // If we're just starting out, start on the right item.
+            if (!this._userManager.is_loaded)
+                this._userList.jumpToItem(loginItem);
+
+            // This blocks the timed login animation until a few
+            // seconds after the user stops interacting with the
+            // login screen.
+            let [animationTime, delayed] =
+                await this._blockTimedLoginUntilIdle(delay, cancellable);
+
+            // If idle timeout is done, make sure the timed login indicator is shown
+            if (delayed && this._authPrompt.visible)
+                this._authPrompt.cancel();
+
+            if (delayed || firstRun) {
+                this._userList.scrollToItem(loginItem);
+                loginItem.grab_key_focus();
+            }
+
+            await loginItem.showTimedLoginIndicator(animationTime, cancellable);
+
+            this._greeter.call_begin_auto_login_sync(userName, cancellable);
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e, 'Timed login failed');
         }
-
-        let loginItem = null;
-        let animationTime;
-
-        let tasks = [() => this._waitForItemForUser(userName),
-
-                     () => {
-                         loginItem = this._userList.getItemFromUserName(userName);
-
-                         // If there is an animation running on the item, reset it.
-                         loginItem.hideTimedLoginIndicator();
-                     },
-
-                     () => {
-                         // If we're just starting out, start on the right item.
-                         if (!this._userManager.is_loaded)
-                             this._userList.jumpToItem(loginItem);
-                     },
-
-                     () => {
-                         // This blocks the timed login animation until a few
-                         // seconds after the user stops interacting with the
-                         // login screen.
-
-                         // We skip this step if the timed login delay is very short.
-                         if (delay > _TIMED_LOGIN_IDLE_THRESHOLD) {
-                             animationTime = delay - _TIMED_LOGIN_IDLE_THRESHOLD;
-                             return this._blockTimedLoginUntilIdle();
-                         } else {
-                             animationTime = delay;
-                             return null;
-                         }
-                     },
-
-                     () => {
-                         // If idle timeout is done, make sure the timed login indicator is shown
-                         if (delay > _TIMED_LOGIN_IDLE_THRESHOLD &&
-                             this._authPrompt.visible)
-                             this._authPrompt.cancel();
-
-                         if (delay > _TIMED_LOGIN_IDLE_THRESHOLD || firstRun) {
-                             this._userList.scrollToItem(loginItem);
-                             loginItem.grab_key_focus();
-                         }
-                     },
-
-                     () => loginItem.showTimedLoginIndicator(animationTime),
-
-                     () => {
-                         this._timedLoginBatch = null;
-                         this._greeter.call_begin_auto_login_sync(userName, null);
-                     }];
-
-        this._timedLoginBatch = new Batch.ConsecutiveBatch(this, tasks);
-
-        return this._timedLoginBatch.run();
     }
 
     _onTimedLoginRequested(client, userName, seconds) {
-        if (this._timedLoginBatch)
+        if (this._timedLoginCancellable && !this._timedLoginCancellable.is_cancelled())
             return;
 
         this._startTimedLogin(userName, seconds);
@@ -1173,6 +1153,9 @@ var LoginDialog = GObject.registerClass({
     }
 
     _onDestroy() {
+        if (this._timedLoginCancellable)
+            this._timedLoginCancellable.cancel();
+
         if (this._userManagerLoadedId) {
             this._userManager.disconnect(this._userManagerLoadedId);
             this._userManagerLoadedId = 0;
