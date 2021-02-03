@@ -15,6 +15,7 @@ unit_tests = [
   'jsParse',
   'markup',
   'params',
+  'promiseUtils',
   'url',
   'versionCompare',
 ]
