@@ -4,7 +4,6 @@
 const { Clutter, GObject, Pango, Shell, St } = imports.gi;
 
 const Animation = imports.ui.animation;
-const Batch = imports.gdm.batch;
 const GdmUtil = imports.gdm.util;
 const OVirt = imports.gdm.oVirt;
 const Vmware = imports.gdm.vmware;
@@ -524,18 +523,13 @@ var AuthPrompt = GObject.registerClass({
         this._entry.clutter_text.insert_unichar(unichar);
     }
 
-    begin(params) {
-        params = Params.parse(params, { userName: null,
-                                        hold: null });
+    async begin(params) {
+        params = Params.parse(params, { userName: null });
 
         this.updateSensitivity(false);
 
-        let hold = params.hold;
-        if (!hold)
-            hold = new Batch.Hold();
-
-        this._userVerifier.begin(params.userName, hold);
         this.verificationStatus = AuthPromptStatus.VERIFYING;
+        await this._userVerifier.begin(params.userName);
     }
 
     finish(onComplete) {

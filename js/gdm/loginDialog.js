@@ -1154,10 +1154,8 @@ var LoginDialog = GObject.registerClass({
         this._authPrompt.setUser(item.user);
 
         let userName = item.user.get_user_name();
-        let hold = new Batch.Hold();
 
-        this._authPrompt.begin({ userName, hold });
-        return hold;
+        return this._authPrompt.begin({ userName });
     }
 
     _onUserListActivated(activatedItem) {
@@ -1165,9 +1163,13 @@ var LoginDialog = GObject.registerClass({
 
         this._updateCancelButton();
 
-        let batch = new Batch.ConcurrentBatch(this, [GdmUtil.cloneAndFadeOutActor(this._userSelectionBox),
-                                                     this._beginVerificationForItem(activatedItem)]);
-        batch.run();
+        Promise.all([
+            GdmUtil.cloneAndFadeOutActor(this._userSelectionBox),
+            this._beginVerificationForItem(activatedItem),
+        ]).catch(e => {
+            logError(e, 'Failed loading user %s item'.format(
+                activatedItem.user.get_user_name()));
+        });
     }
 
     _onDestroy() {

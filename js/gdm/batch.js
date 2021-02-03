@@ -29,9 +29,6 @@
  * - ConsecutiveBatch.  runs a series of tasks in order and completes
  *                      when the last in the series finishes.
  *
- * - ConcurrentBatch.  runs a set of tasks at the same time and completes
- *                     when the last to finish completes.
- *
  * - Hold.  prevents a batch from completing the pending task until
  *          the hold is released.
  *
@@ -172,21 +169,6 @@ var Batch = class extends Task {
     }
 };
 Signals.addSignalMethods(Batch.prototype);
-
-var ConcurrentBatch = class extends Batch {
-    process() {
-        let hold = this.runTask();
-
-        if (hold)
-            this.hold.acquireUntilAfter(hold);
-
-        // Regardless of the state of the just run task,
-        // fire off the next one, so all the tasks can run
-        // concurrently.
-        this.nextTask();
-    }
-};
-Signals.addSignalMethods(ConcurrentBatch.prototype);
 
 var ConsecutiveBatch = class extends Batch {
     process() {

@@ -5,7 +5,6 @@
 const { Clutter, Gdm, Gio, GLib } = imports.gi;
 const Signals = imports.signals;
 
-const Batch = imports.gdm.batch;
 const OVirt = imports.gdm.oVirt;
 const Vmware = imports.gdm.vmware;
 const Main = imports.ui.main;
@@ -59,7 +58,7 @@ const FingerprintReaderType = {
     SWIPE: 2,
 };
 
-function cloneAndFadeOutActor(actor) {
+async function cloneAndFadeOutActor(actor) {
     // Immediately hide actor so its sibling can have its space
     // and position, but leave a non-reactive clone on-screen,
     // so from the user's point of view it smoothly fades away
@@ -74,17 +73,19 @@ function cloneAndFadeOutActor(actor) {
     let [x, y] = actor.get_transformed_position();
     clone.set_position(x, y);
 
-    let hold = new Batch.Hold();
-    clone.ease({
-        opacity: 0,
-        duration: CLONE_FADE_ANIMATION_TIME,
-        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        onComplete: () => {
-            clone.destroy();
-            hold.release();
-        },
-    });
-    return hold;
+    try {
+        await new Promise((resolve, reject) => {
+            clone.ease({
+                opacity: 0,
+                duration: CLONE_FADE_ANIMATION_TIME,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => resolve(),
+                onStopped: () => reject(new Error('Animation stopped')),
+            });
+        });
+    } catch (e) {}
+
+    clone.destroy();
 }
 
 var ShellUserVerifier = class {
@@ -149,9 +150,8 @@ var ShellUserVerifier = class {
         return this._settings.get_int(ALLOWED_FAILURES_KEY);
     }
 
-    begin(userName, hold) {
+    async begin(userName) {
         this._cancellable = new Gio.Cancellable();
-        this._hold = hold;
         this._userName = userName;
         this.reauthenticating = false;
 
@@ -160,9 +160,9 @@ var ShellUserVerifier = class {
         // If possible, reauthenticate an already running session,
         // so any session specific credentials get updated appropriately
         if (userName)
-            this._openReauthenticationChannel(userName);
+            await this._openReauthenticationChannel(userName);
         else
-            this._getUserVerifier();
+            await this._getUserVerifier();
     }
 
     cancel() {
@@ -334,7 +334,6 @@ var ShellUserVerifier = class {
 
     _reportInitError(where, error, serviceName) {
         logError(error, where);
-        this._hold.release();
 
         this._queueMessage(_("Authentication error"), MessageType.ERROR);
         this._verificationFailed(serviceName, false);
@@ -353,18 +352,17 @@ var ShellUserVerifier = class {
                 // Gdm emits org.freedesktop.DBus.Error.AccessDenied when there
                 // is no session to reauthenticate. Fall back to performing
                 // verification from this login session
-                this._getUserVerifier();
+                await this._getUserVerifier();
                 return;
             }
 
             this._reportInitError('Failed to open reauthentication channel', e);
-            return;
+            throw e;
         }
 
         this.reauthenticating = true;
         this._connectSignals();
-        this._beginVerification();
-        this._hold.release();
+        await this._beginVerification();
     }
 
     async _getUserVerifier() {
@@ -376,12 +374,11 @@ var ShellUserVerifier = class {
             if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
                 return;
             this._reportInitError('Failed to obtain user verifier', e);
-            return;
+            throw e;
         }
 
         this._connectSignals();
-        this._beginVerification();
-        this._hold.release();
+        await this._beginVerification();
     }
 
     _connectSignals() {
@@ -442,7 +439,6 @@ var ShellUserVerifier = class {
     }
 
     async _startService(serviceName) {
-        this._hold.acquire();
         try {
             if (this._userName) {
                 await this._userVerifier.call_begin_verification_for_user(
@@ -463,18 +459,19 @@ var ShellUserVerifier = class {
                 ? 'Failed to start %s verification for user'.format(serviceName)
                 : 'Failed to start %s verification'.format(serviceName), e,
             serviceName);
-            return;
+            throw e;
         }
-        this._hold.release();
     }
 
-    _beginVerification() {
-        this._startService(this._getForegroundService());
+    async _beginVerification() {
+        let servicesToStart = [this._getForegroundService()];
 
         if (this._userName &&
             this._fingerprintReaderType !== FingerprintReaderType.NONE &&
-            !this.serviceIsForeground(FINGERPRINT_SERVICE_NAME))
-            this._startService(FINGERPRINT_SERVICE_NAME);
+            !servicesToStart.includes(FINGERPRINT_SERVICE_NAME))
+            servicesToStart.push(FINGERPRINT_SERVICE_NAME);
+
+        await Promise.all(servicesToStart.map(s => this._startService(s)));
     }
 
     _onInfo(client, serviceName, info) {
