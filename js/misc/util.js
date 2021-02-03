@@ -399,7 +399,7 @@ function ensureActorVisibleInScrollView(scrollView, actor) {
     });
 }
 
-function wiggle(actor, params) {
+async function wiggle(actor, params) {
     if (!St.Settings.get().enable_animations)
         return;
 
@@ -411,28 +411,25 @@ function wiggle(actor, params) {
     actor.translation_x = 0;
 
     // Accelerate before wiggling
-    actor.ease({
+    await actor.ease({
         translation_x: -params.offset,
         duration: params.duration,
         mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        onComplete: () => {
-            // Wiggle
-            actor.ease({
-                translation_x: params.offset,
-                duration: params.duration,
-                mode: Clutter.AnimationMode.LINEAR,
-                repeatCount: params.wiggleCount,
-                autoReverse: true,
-                onComplete: () => {
-                    // Decelerate and return to the original position
-                    actor.ease({
-                        translation_x: 0,
-                        duration: params.duration,
-                        mode: Clutter.AnimationMode.EASE_IN_QUAD,
-                    });
-                },
-            });
-        },
+    });
+
+    await actor.ease({
+        translation_x: params.offset,
+        duration: params.duration,
+        mode: Clutter.AnimationMode.LINEAR,
+        repeatCount: params.wiggleCount,
+        autoReverse: true,
+    });
+
+    await actor.ease({
+        // Decelerate and return to the original position
+        translation_x: 0,
+        duration: params.duration,
+        mode: Clutter.AnimationMode.EASE_IN_QUAD,
     });
 }
 
