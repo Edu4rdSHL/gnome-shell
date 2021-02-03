@@ -879,27 +879,17 @@ var BaseAppView = GObject.registerClass({
             log('No such application %s'.format(id));
     }
 
-    selectApp(id) {
+    async selectApp(id) {
         if (this._items.has(id)) {
             let item = this._items.get(id);
 
-            if (item.mapped) {
-                this._selectAppInternal(id);
-            } else {
-                // Need to wait until the view is mapped
-                let signalId = item.connect('notify::mapped', actor => {
-                    if (actor.mapped) {
-                        actor.disconnect(signalId);
-                        this._selectAppInternal(id);
-                    }
-                });
-            }
+            if (!item.mapped)
+                await item.connect_once('notify::mapped');
+            this._selectAppInternal(id);
         } else {
             // Need to wait until the view is built
-            let signalId = this.connect('view-loaded', () => {
-                this.disconnect(signalId);
-                this.selectApp(id);
-            });
+            await this.connect_once('view-loaded');
+            this.selectApp(id);
         }
     }
 
@@ -922,12 +912,8 @@ var BaseAppView = GObject.registerClass({
     }
 
     animate(animationDirection, onComplete) {
-        if (onComplete) {
-            let animationDoneId = this._grid.connect('animation-done', () => {
-                this._grid.disconnect(animationDoneId);
-                onComplete();
-            });
-        }
+        if (onComplete)
+            this._grid.connect_once('animation-done', () => onComplete());
 
         this._clearAnimateLater();
         this._grid.opacity = 255;
@@ -2010,7 +1996,7 @@ class AppViewItem extends St.Button {
         }
     }
 
-    _updateMultiline() {
+    async _updateMultiline() {
         if (!this._expandTitleOnHover || !this.icon.label)
             return;
 
@@ -2022,11 +2008,6 @@ class AppViewItem extends St.Button {
 
         label.remove_transition('allocation');
 
-        const id = label.connect('notify::allocation', () => {
-            label.restore_easing_state();
-            label.disconnect(id);
-        });
-
         const expand = this.hover || this.has_key_focus();
         label.save_easing_state();
         label.set_easing_duration(expand
@@ -2037,6 +2018,9 @@ class AppViewItem extends St.Button {
             line_wrap_mode: expand ? Pango.WrapMode.WORD_CHAR : Pango.WrapMode.NONE,
             ellipsize: expand ? Pango.EllipsizeMode.NONE : Pango.EllipsizeMode.END,
         });
+
+        await label.connect_once('notify::allocation');
+        label.restore_easing_state();
     }
 
     _onHover() {

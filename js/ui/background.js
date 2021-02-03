@@ -100,6 +100,7 @@ const Signals = imports.signals;
 const LoginManager = imports.misc.loginManager;
 const Main = imports.ui.main;
 const Params = imports.misc.params;
+const PromiseUtils = imports.misc.promiseUtils;
 
 Gio._promisify(Gio._LocalFilePrototype, 'query_info_async', 'query_info_finish');
 
@@ -377,13 +378,15 @@ var Background = GObject.registerClass({
         }
     }
 
-    _updateAnimation() {
+    async _updateAnimation() {
         this._updateAnimationTimeoutId = 0;
 
         this._animation.update(this._layoutManager.monitors[this._monitorIndex]);
         let files = this._animation.keyFrameFiles;
 
-        let finish = () => {
+        try {
+            await Promise.all(files.map(f => this._loadImage(f)));
+
             this._setLoaded();
             if (files.length > 1) {
                 this.set_blend(files[0], files[1],
@@ -395,26 +398,9 @@ var Background = GObject.registerClass({
                 this.set_file(null, this._style);
             }
             this._queueUpdateAnimation();
-        };
-
-        let cache = Meta.BackgroundImageCache.get_default();
-        let numPendingImages = files.length;
-        for (let i = 0; i < files.length; i++) {
-            this._watchFile(files[i]);
-            let image = cache.load(files[i]);
-            if (image.is_loaded()) {
-                numPendingImages--;
-                if (numPendingImages == 0)
-                    finish();
-            } else {
-                // eslint-disable-next-line no-loop-func
-                let id = image.connect('loaded', () => {
-                    image.disconnect(id);
-                    numPendingImages--;
-                    if (numPendingImages == 0)
-                        finish();
-                });
-            }
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
         }
     }
 
@@ -465,20 +451,13 @@ var Background = GObject.registerClass({
         });
     }
 
-    _loadImage(file) {
-        this.set_file(file, this._style);
+    async _loadImage(file) {
         this._watchFile(file);
 
         let cache = Meta.BackgroundImageCache.get_default();
         let image = cache.load(file);
-        if (image.is_loaded()) {
-            this._setLoaded();
-        } else {
-            let id = image.connect('loaded', () => {
-                this._setLoaded();
-                image.disconnect(id);
-            });
-        }
+        if (!image.is_loaded())
+            await image.connect_once('loaded');
     }
 
     async _loadFile(file) {
@@ -489,10 +468,13 @@ var Background = GObject.registerClass({
             null);
 
         const contentType = info.get_content_type();
-        if (contentType === 'application/xml')
+        if (contentType === 'application/xml') {
             this._loadAnimation(file);
-        else
-            this._loadImage(file);
+        } else {
+            this.set_file(file, this._style);
+            await this._loadImage(file);
+            this._setLoaded();
+        }
     }
 
     _load() {
@@ -719,7 +701,7 @@ var BackgroundManager = class BackgroundManager {
         });
     }
 
-    _updateBackgroundActor() {
+    async _updateBackgroundActor(cancellable) {
         if (this._newBackgroundActor) {
             /* Skip displaying existing background queued for load */
             this._newBackgroundActor.destroy();
@@ -740,17 +722,10 @@ var BackgroundManager = class BackgroundManager {
 
         const { background } = newBackgroundActor.content;
 
-        if (background.isLoaded) {
-            this._swapBackgroundActor();
-        } else {
-            newBackgroundActor.loadedSignalId = background.connect('loaded',
-                () => {
-                    background.disconnect(newBackgroundActor.loadedSignalId);
-                    newBackgroundActor.loadedSignalId = 0;
+        if (!background.isLoaded)
+            await background.connect_once('loaded', cancellable);
 
-                    this._swapBackgroundActor();
-                });
-        }
+        this._swapBackgroundActor();
     }
 
     _createBackgroundActor() {
@@ -779,36 +754,21 @@ var BackgroundManager = class BackgroundManager {
             this._container.set_child_below_sibling(backgroundActor, null);
         }
 
-        let changeSignalId = background.connect('bg-changed', () => {
-            background.disconnect(changeSignalId);
-            changeSignalId = null;
-            this._updateBackgroundActor();
-        });
+        const cancellable = new Gio.Cancellable();
+        backgroundActor.connect('destroy', () => cancellable.cancel());
 
-        let loadedSignalId;
-        if (background.isLoaded) {
-            GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                this.emit('loaded');
-                return GLib.SOURCE_REMOVE;
-            });
-        } else {
-            loadedSignalId = background.connect('loaded', () => {
-                background.disconnect(loadedSignalId);
-                loadedSignalId = null;
-                this.emit('loaded');
-            });
-        }
+        const loadBackground = async () => {
+            if (background.isLoaded)
+                await new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT, cancellable);
+            else
+                await background.connect_once('loaded', cancellable);
 
-        backgroundActor.connect('destroy', () => {
-            if (changeSignalId)
-                background.disconnect(changeSignalId);
+            this.emit('loaded');
+        };
+        loadBackground();
 
-            if (loadedSignalId)
-                background.disconnect(loadedSignalId);
-
-            if (backgroundActor.loadedSignalId)
-                background.disconnect(backgroundActor.loadedSignalId);
-        });
+        background.connect_once('bg-changed', cancellable).then(
+            () => this._updateBackgroundActor(cancellable));
 
         return backgroundActor;
     }

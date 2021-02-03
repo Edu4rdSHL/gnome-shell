@@ -374,11 +374,8 @@ var ScreenSaverDBus = class {
     }
 
     LockAsync(parameters, invocation) {
-        let tmpId = this._screenShield.connect('lock-screen-shown', () => {
-            this._screenShield.disconnect(tmpId);
-
-            invocation.return_value(null);
-        });
+        this._screenShield.connect_once('lock-screen-shown').then(() =>
+            invocation.return_value(null));
 
         this._screenShield.lock(true);
     }

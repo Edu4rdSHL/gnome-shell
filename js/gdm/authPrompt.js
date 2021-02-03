@@ -598,18 +598,12 @@ var AuthPrompt = GObject.registerClass({
         this.verificationStatus = AuthPromptStatus.VERIFYING;
     }
 
-    finish(onComplete) {
-        if (!this._userVerifier.hasPendingMessages) {
-            this._userVerifier.clear();
-            onComplete();
-            return;
-        }
+    async finish(onComplete) {
+        if (this._userVerifier.hasPendingMessages)
+            await this._userVerifier.connect_once('no-more-messages');
 
-        let signalId = this._userVerifier.connect('no-more-messages', () => {
-            this._userVerifier.disconnect(signalId);
-            this._userVerifier.clear();
-            onComplete();
-        });
+        this._userVerifier.clear();
+        onComplete();
     }
 
     cancel() {

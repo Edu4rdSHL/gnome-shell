@@ -11,6 +11,7 @@ const Vmware = imports.gdm.vmware;
 const Main = imports.ui.main;
 const { loadInterfaceXML } = imports.misc.fileUtils;
 const Params = imports.misc.params;
+const PromiseUtils = imports.misc.promiseUtils;
 const SmartcardManager = imports.misc.smartcardManager;
 
 const FprintManagerIface = loadInterfaceXML('net.reactivated.Fprint.Manager');
@@ -267,17 +268,11 @@ var ShellUserVerifier = class {
         }
     }
 
-    answerQuery(serviceName, answer) {
-        if (!this.hasPendingMessages) {
-            this._userVerifier.call_answer_query(serviceName, answer, this._cancellable, null);
-        } else {
-            const cancellable = this._cancellable;
-            let signalId = this.connect('no-more-messages', () => {
-                this.disconnect(signalId);
-                if (!cancellable.is_cancelled())
-                    this._userVerifier.call_answer_query(serviceName, answer, cancellable, null);
-            });
-        }
+    async answerQuery(serviceName, answer) {
+        if (this.hasPendingMessages)
+            await this.connect_once('no-more-messages', this._cancellable);
+
+        this._userVerifier.call_answer_query(serviceName, answer, this._cancellable, null);
     }
 
     _getIntervalForMessage(message) {
@@ -597,7 +592,7 @@ var ShellUserVerifier = class {
         }
     }
 
-    _onProblem(client, serviceName, problem) {
+    async _onProblem(client, serviceName, problem) {
         const isFingerprint = this.serviceIsFingerprint(serviceName);
 
         if (!this.serviceIsForeground(serviceName) && !isFingerprint)
@@ -619,16 +614,13 @@ var ShellUserVerifier = class {
 
             if (!this._canRetry()) {
                 if (this._fingerprintFailedId)
-                    GLib.source_remove(this._fingerprintFailedId);
+                    this._fingerprintFailedId.cancel();
 
-                const cancellable = this._cancellable;
-                this._fingerprintFailedId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-                    FINGERPRINT_ERROR_TIMEOUT_WAIT, () => {
-                        this._fingerprintFailedId = 0;
-                        if (!cancellable.is_cancelled())
-                            this._verificationFailed(serviceName, false);
-                        return GLib.SOURCE_REMOVE;
-                    });
+                this._fingerprintFailedId =
+                    await new PromiseUtils.TimeoutPromise(
+                        FINGERPRINT_ERROR_TIMEOUT_WAIT,
+                        GLib.PRIORITY_DEFAULT, this._cancellable);
+                this._verificationFailed(serviceName, false);
             }
         }
     }
@@ -685,7 +677,7 @@ var ShellUserVerifier = class {
             (this._reauthOnly || this._failCounter < this.allowedFailures);
     }
 
-    _verificationFailed(serviceName, shouldRetry) {
+    async _verificationFailed(serviceName, shouldRetry) {
         if (serviceName === FINGERPRINT_SERVICE_NAME) {
             if (this._fingerprintFailedId)
                 GLib.source_remove(this._fingerprintFailedId);
@@ -699,34 +691,20 @@ var ShellUserVerifier = class {
 
         const doneTrying = !shouldRetry || !this._canRetry();
 
-        if (doneTrying) {
+        if (doneTrying)
             this._disconnectSignals();
-
-            // eslint-disable-next-line no-lonely-if
-            if (!this.hasPendingMessages) {
-                this._cancelAndReset();
-            } else {
-                const cancellable = this._cancellable;
-                let signalId = this.connect('no-more-messages', () => {
-                    this.disconnect(signalId);
-                    if (!cancellable.is_cancelled())
-                        this._cancelAndReset();
-                });
-            }
-        }
 
         this.emit('verification-failed', serviceName, !doneTrying);
 
-        if (!this.hasPendingMessages) {
-            this._retry(serviceName);
-        } else {
-            const cancellable = this._cancellable;
-            let signalId = this.connect('no-more-messages', () => {
-                this.disconnect(signalId);
-                if (!cancellable.is_cancelled())
-                    this._retry(serviceName);
-            });
+        if (doneTrying) {
+            if (this.hasPendingMessages)
+                await this.connect_once('no-more-messages', this._cancellable);
+            this._cancelAndReset();
         }
+
+        if (this.hasPendingMessages)
+            await this.connect_once('no-more-messages', this._cancellable);
+        this._retry(serviceName);
     }
 
     _onServiceUnavailable(_client, serviceName, errorMessage) {

@@ -190,16 +190,13 @@ var WeatherClient = class {
             this._updateAutoLocation();
     }
 
-    _loadInfo() {
-        let id = this._weatherInfo.connect('updated', () => {
-            this._weatherInfo.disconnect(id);
-            this._loading = false;
-        });
-
+    async _loadInfo() {
         this._loading = true;
         this.emit('changed');
 
         this._weatherInfo.update();
+        await this._weatherInfo.connect_once('updated');
+        this._loading = false;
     }
 
     _locationsEqual(loc1, loc2) {

@@ -10,6 +10,7 @@ const BackgroundMenu = imports.ui.backgroundMenu;
 const DND = imports.ui.dnd;
 const Main = imports.ui.main;
 const Params = imports.misc.params;
+const PromiseUtils = imports.misc.promiseUtils;
 const Ripples = imports.ui.ripples;
 
 var STARTUP_ANIMATION_TIME = 500;
@@ -455,15 +456,6 @@ var LayoutManager = GObject.registerClass({
         }
     }
 
-    _waitLoaded(bgManager) {
-        return new Promise(resolve => {
-            const id = bgManager.connect('loaded', () => {
-                bgManager.disconnect(id);
-                resolve();
-            });
-        });
-    }
-
     _updateBackgrounds() {
         for (let i = 0; i < this._bgManagers.length; i++)
             this._bgManagers[i].destroy();
@@ -481,7 +473,7 @@ var LayoutManager = GObject.registerClass({
                 bgManager.backgroundActor.hide();
         }
 
-        return Promise.all(this._bgManagers.map(this._waitLoaded));
+        return Promise.all(this._bgManagers.map(bg => bg.connect_once('loaded')));
     }
 
     _updateKeyboardBox() {
@@ -592,7 +584,7 @@ var LayoutManager = GObject.registerClass({
         return this._keyboardIndex;
     }
 
-    _loadBackground() {
+    async _loadBackground() {
         if (!this.primaryMonitor) {
             this._pendingLoadBackground = true;
             return;
@@ -606,23 +598,17 @@ var LayoutManager = GObject.registerClass({
                                                       coordinate: Clutter.BindCoordinate.ALL });
         this._systemBackground.add_constraint(constraint);
 
-        let signalId = this._systemBackground.connect('loaded', () => {
-            this._systemBackground.disconnect(signalId);
-
-            // We're mostly prepared for the startup animation
-            // now, but since a lot is going on asynchronously
-            // during startup, let's defer the startup animation
-            // until the event loop is uncontended and idle.
-            // This helps to prevent us from running the animation
-            // when the system is bogged down
-            const id = GLib.idle_add(GLib.PRIORITY_LOW, () => {
-                this._systemBackground.show();
-                global.stage.show();
-                this._prepareStartupAnimation();
-                return GLib.SOURCE_REMOVE;
-            });
-            GLib.Source.set_name_by_id(id, '[gnome-shell] Startup Animation');
-        });
+        await this._systemBackground.connect_once('loaded');
+        // We're mostly prepared for the startup animation
+        // now, but since a lot is going on asynchronously
+        // during startup, let's defer the startup animation
+        // until the event loop is uncontended and idle.
+        // This helps to prevent us from running the animation
+        // when the system is bogged down
+        await new PromiseUtils.IdlePromise(GLib.PRIORITY_LOW);
+        this._systemBackground.show();
+        global.stage.show();
+        this._prepareStartupAnimation();
     }
 
     // Startup Animations

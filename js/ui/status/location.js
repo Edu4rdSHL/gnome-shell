@@ -293,18 +293,14 @@ var AppAuthorizer = class {
         this._showAppAuthDialog(name, reason);
     }
 
-    _showAppAuthDialog(name, reason) {
+    async _showAppAuthDialog(name, reason) {
         this._dialog = new GeolocationDialog(name,
                                              reason,
                                              this.reqAccuracyLevel);
-
-        let responseId = this._dialog.connect('response', (dialog, level) => {
-            this._dialog.disconnect(responseId);
-            this._accuracyLevel = level;
-            this._completeAuth();
-        });
-
         this._dialog.open();
+
+        this._accuracyLevel = await this._dialog.connect_once('response');
+        this._completeAuth();
     }
 
     _completeAuth() {
