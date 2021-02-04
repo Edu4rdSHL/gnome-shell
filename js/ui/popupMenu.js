@@ -934,21 +934,19 @@ var PopupMenu = class extends PopupMenuBase {
         this.emit('open-state-changed', true);
     }
 
-    close(animate) {
+    async close(animate) {
         if (this._activeMenuItem)
             this._activeMenuItem.active = false;
 
-        if (this._boxPointer.visible) {
-            this._boxPointer.close(animate, () => {
-                this.emit('menu-closed');
-            });
+        if (this.isOpen) {
+            this.isOpen = false;
+            this.emit('open-state-changed', false);
         }
 
-        if (!this.isOpen)
-            return;
-
-        this.isOpen = false;
-        this.emit('open-state-changed', false);
+        if (this._boxPointer.visible) {
+            await this._boxPointer.close(animate);
+            this.emit('menu-closed');
+        }
     }
 
     destroy() {
