@@ -36,6 +36,7 @@ const _FADE_ANIMATION_TIME = 250;
 const _SCROLL_ANIMATION_TIME = 500;
 const _TIMED_LOGIN_IDLE_THRESHOLD = 5.0;
 
+Gio._promisify(Gdm.Client.prototype, 'get_greeter', 'get_greeter_finish');
 var UserListItem = GObject.registerClass({
     Signals: { 'activate': {} },
 }, class UserListItem extends St.Button {
@@ -822,12 +823,14 @@ var LoginDialog = GObject.registerClass({
         this._showPrompt();
     }
 
-    _resetGreeterProxy() {
+    async _resetGreeterProxy(cancellable) {
         if (GLib.getenv('GDM_GREETER_TEST') != '1') {
-            if (this._greeter)
+            if (this._greeter) {
                 this._greeter.run_dispose();
+                this._greeter = null;
+            }
 
-            this._greeter = this._gdmClient.get_greeter_sync(null);
+            this._greeter = await this._gdmClient.get_greeter(cancellable);
 
             this._defaultSessionChangedId = this._greeter.connect('default-session-name-changed',
                                                                   this._onDefaultSessionChanged.bind(this));
@@ -842,7 +845,8 @@ var LoginDialog = GObject.registerClass({
         if (this._cancellable)
             this._cancellable.cancel();
 
-        this._resetGreeterProxy();
+        this._cancellable = new Gio.Cancellable();
+        this._resetGreeterProxy(this._cancellable);
         this._sessionMenuButton.updateSensitivity(true);
 
         const previousUser = this._user;
