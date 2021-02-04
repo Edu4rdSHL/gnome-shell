@@ -1,5 +1,6 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
-/* exported CancellablePromise, SignalConnectionPromise */
+/* exported CancellablePromise, SignalConnectionPromise, IdlePromise,
+   TimeoutPromise, TimeoutSecondsPromise */
 
 const { Gio, GLib, GObject } = imports.gi;
 
@@ -178,5 +179,91 @@ var SignalConnectionPromise = class extends CancellablePromise {
 
     get object() {
         return this._chainRoot._object;
+    }
+};
+
+var GSourcePromise = class extends CancellablePromise {
+    constructor(gsource, priority, cancellable) {
+        if (arguments.length === 1 && gsource instanceof Function) {
+            super(gsource);
+            return;
+        }
+
+        if (gsource.constructor.$gtype !== GLib.Source.$gtype)
+            throw new TypeError(`gsource ${gsource} is not of type GLib.Source`);
+
+        if (priority === undefined)
+            priority = GLib.PRIORITY_DEFAULT;
+        else if (!Number.isInteger(priority))
+            throw TypeError('Invalid priority');
+
+        super(resolve => {
+            gsource.set_priority(priority);
+            gsource.set_callback(() => {
+                resolve();
+                return GLib.SOURCE_REMOVE;
+            });
+            gsource.attach(null);
+        }, cancellable);
+
+        this._gsource = gsource;
+        this._gsource.set_name(`[gnome-shell] ${this.constructor.name} ${
+            new Error().stack.split('\n').filter(line =>
+                !line.match(/misc\/promiseUtils\.js/))[0]}`);
+
+        if (this.rejected())
+            this._gsource.destroy();
+    }
+
+    get gsource() {
+        return this._chainRoot._gsource;
+    }
+
+    _cleanup() {
+        this._gsource?.destroy();
+        this._gsource = null;
+        super._cleanup();
+    }
+};
+
+var IdlePromise = class extends GSourcePromise {
+    constructor(priority, cancellable) {
+        if (arguments.length === 1 && priority instanceof Function) {
+            super(priority);
+            return;
+        }
+
+        if (priority === undefined)
+            priority = GLib.PRIORITY_DEFAULT_IDLE;
+
+        super(GLib.idle_source_new(), priority, cancellable);
+    }
+};
+
+var TimeoutPromise = class extends GSourcePromise {
+    constructor(interval, priority, cancellable) {
+        if (arguments.length === 1 && interval instanceof Function) {
+            super(interval);
+            return;
+        }
+
+        if (!Number.isInteger(interval) || interval < 0)
+            throw TypeError('Invalid interval');
+
+        super(GLib.timeout_source_new(interval), priority, cancellable);
+    }
+};
+
+var TimeoutSecondsPromise = class extends GSourcePromise {
+    constructor(interval, priority, cancellable) {
+        if (arguments.length === 1 && interval instanceof Function) {
+            super(interval);
+            return;
+        }
+
+        if (!Number.isInteger(interval) || interval < 0)
+            throw TypeError('Invalid interval');
+
+        super(GLib.timeout_source_new_seconds(interval), priority, cancellable);
     }
 };

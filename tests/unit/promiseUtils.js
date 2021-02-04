@@ -624,3 +624,241 @@ testCase('SignalConnectionPromise JSObject connect_once is cancelled on destroy'
     object.emit('signal');
     await assertCancelledPromiseAsync(promise);
 });
+
+
+testCase('IdlePromise with invalid priority', () => {
+    JsUnit.assertRaises(() => new PromiseUtils.IdlePromise('priority'));
+});
+
+testCase('IdlePromise with invalid cancellable', () => {
+    JsUnit.assertRaises(() => new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT, {}));
+});
+
+testCase('IdlePromise with default priority', () => {
+    const promise = new PromiseUtils.IdlePromise();
+
+    JsUnit.assertNotNull(promise.gsource);
+    JsUnit.assertEquals(GLib.PRIORITY_DEFAULT_IDLE, promise.gsource.get_priority());
+    JsUnit.assertTrue(!!promise.gsource.get_name().match(
+        /\[gnome-shell\] IdlePromise @unit\/promiseUtils\.js:\d+/));
+    JsUnit.assertFalse(promise.gsource.is_destroyed());
+    JsUnit.assertNotNull(promise.gsource.get_context());
+    assertPendingPromise(promise);
+
+    assertResolved(promise);
+});
+
+testCase('IdlePromise with explicit priority', () => {
+    const promise = new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT);
+
+    JsUnit.assertNotNull(promise.gsource);
+    JsUnit.assertEquals(GLib.PRIORITY_DEFAULT, promise.gsource.get_priority());
+    JsUnit.assertTrue(!!promise.gsource.get_name().match(
+        /\[gnome-shell\] IdlePromise @unit\/promiseUtils\.js:\d+/));
+    JsUnit.assertFalse(promise.gsource.is_destroyed());
+    JsUnit.assertNotNull(promise.gsource.get_context());
+    assertPendingPromise(promise);
+
+    const gsource = promise.gsource;
+    assertResolved(promise);
+    JsUnit.assertTrue(gsource.is_destroyed());
+});
+
+testCase('IdlePromise is cancelled on cancel', async () => {
+    const promise = new PromiseUtils.IdlePromise();
+    assertPendingPromise(promise);
+    JsUnit.assertNull(promise.cancellable);
+    JsUnit.assertNotNull(promise.gsource);
+
+    const gsource = promise.gsource;
+    promise.cancel();
+    JsUnit.assertNull(promise.gsource);
+
+    await assertCancelledPromiseAsync(promise);
+    JsUnit.assertTrue(gsource.is_destroyed());
+});
+
+testCase('IdlePromise with already cancelled GCancellable', async () => {
+    const cancellable = new Gio.Cancellable();
+    cancellable.cancel();
+    const promise = new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT_IDLE, cancellable);
+    JsUnit.assertEquals(cancellable, promise.cancellable);
+    JsUnit.assertTrue(promise.gsource.is_destroyed());
+    assertCancelledPromise(promise);
+
+    await assertCancelledPromiseAsync(promise);
+    JsUnit.assertEquals(cancellable, promise.cancellable);
+});
+
+testCase('IdlePromise is cancelled on GCancellable cancellation', async () => {
+    const promise = new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT_IDLE,
+        new Gio.Cancellable());
+    JsUnit.assertNotNull(promise.cancellable);
+    assertPendingPromise(promise);
+
+    JsUnit.assertFalse(promise.gsource.is_destroyed());
+    JsUnit.assertNotNull(promise.gsource.get_context());
+    const gsource = promise.gsource;
+    promise.cancellable.cancel();
+    JsUnit.assertNull(promise.gsource);
+    await assertCancelledPromiseAsync(promise);
+    JsUnit.assertTrue(gsource.is_destroyed());
+});
+
+testCase('IdlePromise with GCancellable is cancelled with cancel', async () => {
+    const promise = new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT_IDLE,
+        new Gio.Cancellable());
+    JsUnit.assertNotNull(promise.cancellable);
+    assertPendingPromise(promise);
+
+    const gsource = promise.gsource;
+    promise.cancel();
+    JsUnit.assertNull(promise.gsource);
+    await assertCancelledPromiseAsync(promise);
+    JsUnit.assertTrue(gsource.is_destroyed());
+});
+
+testCase('TimeoutPromise with invalid interval', () => {
+    JsUnit.assertRaises(() => new PromiseUtils.TimeoutPromise('interval'));
+});
+
+testCase('TimeoutPromise with invalid priority', () => {
+    JsUnit.assertRaises(() => new PromiseUtils.TimeoutPromise(10, 'priority'));
+});
+
+testCase('TimeoutPromise with invalid cancellable', () => {
+    JsUnit.assertRaises(() => new PromiseUtils.TimeoutPromise(10, GLib.PRIORITY_DEFAULT, {}));
+});
+
+testCase('TimeoutPromise with default priority', () => {
+    const promise = new PromiseUtils.TimeoutPromise(10);
+
+    JsUnit.assertNotNull(promise.gsource);
+    JsUnit.assertEquals(GLib.PRIORITY_DEFAULT, promise.gsource.get_priority());
+    JsUnit.assertTrue(!!promise.gsource.get_name().match(
+        /\[gnome-shell\] TimeoutPromise @unit\/promiseUtils\.js:\d+/));
+    assertPendingPromise(promise);
+
+    assertResolved(promise);
+});
+
+testCase('TimeoutPromise with explicit priority', () => {
+    const promise = new PromiseUtils.TimeoutPromise(10, GLib.PRIORITY_DEFAULT_IDLE);
+
+    JsUnit.assertNotNull(promise.gsource);
+    JsUnit.assertEquals(GLib.PRIORITY_DEFAULT_IDLE, promise.gsource.get_priority());
+    JsUnit.assertTrue(!!promise.gsource.get_name().match(
+        /\[gnome-shell\] TimeoutPromise @unit\/promiseUtils\.js:\d+/));
+    assertPendingPromise(promise);
+
+    assertResolved(promise);
+});
+
+testCase('TimeoutPromise is cancelled on cancel', async () => {
+    const promise = new PromiseUtils.TimeoutPromise(10);
+    assertPendingPromise(promise);
+    JsUnit.assertNull(promise.cancellable);
+    JsUnit.assertNotNull(promise.gsource);
+
+    const gsource = promise.gsource;
+    promise.cancel();
+    JsUnit.assertNull(promise.gsource);
+
+    await assertCancelledPromiseAsync(promise);
+    JsUnit.assertTrue(gsource.is_destroyed());
+});
+
+testCase('TimeoutPromise with already cancelled GCancellable', async () => {
+    const cancellable = new Gio.Cancellable();
+    cancellable.cancel();
+    const promise = new PromiseUtils.TimeoutPromise(10, GLib.PRIORITY_DEFAULT, cancellable);
+    JsUnit.assertEquals(cancellable, promise.cancellable);
+    JsUnit.assertTrue(promise.gsource.is_destroyed());
+    assertCancelledPromise(promise);
+
+    await assertCancelledPromiseAsync(promise);
+    JsUnit.assertEquals(cancellable, promise.cancellable);
+});
+
+testCase('TimeoutPromise is cancelled on GCancellable cancellation', async () => {
+    const promise = new PromiseUtils.TimeoutPromise(10, GLib.PRIORITY_DEFAULT,
+        new Gio.Cancellable());
+    JsUnit.assertNotNull(promise.cancellable);
+    assertPendingPromise(promise);
+
+    promise.cancellable.cancel();
+    JsUnit.assertNull(promise.gsource);
+    await assertCancelledPromiseAsync(promise);
+});
+
+testCase('TimeoutPromise with GCancellable is cancelled with cancel', async () => {
+    const promise = new PromiseUtils.TimeoutPromise(10, GLib.PRIORITY_DEFAULT,
+        new Gio.Cancellable());
+    JsUnit.assertNotNull(promise.cancellable);
+    assertPendingPromise(promise);
+
+    const gsource = promise.gsource;
+    promise.cancel();
+    JsUnit.assertNull(promise.gsource);
+    await assertCancelledPromiseAsync(promise);
+    JsUnit.assertTrue(gsource.is_destroyed());
+});
+
+testCase('TimeoutSecondsPromise with invalid interval', () => {
+    JsUnit.assertRaises(() => new PromiseUtils.TimeoutSecondsPromise('interval'));
+});
+
+testCase('TimeoutSecondsPromise with invalid priority', () => {
+    JsUnit.assertRaises(() => new PromiseUtils.TimeoutSecondsPromise(1, 'priority'));
+});
+
+testCase('TimeoutSecondsPromise with invalid cancellable', () => {
+    JsUnit.assertRaises(() => new PromiseUtils.TimeoutSecondsPromise(1, GLib.PRIORITY_DEFAULT, {}));
+});
+
+testCase('TimeoutSecondsPromise with default priority', () => {
+    const promise = new PromiseUtils.TimeoutSecondsPromise(1);
+
+    JsUnit.assertNotNull(promise.gsource);
+    JsUnit.assertEquals(GLib.PRIORITY_DEFAULT, promise.gsource.get_priority());
+    JsUnit.assertTrue(!!promise.gsource.get_name().match(
+        /\[gnome-shell\] TimeoutSecondsPromise @unit\/promiseUtils\.js:\d+/));
+    assertPendingPromise(promise);
+
+    assertResolved(promise);
+});
+
+testCase('TimeoutSecondsPromise with explicit priority', () => {
+    const promise = new PromiseUtils.TimeoutSecondsPromise(1, GLib.PRIORITY_DEFAULT_IDLE);
+
+    JsUnit.assertNotNull(promise.gsource);
+    JsUnit.assertEquals(GLib.PRIORITY_DEFAULT_IDLE, promise.gsource.get_priority());
+    JsUnit.assertTrue(!!promise.gsource.get_name().match(
+        /\[gnome-shell\] TimeoutSecondsPromise @unit\/promiseUtils\.js:\d+/));
+    assertPendingPromise(promise);
+
+    assertResolved(promise);
+});
+
+testCase('TimeoutSecondsPromise is cancelled on cancel', async () => {
+    const promise = new PromiseUtils.TimeoutSecondsPromise(1);
+    assertPendingPromise(promise);
+    JsUnit.assertNull(promise.cancellable);
+    JsUnit.assertNotNull(promise.gsource);
+
+    promise.cancel();
+    JsUnit.assertNull(promise.gsource);
+
+    await assertCancelledPromiseAsync(promise);
+});
+
+testCase('TimeoutSecondsPromise is cancelled on GCancellable cancellation', async () => {
+    const promise = new PromiseUtils.TimeoutSecondsPromise(1, GLib.PRIORITY_DEFAULT,
+        new Gio.Cancellable());
+    JsUnit.assertNotNull(promise.cancellable);
+    assertPendingPromise(promise);
+
+    promise.cancellable.cancel();
+    JsUnit.assertNull(promise.gsource);
+    await assertCancelledPromiseAsync(promise);
+});
