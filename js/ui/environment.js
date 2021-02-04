@@ -84,6 +84,11 @@ function _makeEaseCallback(params, cleanup) {
             onStopped(isFinished);
         if (onComplete && isFinished)
             onComplete();
+
+        if (!isFinished) {
+            throw new GLib.Error(Gio.IOErrorEnum,
+                Gio.IOErrorEnum.CANCELLED, 'Ease not finished');
+        }
     };
 }
 
@@ -108,7 +113,22 @@ function _getPropertyTarget(actor, propName) {
     throw new Error(`Invalid property name ${propName}`);
 }
 
-function _easeActor(actor, params) {
+async function _completeTransition(transition) {
+    try {
+        return await transition.connect_once('stopped');
+    } catch (e) {
+        /* We may still be cancelled if the promise has been rejected */
+        transition.stop();
+
+        if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+            throw e;
+    }
+
+    /* This implies throwing a Gio.IOErrorEnum.CANCELLED again via callback */
+    return false;
+}
+
+async function _easeActor(actor, params) {
     actor.save_easing_state();
 
     if (params.duration != undefined)
@@ -160,19 +180,19 @@ function _easeActor(actor, params) {
         .find(t => t !== null);
 
     if (transition && transition.delay)
-        transition.connect('started', () => prepare());
-    else
-        prepare();
+        await transition.connect_once('started');
+
+    prepare();
 
     if (transition) {
         transition.set({ repeatCount, autoReverse });
-        transition.connect('stopped', (t, finished) => callback(finished));
+        callback(await _completeTransition(transition));
     } else {
         callback(true);
     }
 }
 
-function _easeActorProperty(actor, propName, target, params) {
+async function _easeActorProperty(actor, propName, target, params) {
     // Avoid pointless difference with ease()
     if (params.mode)
         params.progress_mode = params.mode;
@@ -240,11 +260,10 @@ function _easeActorProperty(actor, propName, target, params) {
     transition.set_to(target);
 
     if (transition.delay)
-        transition.connect('started', () => prepare());
-    else
-        prepare();
+        await transition.connect_once('started');
 
-    transition.connect('stopped', (t, finished) => callback(finished));
+    prepare();
+    callback(await _completeTransition(transition));
 }
 
 function _loggingFunc(...args) {
@@ -305,16 +324,16 @@ function init() {
         origSetEasingDelay.call(this, adjustAnimationTime(msecs));
     };
 
-    Clutter.Actor.prototype.ease = function (props) {
-        _easeActor(this, props);
+    Clutter.Actor.prototype.ease = async function (props) {
+        await _easeActor(this, props);
     };
-    Clutter.Actor.prototype.ease_property = function (propName, target, params) {
-        _easeActorProperty(this, propName, target, params);
+    Clutter.Actor.prototype.ease_property = async function (propName, target, params) {
+        await _easeActorProperty(this, propName, target, params);
     };
-    St.Adjustment.prototype.ease = function (target, params) {
+    St.Adjustment.prototype.ease = async function (target, params) {
         // we're not an actor of course, but we implement the same
         // transition API as Clutter.Actor, so this works anyway
-        _easeActorProperty(this, 'value', target, params);
+        await _easeActorProperty(this, 'value', target, params);
     };
 
     Clutter.Actor.prototype[Symbol.iterator] = function* () {
