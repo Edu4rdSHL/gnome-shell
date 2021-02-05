@@ -103,6 +103,10 @@ const Params = imports.misc.params;
 const PromiseUtils = imports.misc.promiseUtils;
 
 Gio._promisify(Gio._LocalFilePrototype, 'query_info_async', 'query_info_finish');
+// The proto has not a finish function, so we need to define one
+GnomeDesktop.BGSlideShow.prototype.load_async_finish = () => {};
+Gio._promisify(GnomeDesktop.BGSlideShow.prototype,
+    'load_async', 'load_async_finish');
 
 var DEFAULT_BACKGROUND_COLOR = Clutter.Color.from_pixel(0x2e3436ff);
 
@@ -159,36 +163,20 @@ var BackgroundCache = class BackgroundCache {
         this._fileMonitors[key] = monitor;
     }
 
-    getAnimation(params) {
-        params = Params.parse(params, { file: null,
-                                        settingsSchema: null,
-                                        onLoaded: null });
+    async getAnimation(params) {
+        params = Params.parse(params, {
+            file: null,
+            settingsSchema: null,
+            cancellable: null,
+        });
 
         let animation = this._animations[params.settingsSchema];
-        if (animation && _fileEqual0(animation.file, params.file)) {
-            if (params.onLoaded) {
-                let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                    params.onLoaded(this._animations[params.settingsSchema]);
-                    return GLib.SOURCE_REMOVE;
-                });
-                GLib.Source.set_name_by_id(id, '[gnome-shell] params.onLoaded');
-            }
-            return;
-        }
+        if (animation && _fileEqual0(animation.file, params.file))
+            return animation;
 
         animation = new Animation({ file: params.file });
-
-        animation.load(() => {
-            this._animations[params.settingsSchema] = animation;
-
-            if (params.onLoaded) {
-                let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                    params.onLoaded(this._animations[params.settingsSchema]);
-                    return GLib.SOURCE_REMOVE;
-                });
-                GLib.Source.set_name_by_id(id, '[gnome-shell] params.onLoaded');
-            }
-        });
+        this._animations[params.settingsSchema] = await animation.loadAsync(params.cancellable);
+        return animation;
     }
 
     getBackgroundSource(layoutManager, settingsSchema) {
@@ -268,7 +256,6 @@ var Background = GObject.registerClass({
 
     destroy() {
         this._cancellable.cancel();
-        this._removeAnimationTimeout();
 
         let i;
         let keys = Object.keys(this._fileWatches);
@@ -323,17 +310,13 @@ var Background = GObject.registerClass({
         this._updateAnimation();
     }
 
-    _setLoaded() {
+    async _setLoaded() {
         if (this.isLoaded)
             return;
 
         this.isLoaded = true;
-
-        let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-            this.emit('loaded');
-            return GLib.SOURCE_REMOVE;
-        });
-        GLib.Source.set_name_by_id(id, '[gnome-shell] Background._setLoaded Idle');
+        await new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT_IDLE, this._cancellable);
+        this.emit('loaded');
     }
 
     _loadPattern() {
@@ -372,15 +355,10 @@ var Background = GObject.registerClass({
     }
 
     _removeAnimationTimeout() {
-        if (this._updateAnimationTimeoutId) {
-            GLib.source_remove(this._updateAnimationTimeoutId);
-            this._updateAnimationTimeoutId = 0;
-        }
+        this._updateAnimationTimeout?.cancel();
     }
 
     async _updateAnimation() {
-        this._updateAnimationTimeoutId = 0;
-
         this._animation.update(this._layoutManager.monitors[this._monitorIndex]);
         let files = this._animation.keyFrameFiles;
 
@@ -404,11 +382,8 @@ var Background = GObject.registerClass({
         }
     }
 
-    _queueUpdateAnimation() {
-        if (this._updateAnimationTimeoutId != 0)
-            return;
-
-        if (!this._cancellable || this._cancellable.is_cancelled())
+    async _queueUpdateAnimation() {
+        if (this._updateAnimationTimeout?.pending())
             return;
 
         if (!this._animation.transitionDuration)
@@ -423,32 +398,35 @@ var Background = GObject.registerClass({
         if (interval > GLib.MAXUINT32)
             return;
 
-        this._updateAnimationTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-                                                          interval,
-                                                          () => {
-                                                              this._updateAnimationTimeoutId = 0;
-                                                              this._updateAnimation();
-                                                              return GLib.SOURCE_REMOVE;
-                                                          });
-        GLib.Source.set_name_by_id(this._updateAnimationTimeoutId, '[gnome-shell] this._updateAnimation');
+        this._updateAnimationTimeout = new PromiseUtils.TimeoutPromise(interval,
+            GLib.PRIORITY_DEFAULT, this._cancellable);
+        await this._updateAnimationTimeout;
+
+        this._updateAnimation();
     }
 
-    _loadAnimation(file) {
-        this._cache.getAnimation({
-            file,
-            settingsSchema: this._settings.schema_id,
-            onLoaded: animation => {
-                this._animation = animation;
+    async _loadAnimation(file) {
+        try {
+            this._animation = await this._cache.getAnimation({
+                file,
+                cancellable: this._cancellable,
+                settingsSchema: this._settings.schema_id,
+            });
 
-                if (!this._animation || this._cancellable.is_cancelled()) {
-                    this._setLoaded();
-                    return;
-                }
+            if (!this._animation)
+                throw new Error('No animation loaded');
 
-                this._updateAnimation();
-                this._watchFile(file);
-            },
-        });
+            await new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT_IDLE,
+                this._cancellable);
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
+            this._setLoaded();
+            return;
+        }
+
+        this._updateAnimation();
+        this._watchFile(file);
     }
 
     async _loadImage(file) {
@@ -623,12 +601,10 @@ class Animation extends GnomeDesktop.BGSlideShow {
         this.loaded = false;
     }
 
-    load(callback) {
-        this.load_async(null, () => {
-            this.loaded = true;
-            if (callback)
-                callback();
-        });
+    async loadAsync(cancellable) {
+        await this.load_async(cancellable);
+        this.loaded = true;
+        return this;
     }
 
     update(monitor) {
