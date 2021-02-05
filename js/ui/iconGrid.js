@@ -1155,7 +1155,6 @@ var IconGridLayout = GObject.registerClass({
 var IconGrid = GObject.registerClass({
     Signals: {
         'pages-changed': {},
-        'animation-done': {},
     },
 }, class IconGrid extends St.Viewport {
     _init(layoutParams = {}) {
@@ -1204,11 +1203,6 @@ var IconGrid = GObject.registerClass({
             clone.destroy();
         });
         this._clonesAnimating = [];
-    }
-
-    _animationDone() {
-        this._resetAnimationActors();
-        this.emit('animation-done');
     }
 
     _childAdded(grid, child) {
@@ -1477,10 +1471,8 @@ var IconGrid = GObject.registerClass({
         this._resetAnimationActors();
 
         let actors = this._getChildrenToAnimate();
-        if (actors.length === 0) {
-            this._animationDone();
+        if (actors.length === 0)
             return;
-        }
 
         await this.layout_manager.ensureIconSizeUpdated();
 
@@ -1583,7 +1575,7 @@ var IconGrid = GObject.registerClass({
             ]);
         }));
 
-        this._animationDone();
+        this._resetAnimationActors();
     }
 
     setGridModes(modes) {

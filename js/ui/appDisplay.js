@@ -18,6 +18,7 @@ const PopupMenu = imports.ui.popupMenu;
 const Search = imports.ui.search;
 const SwipeTracker = imports.ui.swipeTracker;
 const Params = imports.misc.params;
+const PromiseUtils = imports.misc.promiseUtils;
 const SystemActions = imports.misc.systemActions;
 
 var MENU_POPUP_TIMEOUT = 600;
@@ -300,7 +301,6 @@ var BaseAppView = GObject.registerClass({
         this._items = new Map();
         this._orderedItems = [];
 
-        this._animateLaterId = 0;
         this._viewLoadedHandlerId = 0;
         this._viewIsReady = false;
 
@@ -901,47 +901,26 @@ var BaseAppView = GObject.registerClass({
     }
 
     _clearAnimateLater() {
-        if (this._animateLaterId) {
-            Meta.later_remove(this._animateLaterId);
-            this._animateLaterId = 0;
-        }
-        if (this._viewLoadedHandlerId) {
-            this.disconnect(this._viewLoadedHandlerId);
-            this._viewLoadedHandlerId = 0;
-        }
+        this._animateLater?.cancel();
     }
 
-    animate(animationDirection, onComplete) {
-        if (onComplete)
-            this._grid.connect_once('animation-done', () => onComplete());
-
+    async animate(animationDirection) {
         this._clearAnimateLater();
         this._grid.opacity = 255;
 
         if (animationDirection == IconGrid.AnimationDirection.IN) {
-            const doSpringAnimationLater = laterType => {
-                this._animateLaterId = Meta.later_add(laterType,
-                    () => {
-                        this._animateLaterId = 0;
-                        this._doSpringAnimation(animationDirection);
-                        return GLib.SOURCE_REMOVE;
-                    });
-            };
-
             if (this._viewIsReady) {
                 this._grid.opacity = 0;
-                doSpringAnimationLater(Meta.LaterType.IDLE);
+                this._animateLater = PromiseUtils.MetaLaterPromise(Meta.LaterType.IDLE);
             } else {
-                this._viewLoadedHandlerId = this.connect('view-loaded',
-                    () => {
-                        this._clearAnimateLater();
-                        this._grid.opacity = 255;
-                        doSpringAnimationLater(Meta.LaterType.BEFORE_REDRAW);
-                    });
+                await this.connect_once('view-loaded');
+                this._clearAnimateLater();
+                this._grid.opacity = 255;
+                this._animateLater = PromiseUtils.MetaLaterPromise(Meta.LaterType.BEFORE_REDRAW);
             }
-        } else {
-            this._doSpringAnimation(animationDirection);
+            await this._animateLater;
         }
+        this._doSpringAnimation(animationDirection);
     }
 
     _getDropTarget(x, y, source) {
@@ -1659,21 +1638,18 @@ class AppDisplay extends BaseAppView {
     }
 
     // Overridden from BaseAppView
-    animate(animationDirection, onComplete) {
+    async animate(animationDirection) {
         this._scrollView.reactive = false;
         this._swipeTracker.enabled = false;
-        let completionFunc = () => {
-            this._scrollView.reactive = true;
-            this._swipeTracker.enabled = this.mapped;
-            if (onComplete)
-                onComplete();
-        };
 
         if (animationDirection == IconGrid.AnimationDirection.OUT &&
-            this._displayingDialog && this._currentDialog)
+            this._displayingDialog && this._currentDialog) {
             this._currentDialog.popdown();
-        else
-            super.animate(animationDirection, completionFunc);
+        } else {
+            await super.animate(animationDirection);
+            this._scrollView.reactive = true;
+            this._swipeTracker.enabled = this.mapped;
+        }
     }
 
     animateSwitch(animationDirection) {
