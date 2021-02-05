@@ -1,11 +1,12 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported OsdWindowManager */
 
-const { Clutter, GLib, GObject, Meta, St } = imports.gi;
+const { Clutter, GObject, Meta, St } = imports.gi;
 
 const BarLevel = imports.ui.barLevel;
 const Layout = imports.ui.layout;
 const Main = imports.ui.main;
+const PromiseUtils = imports.misc.promiseUtils;
 
 var HIDE_TIMEOUT = 1500;
 var FADE_TIME = 100;
@@ -73,7 +74,6 @@ class OsdWindow extends St.Widget {
         });
         this._box.add(this._level);
 
-        this._hideTimeoutId = 0;
         this._reset();
 
         this.connect('destroy', this._onDestroy.bind(this));
@@ -90,6 +90,8 @@ class OsdWindow extends St.Widget {
     }
 
     _onDestroy() {
+        this._hideTimeout?.cancel();
+
         if (this._monitorsChangedId)
             Main.layoutManager.disconnect(this._monitorsChangedId);
         this._monitorsChangedId = 0;
@@ -128,7 +130,7 @@ class OsdWindow extends St.Widget {
         this._level.maximum_value = maxLevel;
     }
 
-    show() {
+    async show() {
         if (!this._icon.gicon)
             return;
 
@@ -138,40 +140,37 @@ class OsdWindow extends St.Widget {
             this.opacity = 0;
             this.get_parent().set_child_above_sibling(this, null);
 
-            this.ease({
+            await this.ease({
                 opacity: 255,
                 duration: FADE_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         }
 
-        if (this._hideTimeoutId)
-            GLib.source_remove(this._hideTimeoutId);
-        this._hideTimeoutId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, HIDE_TIMEOUT, this._hide.bind(this));
-        GLib.Source.set_name_by_id(this._hideTimeoutId, '[gnome-shell] this._hide');
-    }
+        this._hideTimeout?.cancel();
+        this._hideTimeout = new PromiseUtils.TimeoutPromise(HIDE_TIMEOUT);
+        await this._hideTimeout;
 
-    cancel() {
-        if (!this._hideTimeoutId)
-            return;
-
-        GLib.source_remove(this._hideTimeoutId);
         this._hide();
     }
 
-    _hide() {
-        this._hideTimeoutId = 0;
-        this.ease({
+    cancel() {
+        if (!this._hideTimeout?.pending())
+            return;
+
+        this._hideTimeout.cancel();
+        this._hide();
+    }
+
+    async _hide() {
+        await this.ease({
             opacity: 0,
             duration: FADE_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
-                this._reset();
-                Meta.enable_unredirect_for_display(global.display);
-            },
         });
-        return GLib.SOURCE_REMOVE;
+
+        this._reset();
+        Meta.enable_unredirect_for_display(global.display);
     }
 
     _reset() {

@@ -76,7 +76,7 @@ var PieTimer = GObject.registerClass({
         cr.$dispose();
     }
 
-    start(x, y, duration) {
+    async start(x, y, duration) {
         this.x = x - this.width / 2;
         this.y = y - this.height / 2;
         this.show();
@@ -87,14 +87,11 @@ var PieTimer = GObject.registerClass({
             mode: Clutter.AnimationMode.EASE_IN_QUAD,
         });
 
-        this.ease_property('angle', 2 * Math.PI, {
+        await this.ease_property('angle', 2 * Math.PI, {
             duration,
             mode: Clutter.AnimationMode.LINEAR,
-            onComplete: this._onTransitionComplete.bind(this),
         });
-    }
 
-    _onTransitionComplete() {
         this.ease({
             scale_x: 2,
             scale_y: 2,

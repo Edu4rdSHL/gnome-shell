@@ -89,16 +89,16 @@ class OverviewActor extends St.BoxLayout {
         this.add_child(this._controls);
     }
 
-    animateToOverview(state, callback) {
-        this._controls.animateToOverview(state, callback);
+    async animateToOverview(state) {
+        await this._controls.animateToOverview(state);
     }
 
-    animateFromOverview(callback) {
-        this._controls.animateFromOverview(callback);
+    async animateFromOverview() {
+        await this._controls.animateFromOverview();
     }
 
-    runStartupAnimation(callback) {
-        this._controls.runStartupAnimation(callback);
+    async runStartupAnimation() {
+        await this._controls.runStartupAnimation();
     }
 
     get dash() {
@@ -533,7 +533,7 @@ var Overview = class {
     }
 
 
-    _animateVisible(state) {
+    async _animateVisible(state) {
         if (this._visible || this._animationInProgress)
             return;
 
@@ -544,15 +544,15 @@ var Overview = class {
 
         Meta.disable_unredirect_for_display(global.display);
 
-        this._overview.animateToOverview(state, () => this._showDone());
-
         Main.layoutManager.overviewGroup.set_child_above_sibling(
             this._coverPane, null);
         this._coverPane.show();
         this.emit('showing');
-    }
 
-    _showDone() {
+        try {
+            await this._overview.animateToOverview(state);
+        } catch (e) {}
+
         this._animationInProgress = false;
         this._desktopFade.hide();
         this._coverPane.hide();
@@ -591,22 +591,22 @@ var Overview = class {
         this._syncGrab();
     }
 
-    _animateNotVisible() {
+    async _animateNotVisible() {
         if (!this._visible || this._animationInProgress)
             return;
 
         this._animationInProgress = true;
         this._visibleTarget = false;
 
-        this._overview.animateFromOverview(() => this._hideDone());
-
         Main.layoutManager.overviewGroup.set_child_above_sibling(
             this._coverPane, null);
         this._coverPane.show();
         this.emit('hiding');
-    }
 
-    _hideDone() {
+        try {
+            await this._overview.animateFromOverview();
+        } catch (e) {}
+
         // Re-enable unredirection
         Meta.enable_unredirect_for_display(global.display);
 
@@ -647,7 +647,7 @@ var Overview = class {
         this._overview.controls.appDisplay.selectApp(id);
     }
 
-    runStartupAnimation(callback) {
+    async runStartupAnimation() {
         Main.panel.style = 'transition-duration: 0ms;';
 
         this._shown = true;
@@ -662,16 +662,11 @@ var Overview = class {
 
         this.emit('showing');
 
-        this._overview.runStartupAnimation(() => {
-            if (!this._syncGrab()) {
-                callback();
-                return;
-            }
-
+        await this._overview.runStartupAnimation();
+        if (this._syncGrab()) {
             Main.panel.style = null;
             this.emit('shown');
-            callback();
-        });
+        }
     }
 
     getShowAppsButton() {

@@ -349,6 +349,24 @@ var AuthPrompt = GObject.registerClass({
         this.reset();
     }
 
+    async _hideButtonWell(actor, animate) {
+        const wasSpinner = actor === this._spinner;
+
+        if (!animate) {
+            actor.opacity = 0;
+        } else {
+            await actor.ease({
+                opacity: 0,
+                duration: DEFAULT_BUTTON_WELL_ANIMATION_TIME,
+                delay: DEFAULT_BUTTON_WELL_ANIMATION_DELAY,
+                mode: Clutter.AnimationMode.LINEAR,
+            });
+        }
+
+        if (wasSpinner)
+            this._spinner?.stop();
+    }
+
     setActorInDefaultButtonWell(actor, animate) {
         if (!this._defaultButtonWellActor &&
             !actor)
@@ -359,41 +377,14 @@ var AuthPrompt = GObject.registerClass({
         if (oldActor)
             oldActor.remove_all_transitions();
 
-        let wasSpinner;
-        if (oldActor == this._spinner)
-            wasSpinner = true;
-        else
-            wasSpinner = false;
-
         let isSpinner;
         if (actor == this._spinner)
             isSpinner = true;
         else
             isSpinner = false;
 
-        if (this._defaultButtonWellActor != actor && oldActor) {
-            if (!animate) {
-                oldActor.opacity = 0;
-
-                if (wasSpinner) {
-                    if (this._spinner)
-                        this._spinner.stop();
-                }
-            } else {
-                oldActor.ease({
-                    opacity: 0,
-                    duration: DEFAULT_BUTTON_WELL_ANIMATION_TIME,
-                    delay: DEFAULT_BUTTON_WELL_ANIMATION_DELAY,
-                    mode: Clutter.AnimationMode.LINEAR,
-                    onComplete: () => {
-                        if (wasSpinner) {
-                            if (this._spinner)
-                                this._spinner.stop();
-                        }
-                    },
-                });
-            }
-        }
+        if (this._defaultButtonWellActor !== actor && oldActor)
+            this._hideButtonWell(oldActor, animate);
 
         if (actor) {
             if (isSpinner)

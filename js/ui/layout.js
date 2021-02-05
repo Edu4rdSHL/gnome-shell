@@ -672,41 +672,36 @@ var LayoutManager = GObject.registerClass({
         this._startupAnimation();
     }
 
-    _startupAnimation() {
-        if (Meta.is_restart())
-            this._startupAnimationComplete();
-        else if (Main.sessionMode.isGreeter)
-            this._startupAnimationGreeter();
-        else
-            this._startupAnimationSession();
-    }
-
-    _startupAnimationGreeter() {
-        this.panelBox.ease({
+    async _startupAnimationGreeter() {
+        await this.panelBox.ease({
             translation_y: 0,
             duration: STARTUP_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => this._startupAnimationComplete(),
         });
     }
 
-    _startupAnimationSession() {
-        const onComplete = () => this._startupAnimationComplete();
+    async _startupAnimationSession() {
         if (Main.sessionMode.hasOverview) {
-            Main.overview.runStartupAnimation(onComplete);
+            await Main.overview.runStartupAnimation();
         } else {
-            this.uiGroup.ease({
+            await this.uiGroup.ease({
                 scale_x: 1,
                 scale_y: 1,
                 opacity: 255,
                 duration: STARTUP_ANIMATION_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete,
             });
         }
     }
 
-    _startupAnimationComplete() {
+    async _startupAnimation() {
+        if (!Meta.is_restart()) {
+            if (Main.sessionMode.isGreeter)
+                await this._startupAnimationGreeter();
+            else
+                await this._startupAnimationSession();
+        }
+
         this._coverPane.destroy();
         this._coverPane = null;
 

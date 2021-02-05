@@ -793,7 +793,7 @@ var EmojiPager = GObject.registerClass({
         return true;
     }
 
-    _onPanEnd() {
+    async _onPanEnd() {
         if (Math.abs(this._delta) < this.width * PANEL_SWITCH_RELATIVE_DISTANCE) {
             this._onPanCancel();
         } else {
@@ -807,12 +807,10 @@ var EmojiPager = GObject.registerClass({
             let time = PANEL_SWITCH_ANIMATION_TIME * Math.abs(relDelta);
 
             this.remove_all_transitions();
-            this.ease_property('delta', value, {
+            await this.ease_property('delta', value, {
                 duration: time,
-                onComplete: () => {
-                    this.setCurrentPage(this.getFollowingPage());
-                },
             });
+            this.setCurrentPage(this.getFollowingPage());
         }
     }
 
@@ -1853,25 +1851,21 @@ var Keyboard = GObject.registerClass({
         this.setCursorLocation(null);
     }
 
-    _animateShow() {
+    async _animateShow() {
         if (this._focusWindow)
             this._animateWindow(this._focusWindow, true);
 
         Main.layoutManager.keyboardBox.show();
-        this.ease({
+        this._keyboardVisible = true;
+        this.emit('visibility-changed');
+
+        await this.ease({
             translation_y: -this.height,
             opacity: 255,
             duration: KEYBOARD_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
-                this._animateShowComplete();
-            },
         });
-        this._keyboardVisible = true;
-        this.emit('visibility-changed');
-    }
 
-    _animateShowComplete() {
         let keyboardBox = Main.layoutManager.keyboardBox;
         this._keyboardHeightNotifyId = keyboardBox.connect('notify::height', () => {
             this.translation_y = -this.height;
@@ -1881,7 +1875,7 @@ var Keyboard = GObject.registerClass({
         keyboardBox.queue_relayout();
     }
 
-    _animateHide() {
+    async _animateHide() {
         if (this._focusWindow)
             this._animateWindow(this._focusWindow, false);
 
@@ -1889,21 +1883,16 @@ var Keyboard = GObject.registerClass({
             Main.layoutManager.keyboardBox.disconnect(this._keyboardHeightNotifyId);
             this._keyboardHeightNotifyId = 0;
         }
-        this.ease({
+
+        this._keyboardVisible = false;
+        this.emit('visibility-changed');
+        await this.ease({
             translation_y: 0,
             opacity: 0,
             duration: KEYBOARD_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_IN_QUAD,
-            onComplete: () => {
-                this._animateHideComplete();
-            },
         });
 
-        this._keyboardVisible = false;
-        this.emit('visibility-changed');
-    }
-
-    _animateHideComplete() {
         Main.layoutManager.keyboardBox.hide();
     }
 
@@ -1963,7 +1952,7 @@ var Keyboard = GObject.registerClass({
             this._onFocusWindowMoving.bind(this));
     }
 
-    _animateWindow(window, show) {
+    async _animateWindow(window, show) {
         let windowActor = window.get_compositor_private();
         if (!windowActor)
             return;
@@ -1972,15 +1961,16 @@ var Keyboard = GObject.registerClass({
             ? this._focusWindowStartY - Main.layoutManager.keyboardBox.height
             : this._focusWindowStartY;
 
-        windowActor.ease({
-            y: finalY,
-            duration: KEYBOARD_ANIMATION_TIME,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onStopped: () => {
-                windowActor.y = finalY;
-                this._windowSlideAnimationComplete(window, finalY);
-            },
-        });
+        try {
+            await windowActor.ease({
+                y: finalY,
+                duration: KEYBOARD_ANIMATION_TIME,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        } finally {
+            windowActor.y = finalY;
+            this._windowSlideAnimationComplete(window, finalY);
+        }
     }
 
     _onFocusWindowMoving() {

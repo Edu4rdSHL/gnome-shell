@@ -748,17 +748,33 @@ var _Draggable = class _Draggable {
         });
     }
 
-    _animateDragEnd(eventTime, params) {
+    async _animateDragEnd(eventTime, params) {
         this._animationInProgress = true;
 
         // start the animation
-        this._dragActor.ease(Object.assign(params, {
+        await this._dragActor.ease(Object.assign(params, {
             opacity: this._dragOrigOpacity,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
-                this._onAnimationComplete(this._dragActor, eventTime);
-            },
         }));
+
+        if (this._dragOrigParent) {
+            Main.uiGroup.remove_child(this._dragActor);
+            this._dragOrigParent.add_actor(this._dragActor);
+            this._dragActor.set_scale(this._dragOrigScale, this._dragOrigScale);
+            if (this._dragActorHadFixedPos)
+                this._dragActor.set_position(this._dragOrigX, this._dragOrigY);
+            else
+                this._dragActor.fixed_position_set = false;
+            if (this._dragActorHadNatWidth)
+                this._dragActor.set_width(-1);
+            if (this._dragActorHadNatHeight)
+                this._dragActor.set_height(-1);
+        } else {
+            this._dragActor.destroy();
+        }
+
+        this.emit('drag-end', eventTime, false);
+        this._finishAnimation();
     }
 
     _finishAnimation() {
@@ -770,27 +786,6 @@ var _Draggable = class _Draggable {
             this._dragComplete();
 
         global.display.set_cursor(Meta.Cursor.DEFAULT);
-    }
-
-    _onAnimationComplete(dragActor, eventTime) {
-        if (this._dragOrigParent) {
-            Main.uiGroup.remove_child(this._dragActor);
-            this._dragOrigParent.add_actor(this._dragActor);
-            dragActor.set_scale(this._dragOrigScale, this._dragOrigScale);
-            if (this._dragActorHadFixedPos)
-                dragActor.set_position(this._dragOrigX, this._dragOrigY);
-            else
-                dragActor.fixed_position_set = false;
-            if (this._dragActorHadNatWidth)
-                this._dragActor.set_width(-1);
-            if (this._dragActorHadNatHeight)
-                this._dragActor.set_height(-1);
-        } else {
-            dragActor.destroy();
-        }
-
-        this.emit('drag-end', eventTime, false);
-        this._finishAnimation();
     }
 
     _dragComplete() {
