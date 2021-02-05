@@ -866,9 +866,9 @@ var UnlockDialog = GObject.registerClass({
             this._authPrompt.cancel();
     }
 
-    finish(onComplete) {
+    async finish() {
         this._ensureAuthPrompt();
-        this._authPrompt.finish(onComplete);
+        await this._authPrompt.finish();
     }
 
     open(timestamp) {

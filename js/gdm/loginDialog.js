@@ -995,8 +995,9 @@ var LoginDialog = GObject.registerClass({
         });
     }
 
-    _onSessionOpened(client, serviceName) {
-        this._authPrompt.finish(() => this._startSession(serviceName));
+    async _onSessionOpened(client, serviceName) {
+        await this._authPrompt.finish();
+        this._startSession(serviceName);
     }
 
     _waitForItemForUser(userName) {
@@ -1307,7 +1308,7 @@ var LoginDialog = GObject.registerClass({
         // Don't allow type ahead at the login screen
     }
 
-    finish(onComplete) {
-        this._authPrompt.finish(onComplete);
+    async finish() {
+        await this._authPrompt.finish();
     }
 });

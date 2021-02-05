@@ -496,14 +496,10 @@ var ScreenShield = class {
         return this._activationTime;
     }
 
-    deactivate(animate) {
+    async deactivate(animate) {
         if (this._dialog)
-            this._dialog.finish(() => this._continueDeactivate(animate));
-        else
-            this._continueDeactivate(animate);
-    }
+            await this._dialog.finish();
 
-    async _continueDeactivate(animate) {
         this._hideLockScreen(animate);
 
         if (Main.sessionMode.currentMode == 'unlock-dialog')
