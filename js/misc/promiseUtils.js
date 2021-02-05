@@ -1,8 +1,8 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported CancellablePromise, SignalConnectionPromise, IdlePromise,
-   TimeoutPromise, TimeoutSecondsPromise */
+   TimeoutPromise, TimeoutSecondsPromise, MetaLaterPromise */
 
-const { Gio, GLib, GObject } = imports.gi;
+const { Gio, GLib, GObject, Meta } = imports.gi;
 
 var CancellablePromise = class extends Promise {
     constructor(executor, cancellable) {
@@ -267,5 +267,38 @@ var TimeoutSecondsPromise = class extends GSourcePromise {
             throw TypeError('Invalid interval');
 
         super(GLib.timeout_source_new_seconds(interval), priority, cancellable);
+    }
+};
+
+var MetaLaterPromise = class extends CancellablePromise {
+    constructor(laterType, cancellable) {
+        if (arguments.length === 1 && arguments[0] instanceof Function) {
+            super(laterType);
+            return;
+        }
+
+        if (laterType && laterType.constructor.$gtype !== Meta.LaterType.$gtype)
+            throw new TypeError(`laterType ${laterType} is not of type Meta.LaterType`);
+        else if (!laterType)
+            laterType = Meta.LaterType.BEFORE_REDRAW;
+
+        let id;
+        super(resolve => {
+            id = Meta.later_add(laterType, () => {
+                this.remove();
+                resolve();
+                return GLib.SOURCE_REMOVE;
+            });
+        }, cancellable);
+
+        this._id = id;
+    }
+
+    _cleanup() {
+        if (this._id) {
+            Meta.later_remove(this._id);
+            this._id = 0;
+        }
+        super._cleanup();
     }
 };
