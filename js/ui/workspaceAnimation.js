@@ -344,7 +344,7 @@ var WorkspaceAnimationController = class {
         this.movingWindow = null;
     }
 
-    animateSwitch(from, to, direction, onComplete) {
+    async animateSwitch(from, to, direction) {
         this._swipeTracker.enabled = false;
 
         let workspaceIndices = [];
@@ -375,26 +375,25 @@ var WorkspaceAnimationController = class {
 
         const fromWs = global.workspace_manager.get_workspace_by_index(from);
         const toWs = global.workspace_manager.get_workspace_by_index(to);
+        let primaryMonitorAnimation;
 
         for (const monitorGroup of this._switchData.monitors) {
             monitorGroup.progress = monitorGroup.getWorkspaceProgress(fromWs);
             const progress = monitorGroup.getWorkspaceProgress(toWs);
 
-            const params = {
+            const animation = monitorGroup.ease_property('progress', progress, {
                 duration: WINDOW_ANIMATION_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
-            };
+            });
 
-            if (monitorGroup.index === Main.layoutManager.primaryIndex) {
-                params.onComplete = () => {
-                    this._finishWorkspaceSwitch(this._switchData);
-                    onComplete();
-                    this._swipeTracker.enabled = true;
-                };
-            }
-
-            monitorGroup.ease_property('progress', progress, params);
+            if (monitorGroup.index === Main.layoutManager.primaryIndex)
+                primaryMonitorAnimation = animation;
         }
+
+        await primaryMonitorAnimation;
+
+        this._finishWorkspaceSwitch(this._switchData);
+        this._swipeTracker.enabled = true;
     }
 
     canHandleScrollEvent(event) {
