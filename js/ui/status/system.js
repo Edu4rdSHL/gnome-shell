@@ -58,6 +58,22 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._powerOffItem.visible;
     }
 
+    _getSessionLabel() {
+        if (this._systemActions.can_power_off && this._systemActions.can_logout)
+            return _('Power Off / Log Out');
+
+        if (this._systemActions.can_logout)
+            return _('Log Out');
+
+        if (this._systemActions.can_power_off)
+            return _('Power Off');
+
+        if (this._systemActions.can_suspend)
+            return _('Suspend');
+
+        return _('Power Off / Log Out');
+    }
+
     _createSubMenu() {
         let bindFlags = GObject.BindingFlags.DEFAULT | GObject.BindingFlags.SYNC_CREATE;
         let item;
@@ -113,7 +129,7 @@ class Indicator extends PanelMenu.SystemIndicator {
             bindFlags);
 
         this._sessionSubMenu = new PopupMenu.PopupSubMenuMenuItem(
-            _('Power Off / Log Out'), true);
+            this._getSessionLabel(), true);
         this._sessionSubMenu.icon.icon_name = 'system-shutdown-symbolic';
 
         item = new PopupMenu.PopupMenuItem(_('Suspend'));
