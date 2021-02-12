@@ -108,10 +108,7 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._systemActions.activateLockScreen();
         });
         this.menu.addMenuItem(item);
-        this._lockScreenItem = item;
-        this._systemActions.bind_property('can-lock-screen',
-            this._lockScreenItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-lock-screen', item, 'visible', bindFlags);
 
         this._sessionSubMenu = new PopupMenu.PopupAutoSubMenuMenuItem(
             this._getSessionLabel(), true);
@@ -127,10 +124,7 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._systemActions.activateSuspend();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._suspendItem = item;
-        this._systemActions.bind_property('can-suspend',
-            this._suspendItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-suspend', item, 'visible', bindFlags);
 
         item = new PopupMenu.PopupMenuItem(_('Restart…'));
         item.connect('activate', () => {
@@ -138,10 +132,7 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._systemActions.activateRestart();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._restartItem = item;
-        this._systemActions.bind_property('can-restart',
-            this._restartItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-restart', item, 'visible', bindFlags);
 
         item = new PopupMenu.PopupMenuItem(_('Power Off…'));
         item.connect('activate', () => {
@@ -149,10 +140,7 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._systemActions.activatePowerOff();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._powerOffItem = item;
-        this._systemActions.bind_property('can-power-off',
-            this._powerOffItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-power-off', item, 'visible', bindFlags);
 
         this._sessionSubMenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
@@ -162,10 +150,7 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._systemActions.activateLogout();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._logoutItem = item;
-        this._systemActions.bind_property('can-logout',
-            this._logoutItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-logout', item, 'visible', bindFlags);
 
         item = new PopupMenu.PopupMenuItem(_('Switch User…'));
         item.connect('activate', () => {
@@ -173,10 +158,7 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._systemActions.activateSwitchUser();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._loginScreenItem = item;
-        this._systemActions.bind_property('can-switch-user',
-            this._loginScreenItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-switch-user', item, 'visible', bindFlags);
 
         this.menu.addMenuItem(this._sessionSubMenu);
     }
