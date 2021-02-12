@@ -19,16 +19,6 @@ class Indicator extends PanelMenu.SystemIndicator {
 
         this._createSubMenu();
 
-        this._loginScreenItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
-        this._logoutItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
-        this._suspendItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
-        this._powerOffItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
-        this._restartItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
         // Whether shutdown is available or not depends on both lockdown
         // settings (disable-log-out) and Polkit policy - the latter doesn't
         // notify, so we update the menu item each time the menu opens or
@@ -50,12 +40,7 @@ class Indicator extends PanelMenu.SystemIndicator {
     }
 
     _updateSessionSubMenu() {
-        this._sessionSubMenu.visible =
-            this._loginScreenItem.visible ||
-            this._logoutItem.visible ||
-            this._suspendItem.visible ||
-            this._restartItem.visible ||
-            this._powerOffItem.visible;
+        this._sessionSubMenu.visible = !!this._sessionSubMenu.getVisibleItems().length;
     }
 
     _getSessionLabel() {
@@ -128,9 +113,13 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._lockScreenItem, 'visible',
             bindFlags);
 
-        this._sessionSubMenu = new PopupMenu.PopupSubMenuMenuItem(
+        this._sessionSubMenu = new PopupMenu.PopupAutoSubMenuMenuItem(
             this._getSessionLabel(), true);
         this._sessionSubMenu.icon.icon_name = 'system-shutdown-symbolic';
+        this._sessionSubMenu.connect('items-visibility-changed', () => {
+            this._updateSessionSubMenu();
+            this._sessionSubMenu.label.text = this._getSessionLabel();
+        });
 
         item = new PopupMenu.PopupMenuItem(_('Suspend'));
         item.connect('activate', () => {
