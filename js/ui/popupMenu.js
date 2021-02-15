@@ -458,6 +458,10 @@ class PopupImageMenuItem extends PopupBaseMenuItem {
         else
             this._icon.icon_name = icon;
     }
+
+    setIconVisibility(visible) {
+        this._icon.visible = visible;
+    }
 });
 
 var PopupMenuBase = class {

@@ -118,7 +118,8 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._sessionSubMenu.label.text = this._getSessionLabel();
         });
 
-        item = new PopupMenu.PopupMenuItem(_('Suspend'));
+        item = new PopupMenu.PopupImageMenuItem(_('Suspend'), 'media-playback-pause-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activateSuspend();
@@ -126,7 +127,8 @@ class Indicator extends PanelMenu.SystemIndicator {
         this._sessionSubMenu.menu.addMenuItem(item);
         this._systemActions.bind_property('can-suspend', item, 'visible', bindFlags);
 
-        item = new PopupMenu.PopupMenuItem(_('Restart…'));
+        item = new PopupMenu.PopupImageMenuItem(_('Restart…'), 'system-reboot-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activateRestart();
@@ -134,7 +136,8 @@ class Indicator extends PanelMenu.SystemIndicator {
         this._sessionSubMenu.menu.addMenuItem(item);
         this._systemActions.bind_property('can-restart', item, 'visible', bindFlags);
 
-        item = new PopupMenu.PopupMenuItem(_('Power Off…'));
+        item = new PopupMenu.PopupImageMenuItem(_('Power Off…'), 'system-shutdown-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activatePowerOff();
@@ -144,7 +147,8 @@ class Indicator extends PanelMenu.SystemIndicator {
 
         this._sessionSubMenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        item = new PopupMenu.PopupMenuItem(_('Log Out'));
+        item = new PopupMenu.PopupImageMenuItem(_('Log Out'), 'system-log-out-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activateLogout();
@@ -152,7 +156,8 @@ class Indicator extends PanelMenu.SystemIndicator {
         this._sessionSubMenu.menu.addMenuItem(item);
         this._systemActions.bind_property('can-logout', item, 'visible', bindFlags);
 
-        item = new PopupMenu.PopupMenuItem(_('Switch User…'));
+        item = new PopupMenu.PopupImageMenuItem(_('Switch User…'), 'system-switch-user-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activateSwitchUser();
