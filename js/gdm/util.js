@@ -292,9 +292,19 @@ var ShellUserVerifier = class {
         this.emit('no-more-messages');
     }
 
-    increaseCurrentMessageTimeout(interval) {
-        if (!this._messageQueueTimeoutId && interval > 0)
-            this._currentMessageExtraInterval = interval;
+    freezeCurrentMessage() {
+        if (!this._currentMessageFreezeCount)
+            this._currentMessageFreezeCount = 0;
+        this._currentMessageFreezeCount++;
+    }
+
+    thawCurrentMessage() {
+        if (!this._currentMessageFreezeCount)
+            return;
+
+        this._currentMessageFreezeCount--;
+        if (this._currentMessageFreezeCount === 0)
+            this.emit('current-message-thawed');
     }
 
     _serviceHasPendingMessages(serviceName) {
@@ -309,17 +319,20 @@ var ShellUserVerifier = class {
             this._queuePriorityMessage(serviceName, null, messageType);
     }
 
-    _queueMessageTimeout() {
-        if (this._messageQueueTimeoutId != 0)
+    async _queueMessageTimeout() {
+        if (this._messageQueueTimeoutId !== 0 || this._currentMessageFreezeCount)
             return;
 
         const message = this.currentMessage;
 
-        delete this._currentMessageExtraInterval;
+        delete this._currentMessageFreezeCount;
         this.emit('show-message', message.serviceName, message.text, message.type);
 
+        if (this._currentMessageFreezeCount)
+            await this.connect_once('current-message-thawed', this._cancellable);
+
         this._messageQueueTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-            message.interval + (this._currentMessageExtraInterval | 0), () => {
+            message.interval, () => {
                 this._messageQueueTimeoutId = 0;
 
                 if (this._messageQueue.length > 1) {

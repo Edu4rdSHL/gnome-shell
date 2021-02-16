@@ -449,7 +449,7 @@ var AuthPrompt = GObject.registerClass({
         });
     }
 
-    setMessage(serviceName, message, type) {
+    async setMessage(serviceName, message, type) {
         if (type == GdmUtil.MessageType.ERROR)
             this._message.add_style_class_name('login-dialog-message-warning');
         else
@@ -470,14 +470,9 @@ var AuthPrompt = GObject.registerClass({
 
         if (type === GdmUtil.MessageType.ERROR &&
             this._userVerifier.serviceIsFingerprint(serviceName)) {
-            // TODO: Use Await for wiggle to be over before unfreezing the user verifier queue
-            const wiggleParameters = {
-                duration: 65,
-                wiggleCount: 3,
-            };
-            this._userVerifier.increaseCurrentMessageTimeout(
-                wiggleParameters.duration * (wiggleParameters.wiggleCount + 2));
-            Util.wiggle(this._message, wiggleParameters);
+            this._userVerifier.freezeCurrentMessage();
+            await Util.wiggle(this._message);
+            this._userVerifier.thawCurrentMessage();
         }
     }
 
