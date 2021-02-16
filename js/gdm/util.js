@@ -173,7 +173,6 @@ var ShellUserVerifier = class {
                                                                   this._checkForSmartcard.bind(this));
 
         this._messageQueue = [];
-        this._messageQueueTimeoutId = 0;
         this.reauthenticating = false;
 
         this._failCounter = 0;
@@ -320,31 +319,36 @@ var ShellUserVerifier = class {
     }
 
     async _queueMessageTimeout() {
-        if (this._messageQueueTimeoutId !== 0 || this._currentMessageFreezeCount)
+        if (this._messageQueueTimeout?.pending() || this._currentMessageFreezeCount)
             return;
 
         const message = this.currentMessage;
+        const cancellable = this._cancellable;
 
         delete this._currentMessageFreezeCount;
         this.emit('show-message', message.serviceName, message.text, message.type);
 
         if (this._currentMessageFreezeCount)
-            await this.connect_once('current-message-thawed', this._cancellable);
+            await this.connect_once('current-message-thawed', cancellable);
 
-        this._messageQueueTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-            message.interval, () => {
-                this._messageQueueTimeoutId = 0;
+        this._messageQueueTimeout = new PromiseUtils.TimeoutPromise(
+            message.interval, GLib.PRIORITY_DEFAULT, cancellable);
 
-                if (this._messageQueue.length > 1) {
-                    this._messageQueue.shift();
-                    this._queueMessageTimeout();
-                } else {
-                    this.finishMessageQueue();
-                }
+        try {
+            await this._messageQueueTimeout;
 
-                return GLib.SOURCE_REMOVE;
-            });
-        GLib.Source.set_name_by_id(this._messageQueueTimeoutId, '[gnome-shell] this._queueMessageTimeout');
+            if (this._messageQueue.length > 1) {
+                this._messageQueue.shift();
+                this._queueMessageTimeout();
+            } else {
+                this.finishMessageQueue();
+            }
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
+        } finally {
+            delete this._messageQueueTimeout;
+        }
     }
 
     _queueMessage(serviceName, message, messageType) {
@@ -371,10 +375,7 @@ var ShellUserVerifier = class {
     _clearMessageQueue() {
         this.finishMessageQueue();
 
-        if (this._messageQueueTimeoutId != 0) {
-            GLib.source_remove(this._messageQueueTimeoutId);
-            this._messageQueueTimeoutId = 0;
-        }
+        this._messageQueueTimeout?.cancel();
         this.emit('show-message', null, null, MessageType.NONE);
     }
 
