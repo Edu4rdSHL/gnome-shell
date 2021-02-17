@@ -1613,9 +1613,7 @@ cr_parser_parse_term (CRParser * a_this, CRTerm ** a_term)
         }
         cr_parsing_location_copy (&result->location,
                                   &location) ;
-        *a_term = cr_term_append_term (*a_term, result);
-
-        result = NULL;
+        *a_term = cr_term_append_term (*a_term, g_steal_pointer (&result));
 
         cr_parser_try_to_skip_spaces_and_comments (a_this);
 
@@ -2799,11 +2797,11 @@ cr_parser_new_from_buf (guchar * a_buf,
         g_return_val_if_fail (input, NULL);
 
         result = cr_parser_new_from_input (input);
-        if (!result) {
-                cr_input_destroy (input);
-                input = NULL;
+        cr_input_unref (input);
+
+        if (!result)
                 return NULL;
-        }
+
         return result;
 }
 
@@ -2825,6 +2823,7 @@ cr_parser_new_from_input (CRInput * a_input)
         }
 
         result = cr_parser_new (tokenizer);
+        g_clear_pointer (&tokenizer, cr_tknzr_unref);
         g_return_val_if_fail (result, NULL);
 
         return result;
@@ -2850,6 +2849,7 @@ cr_parser_new_from_file (const guchar * a_file_uri, enum CREncoding a_enc)
         }
 
         result = cr_parser_new (tokenizer);
+        cr_tknzr_unref (tokenizer);
         g_return_val_if_fail (result, NULL);
         return result;
 }
@@ -2992,6 +2992,7 @@ cr_parser_parse_file (CRParser * a_this,
         g_return_val_if_fail (tknzr != NULL, CR_ERROR);
 
         status = cr_parser_set_tknzr (a_this, tknzr);
+        cr_tknzr_unref (tknzr);
         g_return_val_if_fail (status == CR_OK, CR_ERROR);
 
         status = cr_parser_parse (a_this);
@@ -3357,14 +3358,6 @@ cr_parser_parse_ruleset (CRParser * a_this)
 
         if (PRIVATE (a_this)->sac_handler
             && PRIVATE (a_this)->sac_handler->start_selector) {
-                /*
-                 *the selector is ref counted so that the parser's user
-                 *can choose to keep it.
-                 */
-                if (selector) {
-                        cr_selector_ref (selector);
-                }
-
                 PRIVATE (a_this)->sac_handler->start_selector
                         (PRIVATE (a_this)->sac_handler, selector);
                 start_selector = TRUE;
@@ -3377,9 +3370,6 @@ cr_parser_parse_ruleset (CRParser * a_this)
         status = cr_parser_parse_declaration (a_this, &property,
                                               &expr,
                                               &is_important);
-        if (expr) {
-                cr_term_ref (expr);
-        }
         if (status == CR_OK
             && PRIVATE (a_this)->sac_handler
             && PRIVATE (a_this)->sac_handler->property) {
@@ -3432,9 +3422,6 @@ cr_parser_parse_ruleset (CRParser * a_this)
                 status = cr_parser_parse_declaration (a_this, &property,
                                                       &expr, &is_important);
 
-                if (expr) {
-                        cr_term_ref (expr);
-                }
                 if (status == CR_OK
                     && PRIVATE (a_this)->sac_handler
                     && PRIVATE (a_this)->sac_handler->property) {
@@ -3968,9 +3955,6 @@ cr_parser_parse_page (CRParser * a_this)
          */
         if (PRIVATE (a_this)->sac_handler
             && PRIVATE (a_this)->sac_handler->property) {
-                if (css_expression)
-                        cr_term_ref (css_expression);
-
                 PRIVATE (a_this)->sac_handler->property
                         (PRIVATE (a_this)->sac_handler,
                          property, css_expression, important);
@@ -4022,7 +4006,6 @@ cr_parser_parse_page (CRParser * a_this)
                  */
                 if (PRIVATE (a_this)->sac_handler
                     && PRIVATE (a_this)->sac_handler->property) {
-                        cr_term_ref (css_expression);
                         PRIVATE (a_this)->sac_handler->property
                                 (PRIVATE (a_this)->sac_handler,
                                  property, css_expression, important);
@@ -4269,7 +4252,6 @@ cr_parser_parse_font_face (CRParser * a_this)
                 /*
                  *here, call the relevant SAC handler.
                  */
-                cr_term_ref (css_expression);
                 if (PRIVATE (a_this)->sac_handler &&
                     PRIVATE (a_this)->sac_handler->property) {
                         PRIVATE (a_this)->sac_handler->property
@@ -4304,7 +4286,6 @@ cr_parser_parse_font_face (CRParser * a_this)
                 /*
                  *here, call the relevant SAC handler.
                  */
-                cr_term_ref (css_expression);
                 if (PRIVATE (a_this)->sac_handler->property) {
                         PRIVATE (a_this)->sac_handler->property
                                 (PRIVATE (a_this)->sac_handler,
@@ -4476,6 +4457,7 @@ cr_parser_parse_buf (CRParser * a_this,
         g_return_val_if_fail (tknzr != NULL, CR_ERROR);
 
         status = cr_parser_set_tknzr (a_this, tknzr);
+        cr_tknzr_unref (tknzr);
         g_return_val_if_fail (status == CR_OK, CR_ERROR);
 
         status = cr_parser_parse (a_this);

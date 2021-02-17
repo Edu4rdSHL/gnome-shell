@@ -74,6 +74,8 @@ cr_cascade_new (CRStyleSheet * a_author_sheet,
                 return NULL;
         }
 
+        PRIVATE (result)->ref_count = 1;
+
         if (a_author_sheet) {
                 cr_cascade_set_sheet (result, a_author_sheet, ORIGIN_AUTHOR);
         }

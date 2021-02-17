@@ -91,6 +91,7 @@ cr_term_new (void)
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
+        result->ref_count = 1;
         return result;
 }
 

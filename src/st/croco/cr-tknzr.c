@@ -1590,6 +1590,8 @@ cr_tknzr_new (CRInput * a_input)
                 return NULL;
         }
 
+        PRIVATE (result)->ref_count = 1;
+
         if (a_input)
                 cr_tknzr_set_input (result, a_input);
         return result;
@@ -1609,6 +1611,7 @@ cr_tknzr_new_from_buf (guchar * a_buf, gulong a_len,
         g_return_val_if_fail (input != NULL, NULL);
 
         result = cr_tknzr_new (input);
+        g_clear_pointer (&input, cr_input_unref);
 
         return result;
 }
@@ -1624,6 +1627,7 @@ cr_tknzr_new_from_uri (const guchar * a_file_uri,
         g_return_val_if_fail (input != NULL, NULL);
 
         result = cr_tknzr_new (input);
+        g_clear_pointer (&input, cr_input_unref);
 
         return result;
 }

@@ -58,12 +58,16 @@ CRStyleSheet *
 cr_stylesheet_new (CRStatement * a_stmts)
 {
         CRStyleSheet *result;
+        CRStyleSheetReal *real;
 
         result = g_try_malloc0 (sizeof (CRStyleSheetReal));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
+
+        real = (CRStyleSheetReal *) result;
+        real->ref_count = 1;
 
         if (a_stmts)
                 result->statements = a_stmts;

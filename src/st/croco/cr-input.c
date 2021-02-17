@@ -98,6 +98,7 @@ cr_input_new_real (void)
                 return NULL;
         }
 
+        PRIVATE (result)->ref_count = 1;
         PRIVATE (result)->free_in_buf = TRUE;
         return result;
 }
