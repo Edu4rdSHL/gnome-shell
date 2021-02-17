@@ -85,6 +85,8 @@ void cr_stylesheet_destroy (CRStyleSheet *a_this) ;
 void cr_stylesheet_set_app_data (CRStyleSheet *a_this, gpointer app_data, GDestroyNotify app_data_destroy_func);
 gpointer cr_stylesheet_get_app_data (CRStyleSheet *a_this);
 
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (CRStyleSheet, cr_stylesheet_unref);
+
 G_END_DECLS
 
 #endif /*__CR_STYLESHEET_H__*/
