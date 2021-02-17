@@ -37,6 +37,16 @@ typedef struct {
          *cr_stylesheet_unref()
         */
         gulong ref_count;
+
+        /**
+         *custom application data pointer
+         *Can be used by applications.
+         *libcroco itself will handle its destruction
+         *if app_data_destroy_func is set via
+         *cr_stylesheet_set_app_data().
+         */
+        gpointer app_data;
+        GDestroyNotify app_data_destroy_func;
 } CRStyleSheetReal;
 
 /**
@@ -175,6 +185,15 @@ cr_stylesheet_unref (CRStyleSheet * a_this)
         return FALSE;
 }
 
+static void
+cleanup_app_data (CRStyleSheetReal * real)
+{
+        if (real->app_data_destroy_func) {
+                g_clear_pointer (&real->app_data, real->app_data_destroy_func);
+                real->app_data_destroy_func = NULL;
+        }
+}
+
 /**
  *Destructor of the #CRStyleSheet class.
  *@param a_this the current instance of the #CRStyleSheet class.
@@ -182,11 +201,40 @@ cr_stylesheet_unref (CRStyleSheet * a_this)
 void
 cr_stylesheet_destroy (CRStyleSheet * a_this)
 {
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
+
         g_return_if_fail (a_this);
 
         if (a_this->statements) {
                 cr_statement_destroy (a_this->statements);
                 a_this->statements = NULL;
         }
+
+        cleanup_app_data (real);
         g_free (a_this);
+}
+
+void
+cr_stylesheet_set_app_data (CRStyleSheet   * a_this,
+                            gpointer         app_data,
+                            GDestroyNotify   app_data_destroy_func)
+{
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
+
+        g_return_if_fail (a_this);
+
+        cleanup_app_data (real);
+
+        real->app_data = app_data;
+        real->app_data_destroy_func = app_data_destroy_func;
+}
+
+gpointer
+cr_stylesheet_get_app_data (CRStyleSheet *a_this)
+{
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
+
+        g_return_val_if_fail (a_this, NULL);
+
+        return real->app_data;
 }
