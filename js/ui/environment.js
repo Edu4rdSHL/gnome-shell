@@ -113,9 +113,9 @@ function _getPropertyTarget(actor, propName) {
     throw new Error(`Invalid property name ${propName}`);
 }
 
-async function _completeTransition(transition) {
+async function _completeTransition(transition, cancellable) {
     try {
-        return await transition.connect_once('stopped');
+        return await transition.connect_once('stopped', cancellable);
     } catch (e) {
         /* We may still be cancelled if the promise has been rejected */
         transition.stop();
@@ -149,6 +149,15 @@ async function _easeActor(actor, params) {
         autoReverse = params.autoReverse;
     delete params.autoReverse;
 
+    const cancellable = params.cancellable || null;
+    delete params.cancellable;
+
+    if (cancellable?.is_cancelled()) {
+        const callback = _makeEaseCallback(params, () => {});
+        callback(false);
+        return;
+    }
+
     // repeatCount doesn't include the initial iteration
     const numIterations = repeatCount + 1;
     // whether the transition should finish where it started
@@ -180,13 +189,13 @@ async function _easeActor(actor, params) {
         .find(t => t !== null);
 
     if (transition && transition.delay)
-        await transition.connect_once('started');
+        await transition.connect_once('started', cancellable);
 
     prepare();
 
     if (transition) {
         transition.set({ repeatCount, autoReverse });
-        callback(await _completeTransition(transition));
+        callback(await _completeTransition(transition, cancellable));
     } else {
         callback(true);
     }
@@ -211,6 +220,15 @@ async function _easeActorProperty(actor, propName, target, params) {
     if (params.autoReverse != undefined)
         autoReverse = params.autoReverse;
     delete params.autoReverse;
+
+    const cancellable = params.cancellable || null;
+    delete params.cancellable;
+
+    if (cancellable?.is_cancelled()) {
+        const callback = _makeEaseCallback(params, () => {});
+        callback(false);
+        return;
+    }
 
     // repeatCount doesn't include the initial iteration
     const numIterations = repeatCount + 1;
@@ -260,10 +278,10 @@ async function _easeActorProperty(actor, propName, target, params) {
     transition.set_to(target);
 
     if (transition.delay)
-        await transition.connect_once('started');
+        await transition.connect_once('started', cancellable);
 
     prepare();
-    callback(await _completeTransition(transition));
+    callback(await _completeTransition(transition, cancellable));
 }
 
 function _loggingFunc(...args) {
