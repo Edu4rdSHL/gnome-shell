@@ -135,8 +135,7 @@ cr_cascade_set_sheet (CRCascade * a_this,
 
         if (PRIVATE (a_this)->sheets[a_origin])
                 cr_stylesheet_unref (PRIVATE (a_this)->sheets[a_origin]);
-        PRIVATE (a_this)->sheets[a_origin] = a_sheet;
-        cr_stylesheet_ref (a_sheet);
+        PRIVATE (a_this)->sheets[a_origin] = cr_stylesheet_ref (a_sheet);
         a_sheet->origin = a_origin;
         return CR_OK;
 }

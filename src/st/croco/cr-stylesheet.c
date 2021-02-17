@@ -145,14 +145,16 @@ cr_stylesheet_statement_get_from_list (CRStyleSheet * a_this, int itemnr)
         return cr_statement_get_from_list (a_this->statements, itemnr);
 }
 
-void
+CRStyleSheet *
 cr_stylesheet_ref (CRStyleSheet * a_this)
 {
         CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
 
-        g_return_if_fail (a_this);
+        g_return_val_if_fail (a_this, NULL);
 
         real->ref_count++;
+
+        return a_this;
 }
 
 gboolean

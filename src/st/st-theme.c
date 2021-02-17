@@ -274,8 +274,8 @@ st_theme_load_stylesheet (StTheme    *theme,
   stylesheet->app_data = GUINT_TO_POINTER (TRUE);
 
   insert_stylesheet (theme, file, stylesheet);
-  cr_stylesheet_ref (stylesheet);
-  theme->custom_stylesheets = g_slist_prepend (theme->custom_stylesheets, stylesheet);
+  theme->custom_stylesheets = g_slist_prepend (theme->custom_stylesheets,
+                                               cr_stylesheet_ref (stylesheet));
   g_signal_emit (theme, signals[STYLESHEETS_CHANGED], 0);
 
   return TRUE;
