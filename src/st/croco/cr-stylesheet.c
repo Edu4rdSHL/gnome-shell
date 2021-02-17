@@ -28,6 +28,17 @@
  *The definition of the #CRStyleSheet class
  */
 
+typedef struct {
+        CRStyleSheet stylesheet;
+
+        /**
+         *the reference count of this instance of #CRStyleSheet.
+         *It can be manipulated with cr_stylesheet_ref() and
+         *cr_stylesheet_unref()
+        */
+        gulong ref_count;
+} CRStyleSheetReal;
+
 /**
  *Constructor of the #CRStyleSheet class.
  *@param the initial list of css statements.
@@ -38,7 +49,7 @@ cr_stylesheet_new (CRStatement * a_stmts)
 {
         CRStyleSheet *result;
 
-        result = g_try_malloc0 (sizeof (CRStyleSheet));
+        result = g_try_malloc0 (sizeof (CRStyleSheetReal));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
@@ -137,20 +148,24 @@ cr_stylesheet_statement_get_from_list (CRStyleSheet * a_this, int itemnr)
 void
 cr_stylesheet_ref (CRStyleSheet * a_this)
 {
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
+
         g_return_if_fail (a_this);
 
-        a_this->ref_count++;
+        real->ref_count++;
 }
 
 gboolean
 cr_stylesheet_unref (CRStyleSheet * a_this)
 {
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
+
         g_return_val_if_fail (a_this, FALSE);
 
-        if (a_this->ref_count)
-                a_this->ref_count--;
+        if (real->ref_count)
+                real->ref_count--;
 
-        if (!a_this->ref_count) {
+        if (!real->ref_count) {
                 cr_stylesheet_destroy (a_this);
                 return TRUE;
         }
