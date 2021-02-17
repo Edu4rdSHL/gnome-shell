@@ -224,9 +224,8 @@ cr_doc_handler_unref (CRDocHandler * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        if (PRIVATE (a_this)->ref_count > 0) {
-                PRIVATE (a_this)->ref_count--;
-        }
+        g_assert (PRIVATE (a_this)->ref_count > 0);
+        PRIVATE (a_this)->ref_count--;
 
         if (PRIVATE (a_this)->ref_count == 0) {
                 cr_doc_handler_destroy (a_this);

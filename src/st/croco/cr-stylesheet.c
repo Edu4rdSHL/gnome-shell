@@ -176,10 +176,8 @@ cr_stylesheet_unref (CRStyleSheet * a_this)
 {
         CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
 
-        g_return_val_if_fail (a_this, FALSE);
-
-        if (real->ref_count)
-                real->ref_count--;
+        g_assert (real->ref_count > 0);
+        real->ref_count--;
 
         if (!real->ref_count) {
                 cr_stylesheet_destroy (a_this);
