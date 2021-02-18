@@ -1,6 +1,8 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported CredentialManager */
 
+const Signals = imports.signals;
+
 var CredentialManager = class CredentialManager {
     constructor(service) {
         this._token = null;
@@ -22,3 +24,4 @@ var CredentialManager = class CredentialManager {
         return this._service;
     }
 };
+Signals.addSignalMethods(CredentialManager.prototype);
