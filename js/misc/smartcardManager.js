@@ -95,7 +95,7 @@ var SmartcardManager = class {
         if (this._loginToken == token)
             this._loginToken = null;
 
-        token.disconnectAll();
+        token.run_dispose();
     }
 
     hasInsertedTokens() {
