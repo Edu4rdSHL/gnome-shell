@@ -178,20 +178,17 @@ var ShellUserVerifier = class {
         this._failCounter = 0;
         this._unavailableServices = new Set();
 
-        this._credentialManagers = {};
-        this._credentialManagers[OVirt.SERVICE_NAME] = OVirt.getOVirtCredentialsManager();
-        this._credentialManagers[Vmware.SERVICE_NAME] = Vmware.getVmwareCredentialsManager();
+        this._credentialManagers = new Map();
+        this._credentialManagers.set(OVirt.SERVICE_NAME, OVirt.getOVirtCredentialsManager());
+        this._credentialManagers.set(Vmware.SERVICE_NAME, Vmware.getVmwareCredentialsManager());
 
-        for (let service in this._credentialManagers) {
-            if (this._credentialManagers[service].token) {
-                this._onCredentialManagerAuthenticated(this._credentialManagers[service],
-                    this._credentialManagers[service].token);
-            }
+        this._credentialManagers.forEach(service => {
+            if (service.token)
+                this._onCredentialManagerAuthenticated(service, service.token);
 
-            this._credentialManagers[service]._authenticatedSignalId =
-                this._credentialManagers[service].connect('user-authenticated',
-                                                          this._onCredentialManagerAuthenticated.bind(this));
-        }
+            service._authenticatedSignalId = service.connect('user-authenticated',
+                this._onCredentialManagerAuthenticated.bind(this));
+        });
     }
 
     get hasPendingMessages() {
@@ -260,11 +257,11 @@ var ShellUserVerifier = class {
         this._smartcardManager.disconnect(this._smartcardRemovedId);
         this._smartcardManager = null;
 
-        for (let service in this._credentialManagers) {
-            let credentialManager = this._credentialManagers[service];
-            credentialManager.disconnect(credentialManager._authenticatedSignalId);
-            credentialManager = null;
-        }
+        this._credentialManagers.forEach(service => {
+            service.disconnect(service._authenticatedSignalId);
+            delete service._authenticatedSignalId;
+        });
+        this._credentialManagers.clear();
     }
 
     answerQuery(serviceName, answer) {
@@ -644,10 +641,8 @@ var ShellUserVerifier = class {
         if (!this.serviceIsForeground(serviceName))
             return;
 
-        let token = null;
-        if (this._credentialManagers[serviceName])
-            token = this._credentialManagers[serviceName].token;
 
+        const token = this._credentialManagers.get(serviceName)?.token;
         if (token) {
             this.answerQuery(serviceName, token);
             return;
@@ -738,10 +733,9 @@ var ShellUserVerifier = class {
         // If the login failed with the preauthenticated oVirt credentials
         // then discard the credentials and revert to default authentication
         // mechanism.
-        let foregroundService = Object.keys(this._credentialManagers).find(service =>
-            this.serviceIsForeground(service));
-        if (foregroundService) {
-            this._credentialManagers[foregroundService].token = null;
+        const foregroundService = this.serviceIsForeground(serviceName);
+        if (foregroundService && this._credentialManagers.has(serviceName)) {
+            this._credentialManagers.get(serviceName).token = null;
             this._preemptingService = null;
             this._verificationFailed(serviceName, false);
             return;
@@ -755,7 +749,7 @@ var ShellUserVerifier = class {
         // if the password service fails, then cancel everything.
         // But if, e.g., fingerprint fails, still give
         // password authentication a chance to succeed
-        if (this.serviceIsForeground(serviceName))
+        if (foregroundService)
             this._failCounter++;
 
         this._verificationFailed(serviceName, true);
