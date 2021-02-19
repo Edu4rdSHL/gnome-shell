@@ -6,36 +6,19 @@ const Credential = imports.gdm.credentialManager;
 
 var SERVICE_NAME = 'gdm-ovirtcred';
 
-const OVirtCredentialsIface = `
-<node>
-<interface name="org.ovirt.vdsm.Credentials">
-<signal name="UserAuthenticated">
-    <arg type="s" name="token"/>
-</signal>
-</interface>
-</node>`;
-
-const OVirtCredentialsInfo = Gio.DBusInterfaceInfo.new_for_xml(OVirtCredentialsIface);
+const credentialsIface = 'org.ovirt.vdsm.Credentials';
+const credentialsPath = '/org/ovirt/vdsm/Credentials';
 
 let _oVirtCredentialsManager = null;
-
-function OVirtCredentials() {
-    var self = new Gio.DBusProxy({ g_connection: Gio.DBus.system,
-                                   g_interface_name: OVirtCredentialsInfo.name,
-                                   g_interface_info: OVirtCredentialsInfo,
-                                   g_name: 'org.ovirt.vdsm.Credentials',
-                                   g_object_path: '/org/ovirt/vdsm/Credentials',
-                                   g_flags: Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES });
-    self.init(null);
-    return self;
-}
 
 var OVirtCredentialsManager = class OVirtCredentialsManager extends Credential.CredentialManager {
     constructor() {
         super(SERVICE_NAME);
-        this._credentials = new OVirtCredentials();
-        this._credentials.connectSignal('UserAuthenticated',
-            (proxy, sender, [token]) => {
+
+        Gio.DBus.system.signal_subscribe(credentialsIface, credentialsIface,
+            'UserAuthenticated', credentialsPath, null,
+            Gio.DBusSignalFlags.NONE, (_c, _sender, _path, _iface, _signal, params) => {
+                const [token] = params.deep_unpack();
                 this.token = token;
             });
     }
