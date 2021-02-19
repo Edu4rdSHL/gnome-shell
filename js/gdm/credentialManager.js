@@ -36,7 +36,7 @@ var DBusCredentialManager = class extends CredentialManager {
     constructor(service, dbusName, dbusIface, dbusPath) {
         super(service);
 
-        Gio.DBus.system.signal_subscribe(dbusName,
+        this._subscriptionId = Gio.DBus.system.signal_subscribe(dbusName,
             dbusIface, 'UserAuthenticated', dbusPath, null,
             Gio.DBusSignalFlags.NONE, (_c, _sender, _path, _iface, _signal, params) => {
                 const [token] = params.deep_unpack();
@@ -46,5 +46,14 @@ var DBusCredentialManager = class extends CredentialManager {
 
     _onUserAuthenticated(token) {
         this.token = token;
+    }
+
+    destroy() {
+        if (this._subscriptionId) {
+            Gio.DBus.system.signal_unsubscribe(this._subscriptionId);
+            delete this._subscriptionId;
+        }
+
+        super.destroy();
     }
 };

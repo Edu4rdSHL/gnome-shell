@@ -179,8 +179,8 @@ var ShellUserVerifier = class {
         this._unavailableServices = new Set();
 
         this._credentialManagers = new Map();
-        this._credentialManagers.set(OVirt.SERVICE_NAME, OVirt.getOVirtCredentialsManager());
-        this._credentialManagers.set(Vmware.SERVICE_NAME, Vmware.getVmwareCredentialsManager());
+        this._credentialManagers.set(OVirt.SERVICE_NAME, new OVirt.CredentialsManager());
+        this._credentialManagers.set(Vmware.SERVICE_NAME, new Vmware.CredentialsManager());
 
         this._credentialManagers.forEach(service => {
             if (service.token)
@@ -257,10 +257,7 @@ var ShellUserVerifier = class {
         this._smartcardManager.disconnect(this._smartcardRemovedId);
         this._smartcardManager = null;
 
-        this._credentialManagers.forEach(service => {
-            service.disconnect(service._authenticatedSignalId);
-            delete service._authenticatedSignalId;
-        });
+        this._credentialManagers.forEach(s => s.destroy());
         this._credentialManagers.clear();
     }
 

@@ -89,12 +89,17 @@ var ScreenShield = class {
                                                this._activateDialog();
                                        });
 
-        this._oVirtCredentialsManager = OVirt.getOVirtCredentialsManager();
-        this._oVirtCredentialsManager.connect('user-authenticated',
-                                              () => {
-                                                  if (this._isLocked)
-                                                      this._activateDialog();
-                                              });
+        this.connect('locked-changed', () => {
+            if (!this._isLocked) {
+                this._oVirtCredentialsManager?.destroy();
+                delete this._oVirtCredentialsManager;
+                return;
+            }
+
+            this._oVirtCredentialsManager = new OVirt.CredentialsManager();
+            this._oVirtCredentialsManager.connect('user-authenticated',
+                () => this._activateDialog());
+        });
 
         this._loginManager = LoginManager.getLoginManager();
         this._loginManager.connect('prepare-for-sleep',
