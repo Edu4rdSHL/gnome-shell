@@ -733,8 +733,8 @@ var ShellUserVerifier = class {
         const foregroundService = this.serviceIsForeground(serviceName);
         if (foregroundService && this._credentialManagers.has(serviceName)) {
             this._credentialManagers.get(serviceName).token = null;
-            this._preemptingService = null;
             this._verificationFailed(serviceName, false);
+            this._preemptingService = null;
             return;
         }
 
