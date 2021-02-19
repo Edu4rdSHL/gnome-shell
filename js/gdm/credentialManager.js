@@ -1,6 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
-/* exported CredentialManager */
+/* exported CredentialManager, DBusCredentialManager */
 
+const { Gio } = imports.gi;
 const Signals = imports.signals;
 
 var CredentialManager = class CredentialManager {
@@ -8,6 +9,10 @@ var CredentialManager = class CredentialManager {
         this._token = null;
         this._service = service;
         this._authenticatedSignalId = null;
+    }
+
+    destroy() {
+        this.disconnectAll();
     }
 
     get token() {
@@ -25,3 +30,21 @@ var CredentialManager = class CredentialManager {
     }
 };
 Signals.addSignalMethods(CredentialManager.prototype);
+
+
+var DBusCredentialManager = class extends CredentialManager {
+    constructor(service, dbusName, dbusIface, dbusPath) {
+        super(service);
+
+        Gio.DBus.system.signal_subscribe(dbusName,
+            dbusIface, 'UserAuthenticated', dbusPath, null,
+            Gio.DBusSignalFlags.NONE, (_c, _sender, _path, _iface, _signal, params) => {
+                const [token] = params.deep_unpack();
+                this._onUserAuthenticated(token);
+            });
+    }
+
+    _onUserAuthenticated(token) {
+        this.token = token;
+    }
+};
