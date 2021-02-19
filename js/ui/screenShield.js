@@ -82,19 +82,26 @@ var ScreenShield = class {
 
         this._screenSaverDBus = new ShellDBus.ScreenSaverDBus(this);
 
-        this._smartcardManager = SmartcardManager.getSmartcardManager();
-        this._smartcardManager.connect('smartcard-inserted',
-                                       (manager, token) => {
-                                           if (this._isLocked && token.UsedToLogin)
-                                               this._activateDialog();
-                                       });
-
         this.connect('locked-changed', () => {
+            const smartcardManager = SmartcardManager.getSmartcardManager();
             if (!this._isLocked) {
                 this._oVirtCredentialsManager?.destroy();
                 delete this._oVirtCredentialsManager;
+
+                smartcardManager.disconnect(this._smartcardInsertedId);
+                delete this._smartcardInsertedId;
+
                 return;
             }
+
+            if (smartcardManager.hasInsertedLoginToken())
+                this._activateDialog();
+
+            this._smartcardInsertedId = smartcardManager.connect('smartcard-inserted',
+                (manager, token) => {
+                    if (token.UsedToLogin)
+                        this._activateDialog();
+                });
 
             this._oVirtCredentialsManager = new OVirt.CredentialsManager();
             this._oVirtCredentialsManager.connect('user-authenticated',
