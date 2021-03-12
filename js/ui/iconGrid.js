@@ -371,6 +371,15 @@ var IconGridLayout = GObject.registerClass({
         this._iconSizeUpdateResolveCbs = [];
 
         this._childrenMaxSize = -1;
+        this._container = null;
+
+        global.connect('closing', this._onClosing.bind(this));
+    }
+
+    _onClosing() {
+        for (const item of this._items.keys())
+            this._unlinkItem(item);
+        this._clearContainer();
     }
 
     _findBestIconSize() {
@@ -722,9 +731,15 @@ var IconGridLayout = GObject.registerClass({
         }
     }
 
-    vfunc_set_container(container) {
-        if (this._container)
+    _clearContainer() {
+        if (this._container) {
             this._container.disconnect(this._containerDestroyedId);
+            this._container = null;
+        }
+    }
+
+    vfunc_set_container(container) {
+        this._clearContainer();
 
         this._container = container;
 
