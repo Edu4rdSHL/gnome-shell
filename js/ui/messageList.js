@@ -566,6 +566,7 @@ var MessageListSection = GObject.registerClass({
 
         let id = Main.sessionMode.connect('updated',
                                           this._sync.bind(this));
+        global.connect('closing', this._onClosing.bind(this));
         this.connect('destroy', () => {
             Main.sessionMode.disconnect(id);
         });
@@ -573,6 +574,11 @@ var MessageListSection = GObject.registerClass({
         this._empty = true;
         this._canClear = false;
         this._sync();
+    }
+
+    _onClosing() {
+        for (const message of this._messages)
+            this.removeMessage(message, false);
     }
 
     get empty() {
