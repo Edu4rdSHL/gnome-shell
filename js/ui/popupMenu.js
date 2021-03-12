@@ -379,6 +379,12 @@ var PopupSwitchMenuItem = GObject.registerClass({
         this._statusBin.child = this._switch;
     }
 
+    destroy() {
+        this._statusLabel.destroy();
+        this._switch.destroy();
+        super.destroy();
+    }
+
     setStatus(text) {
         if (text != null) {
             this._statusLabel.text = text;
