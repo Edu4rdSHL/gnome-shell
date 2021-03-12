@@ -216,6 +216,18 @@ var LayoutManager = GObject.registerClass({
 
         global.stage.add_child(this.uiGroup);
 
+        global.connect_after('closing', () => {
+            Main.uiGroup.remove_child(global.window_group);
+            global.stage.add_child(global.window_group);
+
+            Main.uiGroup.remove_child(global.top_window_group);
+            global.stage.add_child(global.top_window_group);
+
+            while (Main.uiGroup.get_children().length > 0)
+                Main.uiGroup.get_children()[0].destroy();
+            Main.uiGroup.destroy();
+        });
+
         global.stage.remove_actor(global.window_group);
         this.uiGroup.add_actor(global.window_group);
 
