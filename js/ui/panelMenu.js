@@ -116,15 +116,30 @@ var Button = GObject.registerClass({
         this.track_hover = sensitive;
     }
 
+    _clearMenu() {
+        if (!this.menu)
+            return;
+
+        if (this._openStateChangedId)
+            this.menu.disconnect(this._openStateChangedId);
+        if (this._keyPressEventId)
+            this.menu.actor.disconnect(this._keyPressEventId);
+        this._openStateChangedId = undefined;
+        this._keyPressEventId = undefined;
+        this.menu.destroy();
+        this.menu = null;
+    }
+
     setMenu(menu) {
-        if (this.menu)
-            this.menu.destroy();
+        this._clearMenu();
 
         this.menu = menu;
         if (this.menu) {
             this.menu.actor.add_style_class_name('panel-menu');
-            this.menu.connect('open-state-changed', this._onOpenStateChanged.bind(this));
-            this.menu.actor.connect('key-press-event', this._onMenuKeyPress.bind(this));
+            this._openStateChangedId =
+                this.menu.connect('open-state-changed', this._onOpenStateChanged.bind(this));
+            this._keyPressEventId =
+                this.menu.actor.connect('key-press-event', this._onMenuKeyPress.bind(this));
 
             Main.uiGroup.add_actor(this.menu.actor);
             this.menu.actor.hide();
@@ -185,8 +200,7 @@ var Button = GObject.registerClass({
     }
 
     _onDestroy() {
-        if (this.menu)
-            this.menu.destroy();
+        this._clearMenu();
         super._onDestroy();
     }
 });
