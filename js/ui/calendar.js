@@ -912,8 +912,7 @@ class DoNotDisturbSwitch extends PopupMenu.Switch {
             Gio.SettingsBindFlags.INVERT_BOOLEAN);
 
         this.connect('destroy', () => {
-            this._settings.run_dispose();
-            this._settings = null;
+            Gio.Settings.unbind(this._settings, 'show-banners');
         });
     }
 });
@@ -996,6 +995,15 @@ class CalendarMessageList extends St.Widget {
         this._addSection(this._notificationSection);
 
         Main.sessionMode.connect('updated', this._sync.bind(this));
+        global.connect('closing', this._onClosing.bind(this));
+    }
+
+    _onClosing() {
+        for (const section of this._sectionList) {
+            for (const id of section._calendarConnectionsIds)
+                section.disconnect(id);
+        }
+        this._sectionList.remove_all_children();
     }
 
     _addSection(section) {
@@ -1014,6 +1022,7 @@ class CalendarMessageList extends St.Widget {
             this._sectionList.remove_actor(section);
         }));
 
+        section._calendarConnectionsIds = connectionsIds;
         this._sectionList.add_actor(section);
     }
 
