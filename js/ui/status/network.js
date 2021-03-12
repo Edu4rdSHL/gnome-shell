@@ -119,17 +119,27 @@ var NMConnectionItem = class {
         this._sync();
     }
 
-    _buildUI() {
-        this.labelItem = new PopupMenu.PopupMenuItem('');
+    _setLabelItem(item) {
+        this.labelItem = item;
         this.labelItem.connect('activate', this._toggle.bind(this));
+        this.labelItem.connect('destroy', () => delete this.labelItem);
+    }
 
-        this.radioItem = new PopupMenu.PopupMenuItem(this._connection.get_id(), false);
+    _setRadioItem(item) {
+        this.radioItem = item;
         this.radioItem.connect('activate', this._activate.bind(this));
+        this.radioItem.connect('destroy', () => delete this.radioItem);
+    }
+
+    _buildUI() {
+        this._setLabelItem(new PopupMenu.PopupMenuItem(''));
+        this._setRadioItem(new PopupMenu.PopupMenuItem(this._connection.get_id(), false));
     }
 
     destroy() {
-        this.labelItem.destroy();
-        this.radioItem.destroy();
+        this.labelItem?.destroy();
+        this.radioItem?.destroy();
+        this._clearActiveConnection();
     }
 
     updateForConnection(connection) {
@@ -183,11 +193,16 @@ var NMConnectionItem = class {
         this._sync();
     }
 
-    setActiveConnection(activeConnection) {
+    _clearActiveConnection() {
         if (this._activeConnectionChangedId > 0) {
             this._activeConnection.disconnect(this._activeConnectionChangedId);
             this._activeConnectionChangedId = 0;
+            this._activeConnection = null;
         }
+    }
+
+    setActiveConnection(activeConnection) {
+        this._clearActiveConnection();
 
         this._activeConnection = activeConnection;
 
@@ -217,6 +232,7 @@ var NMConnectionSection = class NMConnectionSection {
         this.item = new PopupMenu.PopupSubMenuMenuItem('', true);
         this.item.menu.addMenuItem(this._labelSection);
         this.item.menu.addMenuItem(this._radioSection);
+        this.item.connect('destroy', () => delete this.item);
 
         this._notifyConnectivityId = this._client.connect('notify::connectivity', this._iconChanged.bind(this));
     }
@@ -227,7 +243,7 @@ var NMConnectionSection = class NMConnectionSection {
             this._notifyConnectivityId = 0;
         }
 
-        this.item.destroy();
+        this.item?.destroy();
     }
 
     _iconChanged() {
@@ -361,6 +377,8 @@ var NMConnectionDevice = class NMConnectionDevice extends NMConnectionSection {
     }
 
     destroy() {
+        this.emit('destroy');
+
         if (this._stateChangedId) {
             GObject.signal_handler_disconnect(this._device, this._stateChangedId);
             this._stateChangedId = 0;
@@ -490,6 +508,7 @@ var NMConnectionDevice = class NMConnectionDevice extends NMConnectionSection {
         }
     }
 };
+Signals.addSignalMethods(NMConnectionDevice.prototype);
 
 var NMDeviceWired = class extends NMConnectionDevice {
     constructor(client, device) {
@@ -1204,6 +1223,7 @@ var NMDeviceWireless = class {
 
         this.item = new PopupMenu.PopupSubMenuMenuItem('', true);
         this.item.menu.addAction(_("Select Network"), this._showDialog.bind(this));
+        this.item.connect('destroy', () => delete this.item);
 
         this._toggleItem = new PopupMenu.PopupMenuItem('');
         this._toggleItem.connect('activate', this._toggleWifi.bind(this));
@@ -1230,6 +1250,8 @@ var NMDeviceWireless = class {
     }
 
     destroy() {
+        this.emit('destroy');
+
         if (this._activeApChangedId) {
             GObject.signal_handler_disconnect(this._device, this._activeApChangedId);
             this._activeApChangedId = 0;
@@ -1259,7 +1281,7 @@ var NMDeviceWireless = class {
             this._notifyConnectivityId = 0;
         }
 
-        this.item.destroy();
+        this.item?.destroy();
     }
 
     _deviceStateChanged(device, newstate, oldstate, reason) {
@@ -1415,12 +1437,14 @@ var NMVpnConnectionItem = class extends NMConnectionItem {
         return this._activeConnection.vpn_state != NM.VpnConnectionState.DISCONNECTED;
     }
 
-    _buildUI() {
-        this.labelItem = new PopupMenu.PopupMenuItem('');
-        this.labelItem.connect('activate', this._toggle.bind(this));
+    destroy() {
+        this._clearActiveConnection();
+        super.destroy();
+    }
 
-        this.radioItem = new PopupMenu.PopupSwitchMenuItem(this._connection.get_id(), false);
-        this.radioItem.connect('toggled', this._toggle.bind(this));
+    _buildUI() {
+        this._setLabelItem(new PopupMenu.PopupMenuItem(''));
+        this._setRadioItem(new PopupMenu.PopupSwitchMenuItem(this._connection.get_id(), false));
     }
 
     _sync() {
@@ -1466,11 +1490,15 @@ var NMVpnConnectionItem = class extends NMConnectionItem {
         super._connectionStateChanged();
     }
 
-    setActiveConnection(activeConnection) {
+    _clearActiveConnection() {
         if (this._activeConnectionChangedId > 0) {
             this._activeConnection.disconnect(this._activeConnectionChangedId);
             this._activeConnectionChangedId = 0;
         }
+    }
+
+    setActiveConnection(activeConnection) {
+        this._clearActiveConnection();
 
         this._activeConnection = activeConnection;
 
@@ -1501,6 +1529,12 @@ var NMVpnSection = class extends NMConnectionSection {
         this.item.menu.addSettingsAction(_("VPN Settings"), 'gnome-network-panel.desktop');
 
         this._sync();
+    }
+
+    destroy() {
+        for (const item of this._connectionItems.values())
+            item.destroy();
+        super.destroy();
     }
 
     _sync() {
@@ -1655,6 +1689,18 @@ class Indicator extends PanelMenu.SystemIndicator {
         this._ctypes[NM.SETTING_VPN_SETTING_NAME] = NMConnectionCategory.VPN;
 
         this._getClient();
+        this.connect('destroy', this._onDestroy.bind(this));
+    }
+
+    _onDestroy() {
+        for (const device of this._nmDevices)
+            device._delegate?.destroy();
+        this._vpnSection.destroy();
+
+        if (this._mainConnectionStateChangedId > 0) {
+            this._mainConnection.disconnect(this._mainConnectionStateChangedId);
+            this._mainConnectionStateChangedId = 0;
+        }
     }
 
     async _getClient() {
@@ -1780,15 +1826,20 @@ class Indicator extends PanelMenu.SystemIndicator {
         let wrapperClass = this._dtypes[device.get_device_type()];
         if (wrapperClass) {
             let wrapper = new wrapperClass(this._client, device);
+            const notifyInterfaceId =
+                device.connect('notify::interface', () => {
+                    this._deviceChanged(device, false);
+                });
+            wrapper.connect('destroy',
+                () => {
+                    GObject.signal_handler_disconnect(device, notifyInterfaceId);
+                });
+
             device._delegate = wrapper;
             this._addDeviceWrapper(wrapper);
 
             this._nmDevices.push(device);
             this._deviceChanged(device, skipSyncDeviceNames);
-
-            device.connect('notify::interface', () => {
-                this._deviceChanged(device, false);
-            });
         }
     }
 
