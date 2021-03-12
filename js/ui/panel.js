@@ -775,6 +775,13 @@ class Panel extends St.Widget {
 
         global.display.connect('workareas-changed', () => this.queue_relayout());
         this._updatePanel();
+
+        this.connect('destroy', this._onDestroy.bind(this));
+    }
+
+    _onDestroy() {
+        for (const role in PANEL_ITEM_IMPLEMENTATIONS)
+            this.statusArea[role].destroy();
     }
 
     vfunc_get_preferred_width(_forHeight) {
@@ -1009,6 +1016,9 @@ class Panel extends St.Widget {
                 return null;
             }
             indicator = new constructor(this);
+            indicator.connect('destroy', () => {
+                indicator.menu?.disconnect(indicator.menu._openChangedId);
+            });
             this.statusArea[role] = indicator;
         }
         return indicator;
