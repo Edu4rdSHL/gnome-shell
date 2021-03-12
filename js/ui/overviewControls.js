@@ -112,7 +112,8 @@ class ControlsManagerLayout extends Clutter.BoxLayout {
 
     vfunc_set_container(container) {
         this._container = container;
-        this.hookup_style(container);
+        if (container)
+            this.hookup_style(container);
     }
 
     vfunc_allocate(container, box) {
@@ -603,6 +604,7 @@ class ControlsManager extends St.Widget {
     }
 
     _onDestroy() {
+        delete this._workspacesDisplay;
         global.workspace_manager.disconnect(this._nWorkspacesNotifyId);
     }
 
@@ -620,7 +622,7 @@ class ControlsManager extends St.Widget {
     }
 
     vfunc_unmap() {
-        this._workspacesDisplay.hide();
+        this._workspacesDisplay?.hide();
         super.vfunc_unmap();
     }
 
