@@ -471,6 +471,8 @@ var PopupMenuBase = class {
             throw new TypeError('Cannot instantiate abstract class %s'.format(this.constructor.name));
 
         this.sourceActor = sourceActor;
+        if (sourceActor)
+            this.sourceActor.connect('destroy', () => delete this.sourceActor);
         this.focusActor = sourceActor;
         this._parent = null;
 
@@ -479,6 +481,7 @@ var PopupMenuBase = class {
             x_expand: true,
             y_expand: true,
         });
+        this.box.connect('destroy', () => delete this.box);
 
         if (styleClass !== undefined)
             this.box.style_class = styleClass;
@@ -779,6 +782,9 @@ var PopupMenuBase = class {
     }
 
     _getMenuItems() {
+        if (!this.box)
+            return [];
+
         return this.box.get_children().map(a => a._delegate).filter(item => {
             return item instanceof PopupBaseMenuItem || item instanceof PopupMenuSection;
         });
@@ -814,7 +820,7 @@ var PopupMenuBase = class {
     destroy() {
         this.close();
         this.removeAll();
-        this.actor.destroy();
+        this.actor?.destroy();
 
         this.emit('destroy');
 
@@ -832,6 +838,10 @@ var PopupMenu = class extends PopupMenuBase {
         this._arrowSide = arrowSide;
 
         this._boxPointer = new BoxPointer.BoxPointer(arrowSide);
+        this._boxPointer.connect('destroy', () => {
+            this._boxPointer = null;
+            this.actor = null;
+        });
         this.actor = this._boxPointer;
         this.actor._delegate = this;
         this.actor.style_class = 'popup-menu-boxpointer';
@@ -849,6 +859,11 @@ var PopupMenu = class extends PopupMenuBase {
                 () => {
                     if (!this.sourceActor.mapped)
                         this.close();
+                });
+            this.sourceActor.connect('destroy',
+                () => {
+                    this._keyPressId = 0;
+                    this._notifyMappedId = 0;
                 });
         }
 
@@ -947,7 +962,7 @@ var PopupMenu = class extends PopupMenuBase {
         if (this._activeMenuItem)
             this._activeMenuItem.active = false;
 
-        if (this._boxPointer.visible) {
+        if (this._boxPointer?.visible) {
             this._boxPointer.close(animate, () => {
                 this.emit('menu-closed');
             });
@@ -1156,6 +1171,7 @@ var PopupMenuSection = class extends PopupMenuBase {
         super();
 
         this.actor = this.box;
+        this.actor.connect('destroy', () => delete this.actor);
         this.actor._delegate = this;
         this.isOpen = true;
     }
@@ -1342,9 +1358,9 @@ var PopupMenuManager = class {
         menu.disconnect(menudata.destroyId);
 
         if (menudata.enterId)
-            menu.sourceActor.disconnect(menudata.enterId);
+            menu.sourceActor?.disconnect(menudata.enterId);
         if (menudata.focusInId)
-            menu.sourceActor.disconnect(menudata.focusInId);
+            menu.sourceActor?.disconnect(menudata.focusInId);
 
         if (menu.sourceActor)
             this._grabHelper.removeActor(menu.sourceActor);
