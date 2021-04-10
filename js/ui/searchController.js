@@ -297,6 +297,9 @@ var SearchController = GObject.registerClass({
                 this._searchResults.navigateFocus(nextDirection);
                 return Clutter.EVENT_STOP;
             } else if (symbol === Clutter.KEY_Return || symbol === Clutter.KEY_KP_Enter) {
+                if (Main.overview.animationInProgress) {
+                    return Clutter.EVENT_STOP;
+                }
                 this._searchResults.activateDefault();
                 return Clutter.EVENT_STOP;
             }
