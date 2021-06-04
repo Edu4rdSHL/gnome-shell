@@ -461,11 +461,18 @@ var Background = GObject.registerClass({
     }
 
     async _loadFile(file) {
-        const info = await file.query_info_async(
-            Gio.FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE,
-            Gio.FileQueryInfoFlags.NONE,
-            0,
-            null);
+        let info;
+        try {
+            info = await file.query_info_async(
+                Gio.FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE,
+                Gio.FileQueryInfoFlags.NONE,
+                GLib.PRIORITY_DEFAULT,
+                this._cancellable);
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
+            return;
+        }
 
         const contentType = info.get_content_type();
         if (contentType === 'application/xml') {
