@@ -1,6 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
-/* exported CancellablePromise, SignalConnectionPromise, IdlePromise,
-   TimeoutPromise, TimeoutSecondsPromise, MetaLaterPromise */
+/* exported CancellablePromise, SignalConnectionPromiseFull,
+   SignalConnectionPromise, IdlePromise, TimeoutPromise, TimeoutSecondsPromise,
+   MetaLaterPromise */
 
 const { Gio, GLib, GObject, Meta } = imports.gi;
 
@@ -115,15 +116,35 @@ var CancellablePromise = class extends Promise {
     }
 };
 
-var SignalConnectionPromise = class extends CancellablePromise {
-    constructor(object, signal, cancellable) {
+const SignalConnectionPromiseFlags = Object.freeze({
+    NONE: 0,
+    AFTER: 1 << 0,
+    MULTIPLE: 1 << 1,
+});
+
+var SignalConnectionPromiseFull = class extends CancellablePromise {
+    static get Flags() {
+        return SignalConnectionPromiseFlags;
+    }
+
+    constructor(object, signal, handler, flags, cancellable) {
         if (arguments.length === 1 && object instanceof Function) {
             super(object);
             return;
         }
 
-        if (!(object.connect instanceof Function))
+        if (flags === undefined)
+            flags = SignalConnectionPromiseFull.Flags.NONE;
+
+        if (flags & SignalConnectionPromiseFull.Flags.AFTER) {
+            if (!(object.connect_after instanceof Function))
+                throw new TypeError('Not a valid object');
+        } else if (!(object.connect instanceof Function)) {
             throw new TypeError('Not a valid object');
+        }
+
+        if (!(handler instanceof Function))
+            throw new TypeError('Not a valid handler');
 
         if (object instanceof GObject.Object &&
             !GObject.signal_lookup(signal.split(':')[0], object.constructor.$gtype))
@@ -131,18 +152,37 @@ var SignalConnectionPromise = class extends CancellablePromise {
 
         let id;
         let destroyId;
-        super(resolve => {
+        super((resolve, reject) => {
             let connectSignal;
-            if (object instanceof GObject.Object)
-                connectSignal = (sig, cb) => GObject.signal_connect(object, sig, cb);
-            else
+            if (object instanceof GObject.Object) {
+                if (flags & SignalConnectionPromiseFull.Flags.AFTER)
+                    connectSignal = (sig, cb) => GObject.signal_connect_after(object, sig, cb);
+                else
+                    connectSignal = (sig, cb) => GObject.signal_connect(object, sig, cb);
+            } else if (flags & SignalConnectionPromiseFull.Flags.AFTER) {
+                connectSignal = (sig, cb) => object.connect_after(sig, cb);
+            } else {
                 connectSignal = (sig, cb) => object.connect(sig, cb);
+            }
 
             id = connectSignal(signal, (_obj, ...args) => {
+                const promiseHandler = { resolve, reject };
+                let ret;
                 if (!args.length)
-                    resolve();
+                    ret = handler(promiseHandler);
                 else
-                    resolve(args.length === 1 ? args[0] : args);
+                    ret = handler(promiseHandler, args.length === 1 ? args[0] : args);
+
+                if (flags & SignalConnectionPromiseFull.Flags.MULTIPLE)
+                    return ret;
+
+                if (this.pending()) {
+                    const e = new Error('Promise was not resolved or rejected');
+                    reject(e);
+                    throw e;
+                }
+
+                return ret;
             });
 
             if (signal !== 'destroy' &&
@@ -179,6 +219,18 @@ var SignalConnectionPromise = class extends CancellablePromise {
 
     get object() {
         return this._chainRoot._object;
+    }
+};
+
+var SignalConnectionPromise = class extends SignalConnectionPromiseFull {
+    constructor(object, signal, cancellable) {
+        if (arguments.length === 1 && object instanceof Function) {
+            super(object);
+            return;
+        }
+
+        super(object, signal, (promise, ...args) => promise.resolve(...args),
+            SignalConnectionPromiseFull.Flags.NONE, cancellable);
     }
 };
 
