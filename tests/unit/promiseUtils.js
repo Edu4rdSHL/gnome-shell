@@ -292,6 +292,11 @@ const SignalingGObject = GObject.registerClass({
         'signal': {},
         'argument_signal': { param_types: [GObject.TYPE_STRING] },
         'arguments_signal': { param_types: [GObject.TYPE_STRING, GObject.TYPE_UINT] },
+        'accumulator_signal': {
+            accumulator: GObject.AccumulatorType.FIRST_WINS,
+            return_type: GObject.TYPE_STRING,
+            param_types: [GObject.TYPE_INT],
+        },
     },
 }, class SignalingObject extends GObject.Object {});
 
@@ -631,6 +636,283 @@ testCase('SignalConnectionPromise JSObject connect_once is cancelled on destroy'
     object.emit('destroy');
     object.emit('signal');
     await assertCancelledPromiseAsync(promise);
+});
+
+testCase('SignalConnectionPromiseFull with resolving handler', async () => {
+    const gobject = new SignalingGObject();
+    const promise = new PromiseUtils.SignalConnectionPromiseFull(gobject,
+        'signal', promiseHandler => promiseHandler.resolve('Hello!'));
+
+    promise.object.emit('signal');
+    JsUnit.assertEquals('Hello!', await promise);
+});
+
+testCase('SignalConnectionPromiseFull with rejecting handler', async () => {
+    const gobject = new SignalingGObject();
+    const promise = new PromiseUtils.SignalConnectionPromiseFull(gobject,
+        'signal', promiseHandler => promiseHandler.reject('Good bye!'));
+
+    promise.object.emit('signal');
+    try {
+        await promise;
+        assertNotReached();
+    } catch (e) {
+        JsUnit.assertEquals('Good bye!', e);
+    }
+});
+
+testCase('SignalConnectionPromiseFull with no handler', () => {
+    const gobject = new SignalingGObject();
+    const promise = new PromiseUtils.SignalConnectionPromiseFull(gobject,
+        'signal', () => {});
+
+    try {
+        GLib.test_expect_message('Gjs', GLib.LogLevelFlags.LEVEL_CRITICAL,
+            '*Promise was not resolved or rejected*');
+        promise.object.emit('signal');
+        GLib.test_assert_expected_messages_internal('Gjs', 'promiseUtils.js', 0,
+            'SignalConnectionPromiseFull with no handler');
+    } catch (e) {
+        JsUnit.assertTrue(e.message.includes('Promise was not resolved or rejected'));
+    }
+
+    const e = assertRejected(promise);
+    JsUnit.assertTrue(e.message.includes('Promise was not resolved or rejected'));
+});
+
+testCase('SignalConnectionPromiseFull with multiple handler', async () => {
+    const gobject = new SignalingGObject();
+    const promise = new PromiseUtils.SignalConnectionPromiseFull(gobject,
+        'accumulator_signal', (handler, param) => {
+            if (param > 100) {
+                handler.resolve('Resolved value');
+                return 'This is resolved';
+            } else {
+                return 'Ignored by promise';
+            }
+        }, PromiseUtils.SignalConnectionPromiseFull.Flags.MULTIPLE);
+
+    JsUnit.assertEquals(
+        'Ignored by promise', promise.object.emit('accumulator_signal', 10));
+    JsUnit.assertEquals(
+        'Ignored by promise', promise.object.emit('accumulator_signal', 20));
+
+    JsUnit.assertEquals(
+        'This is resolved', promise.object.emit('accumulator_signal', 150));
+    JsUnit.assertEquals('Resolved value', await promise);
+});
+
+testCase('SignalConnectionPromiseFull with after resolving handler', async () => {
+    const gobject = new SignalingGObject();
+    const promise = new PromiseUtils.SignalConnectionPromiseFull(gobject,
+        'signal', promiseHandler => promiseHandler.resolve('Hello!'),
+        PromiseUtils.SignalConnectionPromiseFull.Flags.AFTER);
+
+    let gotCb = false;
+    let resolved = false;
+    const id = gobject.connect('signal', () => {
+        gotCb = true;
+        gobject.disconnect(id);
+        resolved = promise.resolved();
+    });
+    promise.object.emit('signal');
+    JsUnit.assertTrue(gotCb);
+    JsUnit.assertFalse(resolved);
+    JsUnit.assertEquals('Hello!', await promise);
+});
+
+testCase('SignalConnectionPromiseFull with resolving handler and accumulator', async () => {
+    const gobject = new SignalingGObject();
+    const promise = new PromiseUtils.SignalConnectionPromiseFull(gobject,
+        'accumulator_signal', (promiseHandler, arg) =>  {
+            promiseHandler.resolve('Yay!');
+            return `Accumulate me ${arg}!`;
+        });
+
+    JsUnit.assertEquals('Accumulate me 55!',
+        promise.object.emit('accumulator_signal', 55));
+    JsUnit.assertEquals('Yay!', await promise);
+});
+
+testCase('SignalConnectionPromiseFull with rejecting handler and accumulator', async () => {
+    const gobject = new SignalingGObject();
+    const promise = new PromiseUtils.SignalConnectionPromiseFull(gobject,
+        'accumulator_signal', (promiseHandler, arg) => {
+            promiseHandler.reject('Noooo!');
+            return `Accumulate me ${arg}!`;
+        });
+
+    JsUnit.assertEquals(promise.object.emit('accumulator_signal', 0),
+        'Accumulate me 0!');
+
+    try {
+        await promise;
+        assertNotReached();
+    } catch (e) {
+        JsUnit.assertEquals('Noooo!', e);
+    }
+});
+
+testCase('SignalConnectionPromiseFull with cancelled handler and accumulator', () => {
+    const gobject = new SignalingGObject();
+    const promise = new PromiseUtils.SignalConnectionPromiseFull(gobject,
+        'accumulator_signal', () => JsUnit.assertNotReached());
+
+    promise.cancel();
+    JsUnit.assertNull(gobject.emit('accumulator_signal', -1));
+
+    const e = assertRejected(promise);
+    JsUnit.assertTrue(e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED));
+    assertCancelledPromise(promise);
+});
+
+testCase('SignalConnectionPromiseFull for GObject with resolving handler', async () => {
+    const gobject = new SignalingGObject();
+    const promise = gobject.connect_with_promise('signal',
+        promiseHandler => promiseHandler.resolve('Hello!'));
+
+    promise.object.emit('signal');
+    JsUnit.assertEquals('Hello!', await promise);
+});
+
+testCase('SignalConnectionPromiseFull for GObject with rejecting handler', async () => {
+    const gobject = new SignalingGObject();
+    const promise = gobject.connect_with_promise('signal',
+        promiseHandler => promiseHandler.reject('Good bye!'));
+
+    promise.object.emit('signal');
+    try {
+        await promise;
+        assertNotReached();
+    } catch (e) {
+        JsUnit.assertEquals('Good bye!', e);
+    }
+});
+
+testCase('SignalConnectionPromiseFull for GObject with no handler', () => {
+    const gobject = new SignalingGObject();
+    const promise = gobject.connect_with_promise('signal', () => {});
+
+    try {
+        GLib.test_expect_message('Gjs', GLib.LogLevelFlags.LEVEL_CRITICAL,
+            '*Promise was not resolved or rejected*');
+        promise.object.emit('signal');
+        GLib.test_assert_expected_messages_internal('Gjs', 'promiseUtils.js', 0,
+            'SignalConnectionPromiseFull for GObject with no handler');
+    } catch (e) {}
+
+    const e = assertRejected(promise);
+    JsUnit.assertTrue(e.message.includes('Promise was not resolved or rejected'));
+});
+
+testCase('SignalConnectionPromiseFull for GObject with resolving handler and accumulator', async () => {
+    const gobject = new SignalingGObject();
+    const promise = gobject.connect_with_promise('accumulator_signal', (promiseHandler, arg) => {
+        promiseHandler.resolve('Yay!');
+        return `Accumulate me ${arg}!`;
+    });
+
+    JsUnit.assertEquals('Accumulate me 55!',
+        promise.object.emit('accumulator_signal', 55));
+    JsUnit.assertEquals('Yay!', await promise);
+});
+
+testCase('SignalConnectionPromiseFull for GObject with rejecting handler and accumulator', async () => {
+    const gobject = new SignalingGObject();
+    const promise = gobject.connect_with_promise('accumulator_signal', (promiseHandler, arg) => {
+        promiseHandler.reject('Noooo!');
+        return `Accumulate me ${arg}!`;
+    });
+
+    JsUnit.assertEquals(promise.object.emit('accumulator_signal', 0),
+        'Accumulate me 0!');
+
+    try {
+        await promise;
+        assertNotReached();
+    } catch (e) {
+        JsUnit.assertEquals('Noooo!', e);
+    }
+});
+
+testCase('SignalConnectionPromiseFull for GObject with after resolving handler', async () => {
+    const gobject = new SignalingGObject();
+    const promise = gobject.connect_with_promise('signal',
+        promiseHandler => promiseHandler.resolve('Hello!'),
+        PromiseUtils.SignalConnectionPromiseFull.Flags.AFTER);
+
+    let gotCb = false;
+    let resolved = false;
+    const id = gobject.connect('signal', () => {
+        gotCb = true;
+        gobject.disconnect(id);
+        resolved = promise.resolved();
+    });
+    promise.object.emit('signal');
+    JsUnit.assertTrue(gotCb);
+    JsUnit.assertFalse(resolved);
+    JsUnit.assertEquals('Hello!', await promise);
+});
+
+testCase('SignalConnectionPromiseFull for GObject with cancelled handler and accumulator', () => {
+    const gobject = new SignalingGObject();
+    const promise = gobject.connect_with_promise('accumulator_signal',
+        () => JsUnit.assertNotReached());
+
+    promise.cancel();
+    JsUnit.assertNull(gobject.emit('accumulator_signal', -1));
+
+    const e = assertRejected(promise);
+    JsUnit.assertTrue(e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED));
+    assertCancelledPromise(promise);
+});
+
+testCase('SignalConnectionPromiseFull for JSObject with resolving handler', async () => {
+    const object = new SignalingJSObject();
+    const promise = object.connect_with_promise('signal',
+        promiseHandler => promiseHandler.resolve('Hello!'));
+
+    promise.object.emit('signal');
+    JsUnit.assertEquals('Hello!', await promise);
+});
+
+testCase('SignalConnectionPromiseFull for JSObject with rejecting handler', async () => {
+    const object = new SignalingJSObject();
+    const promise = object.connect_with_promise('signal',
+        promiseHandler => promiseHandler.reject('Good bye!'));
+
+    promise.object.emit('signal');
+    try {
+        await promise;
+        assertNotReached();
+    } catch (e) {
+        JsUnit.assertEquals('Good bye!', e);
+    }
+});
+
+testCase('SignalConnectionPromiseFull for JSObject with no handler', () => {
+    const object = new SignalingJSObject();
+    const promise = object.connect_with_promise('signal', () => {});
+
+    try {
+        GLib.test_expect_message('Gjs', GLib.LogLevelFlags.LEVEL_WARNING,
+            '*Promise was not resolved or rejected*');
+        promise.object.emit('signal');
+        GLib.test_assert_expected_messages_internal('Gjs', 'promiseUtils.js', 0,
+            'SignalConnectionPromiseFull for JSObject with no handler');
+    } catch (e) {
+        JsUnit.assertTrue(e.message.includes('Promise was not resolved or rejected'));
+    }
+
+    const e = assertRejected(promise);
+    JsUnit.assertTrue(e.message.includes('Promise was not resolved or rejected'));
+});
+
+testCase('SignalConnectionPromiseFull for JSObject with after resolving handler', async () => {
+    const object = new SignalingJSObject();
+    JsUnit.assertRaises(() => object.connect_with_promise('signal',
+        promiseHandler => promiseHandler.resolve('Hello!'),
+        PromiseUtils.SignalConnectionPromiseFull.Flags.AFTER));
 });
 
 

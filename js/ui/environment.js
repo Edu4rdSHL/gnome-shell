@@ -392,10 +392,16 @@ function init() {
         proto.connect_once = function (signal, cancellable) {
             return new PromiseUtils.SignalConnectionPromise(this, signal, cancellable);
         };
+        proto.connect_with_promise = function (signal, handler, flags, cancellable) {
+            return new PromiseUtils.SignalConnectionPromiseFull(this, signal, handler, flags, cancellable);
+        };
     };
 
     GObject.Object.prototype.connect_once = function (signal, cancellable) {
         return new PromiseUtils.SignalConnectionPromise(this, signal, cancellable);
+    };
+    GObject.Object.prototype.connect_with_promise = function (signal, handler, cancellable) {
+        return new PromiseUtils.SignalConnectionPromiseFull(this, signal, handler, cancellable);
     };
 
     _patchContainerClass(St.BoxLayout);
