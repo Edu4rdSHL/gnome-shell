@@ -2275,11 +2275,6 @@ class FolderView extends BaseAppView {
         return aPosition - bPosition;
     }
 
-    // Overridden from BaseAppView
-    animate(animationDirection) {
-        this._grid.animatePulse(animationDirection);
-    }
-
     createFolderIcon(size) {
         const layout = new Clutter.GridLayout({
             row_homogeneous: true,
