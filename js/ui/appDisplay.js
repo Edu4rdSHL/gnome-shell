@@ -1883,17 +1883,15 @@ var AppSearchProvider = class AppSearchProvider {
         return results.slice(0, maxNumber);
     }
 
-    getInitialResultSet(terms, callback, _cancellable) {
+    async getInitialResultSet(terms, callback, _cancellable) {
         // Defer until the parental controls manager is initialised, so the
         // results can be filtered correctly.
         if (!this._parentalControlsManager.initialized) {
-            let initializedId = this._parentalControlsManager.connect('app-filter-changed', () => {
-                if (this._parentalControlsManager.initialized) {
-                    this._parentalControlsManager.disconnect(initializedId);
-                    this.getInitialResultSet(terms, callback, _cancellable);
-                }
-            });
-            return;
+            await this._parentalControlsManager.connect_with_promise(
+                'app-filter-changed', promise => {
+                    if (this._parentalControlsManager.initialized)
+                        promise.resolve();
+                }, PromiseUtils.SignalConnectionPromiseFull.Flags.MULTIPLE);
         }
 
         let query = terms.join(' ');
