@@ -277,24 +277,16 @@ var Background = GObject.registerClass({
         if (this._settingsChangedSignalId != 0)
             this._settings.disconnect(this._settingsChangedSignalId);
         this._settingsChangedSignalId = 0;
-
-        if (this._changedIdleId) {
-            GLib.source_remove(this._changedIdleId);
-            this._changedIdleId = 0;
-        }
     }
 
-    _emitChangedSignal() {
-        if (this._changedIdleId)
+    async _emitChangedSignal() {
+        if (this._changedIdle?.pending())
             return;
 
-        this._changedIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-            this._changedIdleId = 0;
-            this.emit('bg-changed');
-            return GLib.SOURCE_REMOVE;
-        });
-        GLib.Source.set_name_by_id(this._changedIdleId,
-            '[gnome-shell] Background._emitChangedSignal');
+        this._changedIdle = new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT,
+            this._cancellable);
+        await this._changedIdle;
+        this.emit('bg-changed');
     }
 
     updateResolution() {
@@ -493,11 +485,8 @@ var SystemBackground = GObject.registerClass({
         });
         this.content.background = _systemBackground;
 
-        let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-            this.emit('loaded');
-            return GLib.SOURCE_REMOVE;
-        });
-        GLib.Source.set_name_by_id(id, '[gnome-shell] SystemBackground.loaded');
+        new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT).then(() =>
+            this.emit('loaded'));
     }
 });
 
