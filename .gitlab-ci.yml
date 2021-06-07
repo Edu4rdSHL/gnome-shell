@@ -9,6 +9,7 @@ stages:
  - review
  - build
  - test
+ - docs
  - deploy
 
 default:
@@ -227,3 +228,29 @@ nightly:
   extends: '.publish_nightly'
   variables:
     BUNDLES: '$BUNDLE'
+
+reference:
+  stage: docs
+  needs: []
+  variables:
+    EXTRA_MESON_FLAGS: ""
+  script:
+    - meson -Dman=false -Dgtk_doc=true _build
+    - ninja -C _build
+    - mkdir -p _reference/
+    - mv _build/docs/St/ _reference/
+    - mv _build/docs/Shell/ _reference/
+  artifacts:
+    paths:
+      - _reference
+
+pages:
+  stage: deploy
+  needs: ['reference']
+  script:
+    - mv _reference/ public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
