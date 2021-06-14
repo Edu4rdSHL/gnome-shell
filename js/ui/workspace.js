@@ -627,14 +627,18 @@ var WorkspaceLayout = GObject.registerClass({
         }
 
         const { ControlsState } = OverviewControls;
-        const inSessionTransition =
-            this._overviewAdjustment.value <= ControlsState.WINDOW_PICKER;
+
+        const overviewTransitionParams = this._overviewAdjustment.getStateTransitionParams();
+        const transitionMaxState = Math.max(overviewTransitionParams.initialState, overviewTransitionParams.finalState);
+        const transitionMinState = Math.min(overviewTransitionParams.initialState, overviewTransitionParams.finalState);
+        const inSessionTransition = transitionMaxState <= ControlsState.WINDOW_PICKER;
 
         const window = this._sortedWindows[0];
 
         if (inSessionTransition || !window) {
             container.remove_clip();
-        } else {
+            container.clip_to_allocation = false;
+        } else if (transitionMinState === ControlsState.WINDOW_PICKER) {
             const [, bottomOversize] = window.chromeHeights();
             const [containerX, containerY] = containerBox.get_origin();
 
@@ -643,8 +647,12 @@ var WorkspaceLayout = GObject.registerClass({
 
             const extraClipHeight = bottomOversize * (1 - extraHeightProgress);
 
+            container.clip_to_allocation = false;
             container.set_clip(containerX, containerY,
                 containerWidth, containerHeight + extraClipHeight);
+        } else {
+            container.remove_clip();
+            container.clip_to_allocation = true;
         }
 
         let layoutChanged = false;
