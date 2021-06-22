@@ -363,27 +363,35 @@ var Overview = class {
     }
 
     _gestureBegin(tracker) {
-        this._overview.controls.gestureBegin(tracker);
-    }
+        const transition = this._overview.controls.overviewAdjustment.get_transition('value');
+        const cancelProgress = transition
+            ? transition.get_interval().peek_final_value()
+            : Math.round(this._overview.controls.overviewAdjustment.value);
+        this._overview.controls.overviewAdjustment.remove_transition('value');
 
-    _gestureUpdate(tracker, progress) {
-        if (!this._shown) {
-            Meta.disable_unredirect_for_display(global.display);
-
+        const wasShown = this._shown;
+        if (!wasShown) {
             this._shown = true;
-            this._visible = true;
-            this._visibleTarget = true;
-            this._animationInProgress = true;
+            this._syncGrab();
+            Main.layoutManager.showOverview();
 
+            this._visible = true;
+            this._animationInProgress = true;
+            this._visibleTarget = true;
+            Meta.disable_unredirect_for_display(global.display);
+        }
+
+        this._overview.controls.gestureBegin(tracker, cancelProgress);
+
+        if (!wasShown) {
             Main.layoutManager.overviewGroup.set_child_above_sibling(
                 this._coverPane, null);
             this._coverPane.show();
             this.emit('showing');
-
-            Main.layoutManager.showOverview();
-            this._syncGrab();
         }
+    }
 
+    _gestureUpdate(tracker, progress) {
         this._overview.controls.gestureProgress(progress);
     }
 

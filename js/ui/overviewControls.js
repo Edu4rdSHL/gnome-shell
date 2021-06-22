@@ -715,7 +715,7 @@ class ControlsManager extends St.Widget {
         return this.layoutManager.getWorkspacesBoxForState(state);
     }
 
-    gestureBegin(tracker) {
+    gestureBegin(tracker, cancelProgress) {
         const baseDistance = global.screen_height;
         const progress = this._stateAdjustment.value;
         const points = [
@@ -723,12 +723,6 @@ class ControlsManager extends St.Widget {
             ControlsState.WINDOW_PICKER,
             ControlsState.APP_GRID,
         ];
-
-        const transition = this._stateAdjustment.get_transition('value');
-        const cancelProgress = transition
-            ? transition.get_interval().peek_final_value()
-            : Math.round(progress);
-        this._stateAdjustment.remove_transition('value');
 
         tracker.confirmSwipe(baseDistance, points, progress, cancelProgress);
         this._workspacesDisplay.prepareToEnterOverview();
@@ -817,5 +811,9 @@ class ControlsManager extends St.Widget {
 
     get appDisplay() {
         return this._appDisplay;
+    }
+
+    get overviewAdjustment() {
+        return this._stateAdjustment;
     }
 });
