@@ -82,7 +82,6 @@ don't use.
     const { GLib, Gio, St } = imports.gi;
 
     const Main = imports.ui.main;
-    const Params = imports.misc.params;
     const Util = imports.misc.util;
 ```
 The alphabetical ordering should be done independently of the location of the
