@@ -1815,7 +1815,7 @@ cr_statement_get_parent_sheet (CRStatement * a_this, CRStyleSheet ** a_sheet)
  *
  *Appends a new statement to the statement list.
  *
- *Returns the new list statement list, or NULL in cas of failure.
+ *Returns the new list statement list, or NULL in case of failure.
  */
 CRStatement *
 cr_statement_append (CRStatement * a_this, CRStatement * a_new)

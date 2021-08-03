@@ -160,6 +160,12 @@ eslint_mr:
             junit: ${LINT_MR_LOG}
         when: always
 
+codespell:
+    stage: review
+    image: "docker.io/bilelmoussaoui/codespell"
+    script:
+        - codespell -S "*.png,*.po,*.jpg,.git,LINGUAS" -f --builtin "code,clear" --ignore-words-list="ba,claus,clos,datea,distroname,files',filetest,finaly,fo,gir,iff,inout,sav,stdio,te,teh"
+
 potfile_check:
     extends:
         - .fdo.distribution-image@fedora
