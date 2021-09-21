@@ -582,15 +582,18 @@ st_icon_update_icon_size (StIcon *icon)
 
 /**
  * st_icon_new:
+ * @clutter_context: A Clutter context
  *
  * Create a newly allocated #StIcon.
  *
  * Returns: A newly allocated #StIcon
  */
 ClutterActor *
-st_icon_new (void)
+st_icon_new (ClutterContext *clutter_context)
 {
-  return g_object_new (ST_TYPE_ICON, NULL);
+  return g_object_new (ST_TYPE_ICON,
+                       "context", clutter_context,
+                       NULL);
 }
 
 /**

@@ -401,12 +401,14 @@ var GeolocationDialog = GObject.registerClass({
         });
 
         let reasonLabel = new St.Label({
+            context: St.get_clutter_context(),
             text: reason,
             style_class: 'message-dialog-description',
         });
         content.add_child(reasonLabel);
 
         let infoLabel = new St.Label({
+            context: St.get_clutter_context(),
             text: _('Location access can be changed at any time from the privacy settings.'),
             style_class: 'message-dialog-description',
         });

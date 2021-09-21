@@ -810,6 +810,7 @@ class RestartMessage extends ModalDialog.ModalDialog {
                       destroyOnClose: true });
 
         let label = new St.Label({
+            context: St.get_clutter_context(),
             text: message,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,

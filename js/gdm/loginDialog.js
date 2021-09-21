@@ -41,9 +41,11 @@ var UserListItem = GObject.registerClass({
 }, class UserListItem extends St.Button {
     _init(user) {
         let layout = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
         });
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'login-dialog-user-list-item',
             button_mask: St.ButtonMask.ONE | St.ButtonMask.THREE,
             can_focus: true,
@@ -67,9 +69,12 @@ var UserListItem = GObject.registerClass({
         this._userWidget.bind_property('label-actor', this, 'label-actor',
                                        GObject.BindingFlags.SYNC_CREATE);
 
-        this._timedLoginIndicator = new St.Bin({ style_class: 'login-dialog-timed-login-indicator',
-                                                 scale_x: 0,
-                                                 visible: false });
+        this._timedLoginIndicator = new St.Bin({
+            context: St.get_clutter_context(),
+            style_class: 'login-dialog-timed-login-indicator',
+            scale_x: 0,
+            visible: false
+        });
         layout.add(this._timedLoginIndicator);
 
         this._onUserChanged();
@@ -160,6 +165,7 @@ var UserList = GObject.registerClass({
 }, class UserList extends St.ScrollView {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'login-dialog-user-list-view',
             x_expand: true,
             y_expand: true,
@@ -167,9 +173,12 @@ var UserList = GObject.registerClass({
         this.set_policy(St.PolicyType.NEVER,
                         St.PolicyType.AUTOMATIC);
 
-        this._box = new St.BoxLayout({ vertical: true,
-                                       style_class: 'login-dialog-user-list',
-                                       pseudo_class: 'expanded' });
+        this._box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true,
+            style_class: 'login-dialog-user-list',
+            pseudo_class: 'expanded'
+        });
 
         this.add_actor(this._box);
         this._items = {};
@@ -308,8 +317,12 @@ var SessionMenuButton = GObject.registerClass({
     Signals: { 'session-activated': { param_types: [GObject.TYPE_STRING] } },
 }, class SessionMenuButton extends St.Bin {
     _init() {
-        let gearIcon = new St.Icon({ icon_name: 'emblem-system-symbolic' });
+        let gearIcon = new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: 'emblem-system-symbolic'
+        });
         let button = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'modal-dialog-button button login-dialog-session-list-button',
             reactive: true,
             track_hover: true,
@@ -321,7 +334,10 @@ var SessionMenuButton = GObject.registerClass({
             child: gearIcon,
         });
 
-        super._init({ child: button });
+        super._init({
+            context: St.get_clutter_context(),
+            child: button
+        });
         this._button = button;
 
         this._menu = new PopupMenu.PopupMenu(this._button, 0, St.Side.BOTTOM);
@@ -407,7 +423,11 @@ var LoginDialog = GObject.registerClass({
     },
 }, class LoginDialog extends St.Widget {
     _init(parentActor) {
-        super._init({ style_class: 'login-dialog', visible: false });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'login-dialog',
+            visible: false
+        });
 
         this.get_accessible().set_role(Atk.Role.WINDOW);
 
@@ -433,11 +453,14 @@ var LoginDialog = GObject.registerClass({
         this._updateLogoTextureId = this._textureCache.connect('texture-file-changed',
                                                                this._updateLogoTexture.bind(this));
 
-        this._userSelectionBox = new St.BoxLayout({ style_class: 'login-dialog-user-selection-box',
-                                                    x_align: Clutter.ActorAlign.CENTER,
-                                                    y_align: Clutter.ActorAlign.CENTER,
-                                                    vertical: true,
-                                                    visible: false });
+        this._userSelectionBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'login-dialog-user-selection-box',
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+            vertical: true,
+            visible: false
+        });
         this.add_child(this._userSelectionBox);
 
         this._userList = new UserList();
@@ -453,10 +476,12 @@ var LoginDialog = GObject.registerClass({
         // login screen. It can be activated to reveal an entry for
         // manually entering the username.
         let notListedLabel = new St.Label({
+            context: St.get_clutter_context(),
             text: _("Not listed?"),
             style_class: 'login-dialog-not-listed-label',
         });
         this._notListedButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'login-dialog-not-listed-button',
             button_mask: St.ButtonMask.ONE | St.ButtonMask.THREE,
             can_focus: true,
@@ -472,17 +497,23 @@ var LoginDialog = GObject.registerClass({
 
         this._userSelectionBox.add_child(this._notListedButton);
 
-        this._bannerView = new St.ScrollView({ style_class: 'login-dialog-banner-view',
-                                               opacity: 0,
-                                               vscrollbar_policy: St.PolicyType.AUTOMATIC,
-                                               hscrollbar_policy: St.PolicyType.NEVER });
+        this._bannerView = new St.ScrollView({
+            context: St.get_clutter_context(),
+            style_class: 'login-dialog-banner-view',
+            opacity: 0,
+            vscrollbar_policy: St.PolicyType.AUTOMATIC,
+            hscrollbar_policy: St.PolicyType.NEVER
+        });
         this.add_child(this._bannerView);
 
         let bannerBox = new St.BoxLayout({ vertical: true });
 
         this._bannerView.add_actor(bannerBox);
-        this._bannerLabel = new St.Label({ style_class: 'login-dialog-banner',
-                                           text: '' });
+        this._bannerLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'login-dialog-banner',
+            text: ''
+        });
         this._bannerLabel.clutter_text.line_wrap = true;
         this._bannerLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         bannerBox.add_child(this._bannerLabel);
@@ -497,9 +528,12 @@ var LoginDialog = GObject.registerClass({
         this._sessionMenuButton.show();
         this.add_child(this._sessionMenuButton);
 
-        this._logoBin = new St.Widget({ style_class: 'login-dialog-logo-bin',
-                                        x_align: Clutter.ActorAlign.CENTER,
-                                        y_align: Clutter.ActorAlign.END });
+        this._logoBin = new St.Widget({
+            context: St.get_clutter_context(),
+            style_class: 'login-dialog-logo-bin',
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.END
+        });
         this._logoBin.connect('resource-scale-changed', () => {
             this._updateLogoTexture(this._textureCache, this._logoFile);
         });

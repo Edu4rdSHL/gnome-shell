@@ -388,7 +388,9 @@ var WorkspaceTracker = class {
 var TilePreview = GObject.registerClass(
 class TilePreview extends St.Widget {
     _init() {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
         global.window_group.add_actor(this);
 
         this._reset();
@@ -535,11 +537,17 @@ var AppSwitchAction = GObject.registerClass({
 var ResizePopup = GObject.registerClass(
 class ResizePopup extends St.Widget {
     _init() {
-        super._init({ layout_manager: new Clutter.BinLayout() });
-        this._label = new St.Label({ style_class: 'resize-popup',
-                                     x_align: Clutter.ActorAlign.CENTER,
-                                     y_align: Clutter.ActorAlign.CENTER,
-                                     x_expand: true, y_expand: true });
+        super._init({
+            context: St.get_clutter_context(),
+            layout_manager: new Clutter.BinLayout()
+        });
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'resize-popup',
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+            x_expand: true, y_expand: true
+        });
         this.add_child(this._label);
         Main.uiGroup.add_actor(this);
     }
@@ -1284,7 +1292,10 @@ var WindowManager = class {
         // Position a clone of the window on top of the old position,
         // while actor updates are frozen.
         let actorContent = actor.paint_to_content(oldFrameRect);
-        let actorClone = new St.Widget({ content: actorContent });
+        let actorClone = new St.Widget({
+            context: St.get_clutter_context(),
+            content: actorContent
+        });
         actorClone.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
         actorClone.set_position(oldFrameRect.x, oldFrameRect.y);
         actorClone.set_size(oldFrameRect.width, oldFrameRect.height);

@@ -245,15 +245,18 @@ st_password_entry_init (StPasswordEntry *entry)
 
 /**
  * st_password_entry_new:
+ * @clutter_context: the Clutter context
  *
  * Create a new #StPasswordEntry.
  *
  * Returns: a new #StEntry
  */
 StEntry*
-st_password_entry_new (void)
+st_password_entry_new (ClutterContext *clutter_context)
 {
-  return ST_ENTRY (g_object_new (ST_TYPE_PASSWORD_ENTRY, NULL));
+  return ST_ENTRY (g_object_new (ST_TYPE_PASSWORD_ENTRY,
+                                 "context", clutter_context,
+                                 NULL));
 }
 
 /**

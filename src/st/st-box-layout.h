@@ -50,7 +50,7 @@ struct _StBoxLayout
   StBoxLayoutPrivate *priv;
 };
 
-StWidget *st_box_layout_new (void);
+StWidget *st_box_layout_new (ClutterContext *clutter_context);
 
 void     st_box_layout_set_vertical   (StBoxLayout *box,
                                        gboolean     vertical);

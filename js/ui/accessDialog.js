@@ -59,6 +59,7 @@ class AccessDialog extends ModalDialog.ModalDialog {
         }
 
         let bodyLabel = new St.Label({
+            context: St.get_clutter_context(),
             text: body,
             x_align: Clutter.ActorAlign.CENTER,
         });

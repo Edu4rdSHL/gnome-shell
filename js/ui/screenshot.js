@@ -347,6 +347,7 @@ class SelectArea extends St.Widget {
         this._result = null;
 
         super._init({
+            context: St.get_clutter_context(),
             visible: false,
             reactive: true,
             x: 0,
@@ -361,6 +362,7 @@ class SelectArea extends St.Widget {
         this.add_constraint(constraint);
 
         this._rubberband = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'select-area-rubberband',
             visible: false,
         });
@@ -570,7 +572,11 @@ var RecolorEffect = GObject.registerClass({
 var PickPixel = GObject.registerClass(
 class PickPixel extends St.Widget {
     _init(screenshot) {
-        super._init({ visible: false, reactive: true });
+        super._init({
+            context: St.get_clutter_context(),
+            visible: false,
+            reactive: true
+        });
 
         this._screenshot = screenshot;
 
@@ -604,6 +610,7 @@ class PickPixel extends St.Widget {
             smoothing: 0.07,
         });
         this._previewCursor = new St.Icon({
+            context: St.get_clutter_context(),
             icon_name: 'color-pick',
             icon_size: Meta.prefs_get_cursor_size(),
             effect: this._recolorEffect,

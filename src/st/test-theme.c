@@ -23,6 +23,7 @@
 #include "st-theme-context.h"
 #include "st-label.h"
 #include "st-button.h"
+#include "st-context.h"
 #include <math.h>
 #include <string.h>
 #include <meta-test/meta-context-test.h>
@@ -464,7 +465,7 @@ test_pseudo_class (void)
   assert_text_decoration  (group3,  "group3", 0);
 
   /* Test the StWidget add/remove pseudo_class interfaces */
-  label = st_label_new ("foo");
+  label = st_label_new (st_get_clutter_context (), "foo");
   clutter_actor_add_child (stage, CLUTTER_ACTOR (label));
 
   labelNode = st_widget_get_theme_node (label);

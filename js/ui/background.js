@@ -94,7 +94,7 @@
 //     MetaBackgroundImage         MetaBackgroundImage
 //     MetaBackgroundImage         MetaBackgroundImage
 
-const { Clutter, GDesktopEnums, Gio, GLib, GObject, GnomeDesktop, Meta } = imports.gi;
+const { Clutter, GDesktopEnums, Gio, GLib, GObject, GnomeDesktop, Meta, St } = imports.gi;
 const Signals = imports.signals;
 
 const LoginManager = imports.misc.loginManager;
@@ -521,6 +521,7 @@ var SystemBackground = GObject.registerClass({
         }
 
         super._init({
+            context: St.get_clutter_context(),
             meta_display: global.display,
             monitor: 0,
         });
@@ -756,6 +757,7 @@ var BackgroundManager = class BackgroundManager {
     _createBackgroundActor() {
         let background = this._backgroundSource.getBackground(this._monitorIndex);
         let backgroundActor = new Meta.BackgroundActor({
+            context: St.get_clutter_context(),
             meta_display: global.display,
             monitor: this._monitorIndex,
             request_mode: this._useContentSize

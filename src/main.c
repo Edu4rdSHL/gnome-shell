@@ -14,6 +14,7 @@
 #include <glib-unix.h>
 #include <glib/gi18n-lib.h>
 #include <girepository.h>
+#include <meta/meta-backend.h>
 #include <meta/meta-context.h>
 #include <meta/meta-plugin.h>
 #include <meta/prefs.h>
@@ -488,6 +489,7 @@ main (int argc, char **argv)
 {
   g_autoptr (MetaContext) context = NULL;
   GError *error = NULL;
+  MetaBackend *backend;
   int ecode = EXIT_SUCCESS;
 
   bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
@@ -532,6 +534,9 @@ main (int argc, char **argv)
   shell_perf_log_init ();
   shell_introspection_init ();
   shell_fonts_init ();
+
+  backend = meta_context_get_backend (context);
+  st_init (meta_backend_get_clutter_context (backend));
 
   g_log_set_default_handler (default_log_handler, NULL);
 

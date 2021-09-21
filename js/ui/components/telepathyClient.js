@@ -831,6 +831,12 @@ var ChatNotification = HAVE_TP ? GObject.registerClass({
 
 var ChatLineBox = GObject.registerClass(
 class ChatLineBox extends St.BoxLayout {
+    _init() {
+        super._init({
+            context: St.get_clutter_context(),
+        });
+    }
+
     vfunc_get_preferred_height(forWidth) {
         let [, natHeight] = super.vfunc_get_preferred_height(forWidth);
         return [natHeight, natHeight];
@@ -842,9 +848,12 @@ class ChatNotificationBanner extends MessageTray.NotificationBanner {
     _init(notification) {
         super._init(notification);
 
-        this._responseEntry = new St.Entry({ style_class: 'chat-response',
-                                             x_expand: true,
-                                             can_focus: true });
+        this._responseEntry = new St.Entry({
+            context: St.get_clutter_context(),
+            style_class: 'chat-response',
+            x_expand: true,
+            can_focus: true
+        });
         this._responseEntry.clutter_text.connect('activate', this._onEntryActivated.bind(this));
         this._responseEntry.clutter_text.connect('text-changed', this._onEntryChanged.bind(this));
         this.setActionArea(this._responseEntry);
@@ -857,12 +866,18 @@ class ChatNotificationBanner extends MessageTray.NotificationBanner {
             this.emit('unfocused');
         });
 
-        this._scrollArea = new St.ScrollView({ style_class: 'chat-scrollview vfade',
-                                               vscrollbar_policy: St.PolicyType.AUTOMATIC,
-                                               hscrollbar_policy: St.PolicyType.NEVER,
-                                               visible: this.expanded });
-        this._contentArea = new St.BoxLayout({ style_class: 'chat-body',
-                                               vertical: true });
+        this._scrollArea = new St.ScrollView({
+            context: St.get_clutter_context(),
+            style_class: 'chat-scrollview vfade',
+            vscrollbar_policy: St.PolicyType.AUTOMATIC,
+            hscrollbar_policy: St.PolicyType.NEVER,
+            visible: this.expanded
+        });
+        this._contentArea = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'chat-body',
+            vertical: true
+        });
         this._scrollArea.add_actor(this._contentArea);
 
         this.setExpandedBody(this._scrollArea);

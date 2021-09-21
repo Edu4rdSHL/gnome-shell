@@ -96,7 +96,10 @@ var Magnifier = class Magnifier {
         let cursorTracker = Meta.CursorTracker.get_for_display(global.display);
         this._cursorTracker = cursorTracker;
 
-        this._mouseSprite = new Clutter.Actor({ request_mode: Clutter.RequestMode.CONTENT_SIZE });
+        this._mouseSprite = new Clutter.Actor({
+            context: St.get_clutter_context(),
+            request_mode: Clutter.RequestMode.CONTENT_SIZE
+        });
         this._mouseSprite.content = new MouseSpriteContent();
 
         // Create the first ZoomRegion and initialize it according to the
@@ -1324,14 +1327,19 @@ var ZoomRegion = class ZoomRegion {
 
     _createActors() {
         // The root actor for the zoom region
-        this._magView = new St.Bin({ style_class: 'magnifier-zoom-region' });
+        this._magView = new St.Bin({
+            style_class: 'magnifier-zoom-region'
+        });
         global.stage.add_actor(this._magView);
 
         // hide the magnified region from CLUTTER_PICK_ALL
         Shell.util_set_hidden_from_pick(this._magView, true);
 
         // Add a group to clip the contents of the magnified view.
-        let mainGroup = new Clutter.Actor({ clip_to_allocation: true });
+        let mainGroup = new Clutter.Actor({
+            context: St.get_clutter_context(),
+            clip_to_allocation: true
+        });
         this._magView.set_child(mainGroup);
 
         // Add a background for when the magnified uiGroup is scrolled
@@ -1341,14 +1349,20 @@ var ZoomRegion = class ZoomRegion {
 
         // Clone the group that contains all of UI on the screen.  This is the
         // chrome, the windows, etc.
-        this._uiGroupClone = new Clutter.Clone({ source: Main.uiGroup,
-                                                 clip_to_allocation: true });
+        this._uiGroupClone = new Clutter.Clone({
+            context: St.get_clutter_context(),
+            source: Main.uiGroup,
+            clip_to_allocation: true
+        });
         mainGroup.add_actor(this._uiGroupClone);
 
         // Add either the given mouseSourceActor to the ZoomRegion, or a clone of
         // it.
         if (this._mouseSourceActor.get_parent() != null)
-            this._mouseActor = new Clutter.Clone({ source: this._mouseSourceActor });
+            this._mouseActor = new Clutter.Clone({
+                context: St.get_clutter_context(),
+                source: this._mouseSourceActor
+            });
         else
             this._mouseActor = this._mouseSourceActor;
         mainGroup.add_actor(this._mouseActor);
@@ -1671,14 +1685,23 @@ class Crosshairs extends Clutter.Actor {
         let groupHeight = global.screen_height * 3;
 
         super._init({
+            context: St.get_clutter_context(),
             clip_to_allocation: false,
             width: groupWidth,
             height: groupHeight,
         });
-        this._horizLeftHair = new Clutter.Actor();
-        this._horizRightHair = new Clutter.Actor();
-        this._vertTopHair = new Clutter.Actor();
-        this._vertBottomHair = new Clutter.Actor();
+        this._horizLeftHair = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
+        this._horizRightHair = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
+        this._vertTopHair = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
+        this._vertBottomHair = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
         this.add_actor(this._horizLeftHair);
         this.add_actor(this._horizRightHair);
         this.add_actor(this._vertTopHair);
@@ -1724,7 +1747,10 @@ class Crosshairs extends Clutter.Actor {
             if (container) {
                 crosshairsActor = this;
                 if (this.get_parent() != null) {
-                    crosshairsActor = new Clutter.Clone({ source: this });
+                    crosshairsActor = new Clutter.Clone({
+                        context: St.get_clutter_context(),
+                        source: this
+                    });
                     this._clones.push(crosshairsActor);
 
                     // Clones don't share visibility.

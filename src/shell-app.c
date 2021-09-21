@@ -270,7 +270,7 @@ shell_app_create_icon_texture (ShellApp   *app,
 {
   ClutterActor *ret;
 
-  ret = st_icon_new ();
+  ret = st_icon_new (st_get_clutter_context ());
   st_icon_set_icon_size (ST_ICON (ret), size);
   st_icon_set_fallback_icon_name (ST_ICON (ret), "application-x-executable");
 

@@ -22,10 +22,14 @@ class LayoutMenuItem extends PopupMenu.PopupBaseMenuItem {
         super._init();
 
         this.label = new St.Label({
+            context: St.get_clutter_context(),
             text: displayName,
             x_expand: true,
         });
-        this.indicator = new St.Label({ text: shortName });
+        this.indicator = new St.Label({
+            context: St.get_clutter_context(),
+            text: shortName
+        });
         this.add_child(this.label);
         this.add(this.indicator);
         this.label_actor = this.label;
@@ -114,10 +118,17 @@ class InputSourceSwitcher extends SwitcherPopup.SwitcherList {
     }
 
     _addIcon(item) {
-        let box = new St.BoxLayout({ vertical: true });
+        let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
 
-        let bin = new St.Bin({ style_class: 'input-source-switcher-symbol' });
+        let bin = new St.Bin({
+            context: St.get_clutter_context(),
+            style_class: 'input-source-switcher-symbol'
+        });
         let symbol = new St.Label({
+            context: St.get_clutter_context(),
             text: item.shortName,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
@@ -126,6 +137,7 @@ class InputSourceSwitcher extends SwitcherPopup.SwitcherList {
         box.add_child(bin);
 
         let text = new St.Label({
+            context: St.get_clutter_context(),
             text: item.displayName,
             x_align: Clutter.ActorAlign.CENTER,
         });
@@ -789,6 +801,13 @@ function getInputSourceManager() {
 
 var InputSourceIndicatorContainer = GObject.registerClass(
 class InputSourceIndicatorContainer extends St.Widget {
+    _init(params) {
+        const defaultParams = {
+            context: St.get_clutter_context(),
+        };
+        super._init(Object.assign(defaultParams, params));
+    }
+
     vfunc_get_preferred_width(forHeight) {
         // Here, and in vfunc_get_preferred_height, we need to query
         // for the height of all children, but we ignore the results
@@ -888,8 +907,11 @@ class InputSourceIndicator extends PanelMenu.Button {
             let menuItem = new LayoutMenuItem(is.displayName, is.shortName);
             menuItem.connect('activate', () => is.activate(true));
 
-            let indicatorLabel = new St.Label({ text: is.shortName,
-                                                visible: false });
+            let indicatorLabel = new St.Label({
+                context: St.get_clutter_context(),
+                text: is.shortName,
+                visible: false
+            });
 
             this._menuItems[i] = menuItem;
             this._indicatorLabels[i] = indicatorLabel;

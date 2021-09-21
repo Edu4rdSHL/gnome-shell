@@ -218,15 +218,18 @@ st_box_layout_init (StBoxLayout *self)
 
 /**
  * st_box_layout_new:
+ * @clutter_context: The Clutter context
  *
  * Create a new #StBoxLayout.
  *
  * Returns: a newly allocated #StBoxLayout
  */
 StWidget *
-st_box_layout_new (void)
+st_box_layout_new (ClutterContext *clutter_context)
 {
-  return g_object_new (ST_TYPE_BOX_LAYOUT, NULL);
+  return g_object_new (ST_TYPE_BOX_LAYOUT,
+                       "context", clutter_context,
+                       NULL);
 }
 
 /**

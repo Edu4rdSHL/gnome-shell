@@ -35,6 +35,7 @@ var URLHighlighter = GObject.registerClass(
 class URLHighlighter extends St.Label {
     _init(text = '', lineWrap, allowMarkup) {
         super._init({
+            context: St.get_clutter_context(),
             reactive: true,
             style_class: 'url-highlighter',
             x_expand: true,
@@ -304,6 +305,7 @@ var Message = GObject.registerClass({
 }, class Message extends St.Button {
     _init(title, body) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'message',
             accessible_role: Atk.Role.NOTIFICATION,
             can_focus: true,
@@ -315,53 +317,81 @@ var Message = GObject.registerClass({
         this._useBodyMarkup = false;
 
         let vbox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
             x_expand: true,
         });
         this.set_child(vbox);
 
-        let hbox = new St.BoxLayout();
+        let hbox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+        });
         vbox.add_actor(hbox);
 
-        this._actionBin = new St.Widget({ layout_manager: new ScaleLayout(),
-                                          visible: false });
+        this._actionBin = new St.Widget({
+            context: St.get_clutter_context(),
+            layout_manager: new ScaleLayout(),
+            visible: false
+        });
         vbox.add_actor(this._actionBin);
 
-        this._iconBin = new St.Bin({ style_class: 'message-icon-bin',
-                                     y_expand: true,
-                                     y_align: Clutter.ActorAlign.START,
-                                     visible: false });
+        this._iconBin = new St.Bin({
+            context: St.get_clutter_context(),
+            style_class: 'message-icon-bin',
+            y_expand: true,
+            y_align: Clutter.ActorAlign.START,
+            visible: false
+        });
         hbox.add_actor(this._iconBin);
 
-        let contentBox = new St.BoxLayout({ style_class: 'message-content',
-                                            vertical: true, x_expand: true });
+        let contentBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'message-content',
+            vertical: true,
+            x_expand: true
+        });
         hbox.add_actor(contentBox);
 
-        this._mediaControls = new St.BoxLayout();
+        this._mediaControls = new St.BoxLayout({
+            context: St.get_clutter_context(),
+        });
         hbox.add_actor(this._mediaControls);
 
-        let titleBox = new St.BoxLayout();
+        let titleBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+        });
         contentBox.add_actor(titleBox);
 
-        this.titleLabel = new St.Label({ style_class: 'message-title' });
+        this.titleLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'message-title'
+        });
         this.setTitle(title);
         titleBox.add_actor(this.titleLabel);
 
         this._secondaryBin = new St.Bin({
+            context: St.get_clutter_context(),
             style_class: 'message-secondary-bin',
             x_expand: true, y_expand: true,
         });
         titleBox.add_actor(this._secondaryBin);
 
-        let closeIcon = new St.Icon({ icon_name: 'window-close-symbolic',
-                                      icon_size: 16 });
+        let closeIcon = new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: 'window-close-symbolic',
+            icon_size: 16
+        });
         this._closeButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'message-close-button',
             child: closeIcon, opacity: 0,
         });
         titleBox.add_actor(this._closeButton);
 
-        this._bodyStack = new St.Widget({ x_expand: true });
+        this._bodyStack = new St.Widget({
+            context: St.get_clutter_context(),
+            x_expand: true
+        });
         this._bodyStack.layout_manager = new LabelExpanderLayout();
         contentBox.add_actor(this._bodyStack);
 
@@ -426,9 +456,16 @@ var Message = GObject.registerClass({
     }
 
     addMediaControl(iconName, callback) {
-        let icon = new St.Icon({ icon_name: iconName, icon_size: 16 });
-        let button = new St.Button({ style_class: 'message-media-control',
-                                     child: icon });
+        let icon = new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: iconName,
+            icon_size: 16
+        });
+        let button = new St.Button({
+            context: St.get_clutter_context(),
+            style_class: 'message-media-control',
+            child: icon
+        });
         button.connect('clicked', callback);
         this._mediaControls.add_actor(button);
         return button;
@@ -551,14 +588,18 @@ var MessageListSection = GObject.registerClass({
 }, class MessageListSection extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'message-list-section',
             clip_to_allocation: true,
             vertical: true,
             x_expand: true,
         });
 
-        this._list = new St.BoxLayout({ style_class: 'message-list-section-list',
-                                        vertical: true });
+        this._list = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'message-list-section-list',
+            vertical: true
+        });
         this.add_actor(this._list);
 
         this._list.connect('actor-added', this._sync.bind(this));
@@ -604,6 +645,7 @@ var MessageListSection = GObject.registerClass({
             throw new Error('Message was already added previously');
 
         let listItem = new St.Bin({
+            context: St.get_clutter_context(),
             child: message,
             layout_manager: new ScaleLayout(),
             pivot_point: new Graphene.Point({ x: .5, y: .5 }),

@@ -46,6 +46,7 @@ var WindowPreview = GObject.registerClass({
         this._overviewAdjustment = overviewAdjustment;
 
         super._init({
+            context: St.get_clutter_context(),
             reactive: true,
             can_focus: true,
             accessible_role: Atk.Role.PUSH_BUTTON,
@@ -53,6 +54,7 @@ var WindowPreview = GObject.registerClass({
         });
 
         const windowContainer = new Clutter.Actor({
+            context: St.get_clutter_context(),
             pivot_point: new Graphene.Point({ x: 0.5, y: 0.5 }),
         });
         this.window_container = windowContainer;
@@ -146,6 +148,7 @@ var WindowPreview = GObject.registerClass({
 
         const { scaleFactor } = St.ThemeContext.get_for_stage(global.stage);
         this._title = new St.Label({
+            context: St.get_clutter_context(),
             visible: false,
             style_class: 'window-caption',
             text: this._getCaption(),
@@ -185,9 +188,13 @@ var WindowPreview = GObject.registerClass({
                 ? St.Side.LEFT : St.Side.RIGHT;
 
         this._closeButton = new St.Button({
+            context: St.get_clutter_context(),
             visible: false,
             style_class: 'window-close',
-            child: new St.Icon({ icon_name: 'preview-close-symbolic' }),
+            child: new St.Icon({
+                context: St.get_clutter_context(),
+                icon_name: 'preview-close-symbolic'
+            }),
         });
         this._closeButton.add_constraint(new Clutter.BindConstraint({
             source: windowContainer,

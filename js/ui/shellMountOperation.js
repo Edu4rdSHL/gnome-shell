@@ -273,6 +273,7 @@ var ShellMountPasswordDialog = GObject.registerClass({
 
         let passwordGridLayout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
         let passwordGrid = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-password-grid',
             layout_manager: passwordGridLayout,
         });
@@ -292,7 +293,10 @@ var ShellMountPasswordDialog = GObject.registerClass({
             this._keyfilesCheckbox.connect("clicked", this._onKeyfilesCheckboxClicked.bind(this));
             content.add_child(this._keyfilesCheckbox);
 
-            this._keyfilesLabel = new St.Label({ visible: false });
+            this._keyfilesLabel = new St.Label({
+                context: St.get_clutter_context(),
+                visible: false
+            });
             this._keyfilesLabel.clutter_text.set_markup(
                 /* Translators: %s is the Disks application */
                 _('To unlock a volume that uses keyfiles, use the <i>%s</i> utility instead.')
@@ -302,6 +306,7 @@ var ShellMountPasswordDialog = GObject.registerClass({
             content.add_child(this._keyfilesLabel);
 
             this._pimEntry = new St.PasswordEntry({
+                context: St.get_clutter_context(),
                 style_class: 'prompt-dialog-password-entry',
                 hint_text: _('PIM Number'),
                 can_focus: true,
@@ -322,6 +327,7 @@ var ShellMountPasswordDialog = GObject.registerClass({
         }
 
         this._passwordEntry = new St.PasswordEntry({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-password-entry',
             hint_text: _('Password'),
             can_focus: true,
@@ -344,12 +350,16 @@ var ShellMountPasswordDialog = GObject.registerClass({
         }
         curGridRow += 1;
 
-        let warningBox = new St.BoxLayout({ vertical: true });
+        let warningBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
 
         let capsLockWarning = new ShellEntry.CapsLockWarning();
         warningBox.add_child(capsLockWarning);
 
         this._errorMessageLabel = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-error-label',
             opacity: 0,
         });

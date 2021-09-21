@@ -26,6 +26,7 @@ var BarLevel = GObject.registerClass({
         this._barLevelWidth = 0;
 
         let defaultParams = {
+            context: St.get_clutter_context(),
             style_class: 'barlevel',
             accessible_role: Atk.Role.LEVEL_BAR,
         };

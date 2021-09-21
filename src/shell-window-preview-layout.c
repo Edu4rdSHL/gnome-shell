@@ -363,7 +363,8 @@ shell_window_preview_layout_add_window (ShellWindowPreviewLayout *self,
     }
 
   window_actor = CLUTTER_ACTOR (meta_window_get_compositor_private (window));
-  actor = clutter_clone_new (window_actor);
+  actor = clutter_clone_new (clutter_actor_get_context (window_actor),
+                             window_actor);
 
   window_info = g_new0 (WindowInfo, 1);
 

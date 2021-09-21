@@ -40,20 +40,30 @@ class TodayButton extends St.Button {
         // on the current date can be confusing. So don't make the button reactive
         // until the selected date changes.
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'datemenu-today-button',
             x_expand: true,
             can_focus: true,
             reactive: false,
         });
 
-        let hbox = new St.BoxLayout({ vertical: true });
+        let hbox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
         this.add_actor(hbox);
 
-        this._dayLabel = new St.Label({ style_class: 'day-label',
-                                        x_align: Clutter.ActorAlign.START });
+        this._dayLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'day-label',
+            x_align: Clutter.ActorAlign.START
+        });
         hbox.add_actor(this._dayLabel);
 
-        this._dateLabel = new St.Label({ style_class: 'date-label' });
+        this._dateLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'date-label'
+        });
         hbox.add_actor(this._dateLabel);
 
         this._calendar = calendar;
@@ -92,10 +102,12 @@ var EventsSection = GObject.registerClass(
 class EventsSection extends St.Button {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'events-button',
             can_focus: true,
             x_expand: true,
             child: new St.BoxLayout({
+                context: St.get_clutter_context(),
                 style_class: 'events-box',
                 vertical: true,
                 x_expand: true,
@@ -109,11 +121,13 @@ class EventsSection extends St.Button {
         this._calendarApp = null;
 
         this._title = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'events-title',
         });
         this.child.add_child(this._title);
 
         this._eventsList = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'events-list',
             vertical: true,
             x_expand: true,
@@ -212,14 +226,17 @@ class EventsSection extends St.Button {
 
         for (let event of events) {
             const box = new St.BoxLayout({
+                context: St.get_clutter_context(),
                 style_class: 'event-box',
                 vertical: true,
             });
             box.add(new St.Label({
+                context: St.get_clutter_context(),
                 text: event.summary,
                 style_class: 'event-summary',
             }));
             box.add(new St.Label({
+                context: St.get_clutter_context(),
                 text: this._formatEventTime(event),
                 style_class: 'event-time',
             }));
@@ -228,6 +245,7 @@ class EventsSection extends St.Button {
 
         if (this._eventsList.get_n_children() === 0) {
             const placeholder = new St.Label({
+                context: St.get_clutter_context(),
                 text: _('No Events'),
                 style_class: 'event-placeholder',
             });
@@ -274,6 +292,7 @@ var WorldClocksSection = GObject.registerClass(
 class WorldClocksSection extends St.Button {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'world-clocks-button',
             can_focus: true,
             x_expand: true,
@@ -285,9 +304,12 @@ class WorldClocksSection extends St.Button {
         this._locations = [];
 
         let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
-        this._grid = new St.Widget({ style_class: 'world-clocks-grid',
-                                     x_expand: true,
-                                     layout_manager: layout });
+        this._grid = new St.Widget({
+            context: St.get_clutter_context(),
+            style_class: 'world-clocks-grid',
+            x_expand: true,
+            layout_manager: layout
+        });
         layout.hookup_style(this._grid);
 
         this.child = this._grid;
@@ -347,9 +369,12 @@ class WorldClocksSection extends St.Button {
         let title = this._locations.length == 0
             ? _("Add world clocks…")
             : _("World Clocks");
-        let header = new St.Label({ style_class: 'world-clocks-header',
-                                    x_align: Clutter.ActorAlign.START,
-                                    text: title });
+        let header = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'world-clocks-header',
+            x_align: Clutter.ActorAlign.START,
+            text: title
+        });
         layout.attach(header, 0, 0, 2, 1);
         this.label_actor = header;
 
@@ -357,15 +382,19 @@ class WorldClocksSection extends St.Button {
             let l = this._locations[i].location;
 
             let name = l.get_city_name() || l.get_name();
-            let label = new St.Label({ style_class: 'world-clocks-city',
-                                       text: name,
-                                       x_align: Clutter.ActorAlign.START,
-                                       y_align: Clutter.ActorAlign.CENTER,
-                                       x_expand: true });
+            let label = new St.Label({
+                context: St.get_clutter_context(),
+                style_class: 'world-clocks-city',
+                text: name,
+                x_align: Clutter.ActorAlign.START,
+                y_align: Clutter.ActorAlign.CENTER,
+                x_expand: true
+            });
 
             let time = new St.Label({ style_class: 'world-clocks-time' });
 
             const tz = new St.Label({
+                context: St.get_clutter_context(),
                 style_class: 'world-clocks-timezone',
                 x_align: Clutter.ActorAlign.END,
                 y_align: Clutter.ActorAlign.CENTER,
@@ -470,6 +499,7 @@ var WeatherSection = GObject.registerClass(
 class WeatherSection extends St.Button {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'weather-button',
             can_focus: true,
             x_expand: true,
@@ -478,6 +508,7 @@ class WeatherSection extends St.Button {
         this._weatherClient = new Weather.WeatherClient();
 
         let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'weather-box',
             vertical: true,
             x_expand: true,
@@ -485,8 +516,12 @@ class WeatherSection extends St.Button {
 
         this.child = box;
 
-        let titleBox = new St.BoxLayout({ style_class: 'weather-header-box' });
+        let titleBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'weather-header-box'
+        });
         this._titleLabel = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'weather-header',
             x_align: Clutter.ActorAlign.START,
             x_expand: true,
@@ -496,6 +531,7 @@ class WeatherSection extends St.Button {
         box.add_child(titleBox);
 
         this._titleLocation = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'weather-header location',
             x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.END,
@@ -504,6 +540,7 @@ class WeatherSection extends St.Button {
 
         let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
         this._forecastGrid = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'weather-grid',
             layout_manager: layout,
         });
@@ -570,17 +607,20 @@ class WeatherSection extends St.Button {
             const tempPrefix = Math.round(tempValue) >= 0 ? ' ' : '';
 
             let time = new St.Label({
+                context: St.get_clutter_context(),
                 style_class: 'weather-forecast-time',
                 text: timeStr,
                 x_align: Clutter.ActorAlign.CENTER,
             });
             let icon = new St.Icon({
+                context: St.get_clutter_context(),
                 style_class: 'weather-forecast-icon',
                 icon_name: fc.get_symbolic_icon_name(),
                 x_align: Clutter.ActorAlign.CENTER,
                 x_expand: true,
             });
             let temp = new St.Label({
+                context: St.get_clutter_context(),
                 style_class: 'weather-forecast-temp',
                 text: '%s%d°'.format(tempPrefix, Math.round(tempValue)),
                 x_align: Clutter.ActorAlign.CENTER,
@@ -598,7 +638,10 @@ class WeatherSection extends St.Button {
 
     _setStatusLabel(text) {
         let layout = this._forecastGrid.layout_manager;
-        let label = new St.Label({ text });
+        let label = new St.Label({
+            context: St.get_clutter_context(),
+            text: text
+        });
         layout.attach(label, 0, 0, 1, 1);
     }
 
@@ -663,6 +706,7 @@ var MessagesIndicator = GObject.registerClass(
 class MessagesIndicator extends St.Icon {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             icon_size: 16,
             visible: false,
             y_expand: true,
@@ -787,13 +831,18 @@ class DateMenuButton extends PanelMenu.Button {
 
         super._init(0.5);
 
-        this._clockDisplay = new St.Label({ style_class: 'clock' });
+        this._clockDisplay = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'clock'
+        });
         this._clockDisplay.clutter_text.y_align = Clutter.ActorAlign.CENTER;
         this._clockDisplay.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
 
         this._indicator = new MessagesIndicator();
 
-        const indicatorPad = new St.Widget();
+        const indicatorPad = new St.Widget({
+            context: St.get_clutter_context(),
+        });
         this._indicator.bind_property('visible',
             indicatorPad, 'visible',
             GObject.BindingFlags.SYNC_CREATE);
@@ -802,7 +851,10 @@ class DateMenuButton extends PanelMenu.Button {
             coordinate: Clutter.BindCoordinate.SIZE,
         }));
 
-        let box = new St.BoxLayout({ style_class: 'clock-display-box' });
+        let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'clock-display-box'
+        });
         box.add_actor(indicatorPad);
         box.add_actor(this._clockDisplay);
         box.add_actor(this._indicator);
@@ -812,12 +864,18 @@ class DateMenuButton extends PanelMenu.Button {
         this.add_style_class_name('clock-display');
 
         let layout = new FreezableBinLayout();
-        let bin = new St.Widget({ layout_manager: layout });
+        let bin = new St.Widget({
+            context: St.get_clutter_context(),
+            layout_manager: layout
+        });
         // For some minimal compatibility with PopupMenuItem
         bin._delegate = this;
         this.menu.box.add_child(bin);
 
-        hbox = new St.BoxLayout({ name: 'calendarArea' });
+        hbox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'calendarArea'
+        });
         bin.add_actor(hbox);
 
         this._calendar = new Calendar.Calendar();
@@ -844,23 +902,32 @@ class DateMenuButton extends PanelMenu.Button {
 
         // Fill up the second column
         const boxLayout = new CalendarColumnLayout([this._calendar, this._date]);
-        vbox = new St.Widget({ style_class: 'datemenu-calendar-column',
-                               layout_manager: boxLayout });
+        vbox = new St.Widget({
+            context: St.get_clutter_context(),
+            style_class: 'datemenu-calendar-column',
+            layout_manager: boxLayout
+        });
         boxLayout.hookup_style(vbox);
         hbox.add(vbox);
 
         vbox.add_actor(this._date);
         vbox.add_actor(this._calendar);
 
-        this._displaysSection = new St.ScrollView({ style_class: 'datemenu-displays-section vfade',
-                                                    x_expand: true,
-                                                    overlay_scrollbars: true });
+        this._displaysSection = new St.ScrollView({
+            context: St.get_clutter_context(),
+            style_class: 'datemenu-displays-section vfade',
+            x_expand: true,
+            overlay_scrollbars: true
+        });
         this._displaysSection.set_policy(St.PolicyType.NEVER, St.PolicyType.EXTERNAL);
         vbox.add_actor(this._displaysSection);
 
-        let displaysBox = new St.BoxLayout({ vertical: true,
-                                             x_expand: true,
-                                             style_class: 'datemenu-displays-box' });
+        let displaysBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true,
+            x_expand: true,
+            style_class: 'datemenu-displays-box'
+        });
         this._displaysSection.add_actor(displaysBox);
 
         this._eventsItem = new EventsSection();

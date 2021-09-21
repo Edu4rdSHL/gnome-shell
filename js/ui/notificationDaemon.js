@@ -452,8 +452,11 @@ class FdoNotificationDaemonSource extends MessageTray.Source {
         if (this.app) {
             return this.app.create_icon_texture(size);
         } else if (this._gicon) {
-            return new St.Icon({ gicon: this._gicon,
-                                 icon_size: size });
+            return new St.Icon({
+                context: St.get_clutter_context(),
+                gicon: this._gicon,
+                icon_size: size
+            });
         } else {
             return null;
         }

@@ -27,11 +27,13 @@ class KeyringDialog extends ModalDialog.ModalDialog {
             content, 'description', GObject.BindingFlags.SYNC_CREATE);
 
         let passwordBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-password-layout',
             vertical: true,
         });
 
         this._passwordEntry = new St.PasswordEntry({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-password-entry',
             can_focus: true,
             x_align: Clutter.ActorAlign.CENTER,
@@ -43,6 +45,7 @@ class KeyringDialog extends ModalDialog.ModalDialog {
         passwordBox.add_child(this._passwordEntry);
 
         this._confirmEntry = new St.PasswordEntry({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-password-entry',
             can_focus: true,
             x_align: Clutter.ActorAlign.CENTER,
@@ -56,7 +59,10 @@ class KeyringDialog extends ModalDialog.ModalDialog {
         this.prompt.set_password_actor(this._passwordEntry.clutter_text);
         this.prompt.set_confirm_actor(this._confirmEntry.clutter_text);
 
-        let warningBox = new St.BoxLayout({ vertical: true });
+        let warningBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
 
         let capsLockWarning = new ShellEntry.CapsLockWarning();
         let syncCapsLockWarningVisibility = () => {
@@ -67,7 +73,10 @@ class KeyringDialog extends ModalDialog.ModalDialog {
         this.prompt.connect('notify::confirm-visible', syncCapsLockWarningVisibility);
         warningBox.add_child(capsLockWarning);
 
-        let warning = new St.Label({ style_class: 'prompt-dialog-error-label' });
+        let warning = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'prompt-dialog-error-label'
+        });
         warning.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         warning.clutter_text.line_wrap = true;
         this.prompt.bind_property('warning',

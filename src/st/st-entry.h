@@ -40,7 +40,8 @@ struct _StEntryClass
   void (*secondary_icon_clicked) (StEntry *entry);
 };
 
-StWidget       *st_entry_new                (const gchar    *text);
+StWidget       *st_entry_new                (ClutterContext *clutter_context,
+                                             const char     *text);
 const gchar    *st_entry_get_text           (StEntry        *entry);
 void            st_entry_set_text           (StEntry        *entry,
                                              const gchar    *text);

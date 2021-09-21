@@ -35,6 +35,7 @@ class ATIndicator extends PanelMenu.Button {
         super._init(0.5, _("Accessibility"));
 
         this.add_child(new St.Icon({
+            context: St.get_clutter_context(),
             style_class: 'system-status-icon',
             icon_name: 'preferences-desktop-accessibility-symbolic',
         }));

@@ -61,6 +61,7 @@ class RunDialog extends ModalDialog.ModalDialog {
         this.contentLayout.add_actor(content);
 
         let entry = new St.Entry({
+            context: St.get_clutter_context(),
             style_class: 'run-dialog-entry',
             can_focus: true,
         });
@@ -73,6 +74,7 @@ class RunDialog extends ModalDialog.ModalDialog {
         let defaultDescriptionText = _('Press ESC to close');
 
         this._descriptionLabel = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'run-dialog-description',
             text: defaultDescriptionText,
         });
