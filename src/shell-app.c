@@ -7,6 +7,8 @@
 #include <glib/gi18n-lib.h>
 
 #include <meta/display.h>
+#include <meta/meta-backend.h>
+#include <meta/meta-context.h>
 #include <meta/meta-workspace-manager.h>
 #include <meta/meta-x11-display.h>
 
@@ -1485,6 +1487,9 @@ static void
 create_running_state (ShellApp *app)
 {
   MetaDisplay *display = shell_global_get_display (shell_global_get ());
+  MetaContext *context = meta_display_get_context (display);
+  MetaBackend *backend = meta_context_get_backend (context);
+  ClutterContext *clutter_context = meta_backend_get_clutter_context (backend);
   MetaWorkspaceManager *workspace_manager =
     meta_display_get_workspace_manager (display);
 
@@ -1498,7 +1503,7 @@ create_running_state (ShellApp *app)
 
   app->running_state->session = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, NULL);
   g_assert (app->running_state->session != NULL);
-  app->running_state->muxer = gtk_action_muxer_new ();
+  app->running_state->muxer = gtk_action_muxer_new (clutter_context);
 }
 
 void

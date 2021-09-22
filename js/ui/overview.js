@@ -578,7 +578,8 @@ var Overview = class {
         if (!this._shown)
             return;
 
-        let event = Clutter.get_current_event();
+        const clutterContext = St.get_clutter_context();
+        const event = clutterContext.get_current_event();
         if (event) {
             let type = event.type();
             let button = type == Clutter.EventType.BUTTON_PRESS ||

@@ -1425,6 +1425,7 @@ guint32
 shell_global_get_current_time (ShellGlobal *global)
 {
   guint32 time;
+  ClutterContext *clutter_context;
 
   /* meta_display_get_current_time() will return the correct time
      when handling an X or Gdk event, but will return CurrentTime
@@ -1443,7 +1444,8 @@ shell_global_get_current_time (ShellGlobal *global)
   if (time != CLUTTER_CURRENT_TIME)
     return time;
 
-  return clutter_get_current_event_time ();
+  clutter_context = meta_backend_get_clutter_context (global->backend);
+  return clutter_context_get_current_event_time (clutter_context);
 }
 
 static void

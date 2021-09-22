@@ -2158,13 +2158,17 @@ var KeyboardController = class {
     }
 
     keyvalPress(keyval) {
-        this._virtualDevice.notify_keyval(Clutter.get_current_event_time() * 1000,
-                                          keyval, Clutter.KeyState.PRESSED);
+        const clutterContext = St.get_clutter_context();
+        this._virtualDevice.notify_keyval(
+            clutterContext.get_current_event_time() * 1000,
+            keyval, Clutter.KeyState.PRESSED);
     }
 
     keyvalRelease(keyval) {
-        this._virtualDevice.notify_keyval(Clutter.get_current_event_time() * 1000,
-                                          keyval, Clutter.KeyState.RELEASED);
+        const clutterContext = St.get_clutter_context();
+        this._virtualDevice.notify_keyval(
+            clutterContext.get_current_event_time() * 1000,
+            keyval, Clutter.KeyState.RELEASED);
     }
 };
 Signals.addSignalMethods(KeyboardController.prototype);
