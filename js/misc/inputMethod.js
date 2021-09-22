@@ -1,6 +1,6 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported InputMethod */
-const { Clutter, GLib, Gio, GObject, IBus } = imports.gi;
+const { Clutter, GLib, Gio, GObject, IBus, St } = imports.gi;
 
 const Keyboard = imports.ui.status.keyboard;
 
@@ -12,7 +12,9 @@ var HIDE_PANEL_TIME = 50;
 var InputMethod = GObject.registerClass(
 class InputMethod extends Clutter.InputMethod {
     _init() {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
         this._hints = 0;
         this._purpose = 0;
         this._currentFocus = null;
