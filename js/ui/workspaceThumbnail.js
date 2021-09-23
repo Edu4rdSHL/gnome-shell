@@ -913,7 +913,8 @@ var ThumbnailsBox = GObject.registerClass({
             source != Main.xdndHandler)
             return DND.DragMotionResult.CONTINUE;
 
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         let canCreateWorkspaces = Meta.prefs_get_dynamic_workspaces();
         let spacing = this.get_theme_node().get_length('spacing');
 
@@ -1352,7 +1353,8 @@ var ThumbnailsBox = GObject.registerClass({
     vfunc_allocate(box) {
         this.set_allocation(box);
 
-        let rtl = Clutter.get_default_text_direction() == Clutter.TextDirection.RTL;
+        let rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
 
         if (this._thumbnails.length == 0) // not visible
             return;

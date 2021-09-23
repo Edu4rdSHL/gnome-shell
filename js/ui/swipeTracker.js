@@ -663,7 +663,8 @@ var SwipeTracker = GObject.registerClass({
         }
 
         if (this.orientation === Clutter.Orientation.HORIZONTAL &&
-            Clutter.get_default_text_direction() === Clutter.TextDirection.RTL)
+            St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL)
             delta = -delta;
 
         this._progress += delta / distance;

@@ -197,7 +197,8 @@ class EventsSection extends St.Button {
             title = Util.formatTime(date, { timeOnly: true });
         }
 
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         if (event.date < this._startDate && !event.allDay) {
             if (rtl)
                 title = '%s%s'.format(title, ELLIPSIS_CHAR);

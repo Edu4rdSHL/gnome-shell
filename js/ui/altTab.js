@@ -167,7 +167,8 @@ class AppSwitcherPopup extends SwitcherPopup.SwitcherPopup {
     }
 
     _keyPressHandler(keysym, action) {
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         if (action == Meta.KeyBindingAction.SWITCH_GROUP) {
             if (!this._thumbnailsFocused)
                 this._select(this._selectedIndex, 0);
@@ -618,7 +619,8 @@ class WindowSwitcherPopup extends SwitcherPopup.SwitcherPopup {
     }
 
     _keyPressHandler(keysym, action) {
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         if (action == Meta.KeyBindingAction.SWITCH_WINDOWS)
             this._select(this._next());
         else if (action == Meta.KeyBindingAction.SWITCH_WINDOWS_BACKWARD)

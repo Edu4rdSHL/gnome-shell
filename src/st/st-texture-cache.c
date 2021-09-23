@@ -26,6 +26,7 @@
 #include "st-texture-cache.h"
 #include "st-private.h"
 #include "st-settings.h"
+#include <clutter/clutter.h>
 #include <gtk/gtk.h>
 #include <math.h>
 #include <string.h>
@@ -996,6 +997,7 @@ st_texture_cache_load_gicon (StTextureCache    *cache,
                              gint               paint_scale,
                              gfloat             resource_scale)
 {
+  ClutterContext *clutter_context = st_get_clutter_context ();
   AsyncTextureLoadData *request;
   ClutterActor *actor;
   gint scale;
@@ -1046,7 +1048,8 @@ st_texture_cache_load_gicon (StTextureCache    *cache,
   else if (icon_style == ST_ICON_STYLE_SYMBOLIC)
     lookup_flags |= GTK_ICON_LOOKUP_FORCE_SYMBOLIC;
 
-  if (clutter_get_default_text_direction () == CLUTTER_TEXT_DIRECTION_RTL)
+  if (clutter_context_get_text_direction (clutter_context) ==
+      CLUTTER_TEXT_DIRECTION_RTL)
     lookup_flags |= GTK_ICON_LOOKUP_DIR_RTL;
   else
     lookup_flags |= GTK_ICON_LOOKUP_DIR_LTR;

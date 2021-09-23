@@ -2960,7 +2960,8 @@ var AppFolderDialog = GObject.registerClass({
         // and TAB_BACKWARD for up key and left key on ltr
         // languages
         let direction;
-        let isLtr = Clutter.get_default_text_direction() == Clutter.TextDirection.LTR;
+        const isLtr = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.LTR;
         switch (keyEvent.keyval) {
         case Clutter.KEY_Down:
             direction = St.DirectionType.TAB_FORWARD;

@@ -192,7 +192,8 @@ var LayoutManager = GObject.registerClass({
     _init() {
         super._init();
 
-        this._rtl = Clutter.get_default_text_direction() == Clutter.TextDirection.RTL;
+        this._rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         this.monitors = [];
         this.primaryMonitor = null;
         this.primaryIndex = -1;
@@ -1124,7 +1125,8 @@ class HotCorner extends Clutter.Actor {
 
         let px = 0.0;
         let py = 0.0;
-        if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL) {
+        if (St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL) {
             px = 1.0;
             py = 0.0;
         }
@@ -1149,7 +1151,8 @@ class HotCorner extends Clutter.Actor {
         }
 
         if (size > 0) {
-            if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL) {
+            if (St.get_clutter_context().get_text_direction() ===
+                Clutter.TextDirection.RTL) {
                 this._verticalBarrier = new Meta.Barrier({ display: global.display,
                                                            x1: this._x, x2: this._x, y1: this._y, y2: this._y + size,
                                                            directions: Meta.BarrierDirection.NEGATIVE_X });
@@ -1194,7 +1197,8 @@ class HotCorner extends Clutter.Actor {
             this.add_child(this._corner);
             layoutManager.addChrome(this);
 
-            if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL) {
+            if (St.get_clutter_context().get_text_direction() ===
+                Clutter.TextDirection.RTL) {
                 this._corner.set_position(this.width - this._corner.width, 0);
                 this.set_pivot_point(1.0, 0.0);
                 this.translation_x = -this.width;

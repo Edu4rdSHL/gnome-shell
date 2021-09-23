@@ -185,7 +185,8 @@ const MonitorGroup = GObject.registerClass({
 
             if (vertical)
                 y += this.baseDistance;
-            else if (Clutter.get_default_text_direction() === Clutter.TextDirection.RTL)
+            else if (St.get_clutter_context().get_text_direction() ===
+                Clutter.TextDirection.RTL)
                 x -= this.baseDistance;
             else
                 x += this.baseDistance;
@@ -372,7 +373,8 @@ var WorkspaceAnimationController = class {
             break;
         }
 
-        if (Clutter.get_default_text_direction() === Clutter.TextDirection.RTL &&
+        if (St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL &&
             direction !== Meta.MotionDirection.UP &&
             direction !== Meta.MotionDirection.DOWN)
             workspaceIndices.reverse();

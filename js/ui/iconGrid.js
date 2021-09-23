@@ -691,8 +691,8 @@ var IconGridLayout = GObject.registerClass({
         const nEmpty = this.columnsPerPage - itemsInThisRow;
         const availableWidth = nEmpty * (spacing + childSize);
 
-        const isRtl =
-            Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const isRtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
 
         switch (align) {
         case Clutter.ActorAlign.CENTER:
@@ -783,8 +783,8 @@ var IconGridLayout = GObject.registerClass({
         if (this._pageWidth === 0 || this._pageHeight === 0)
             throw new Error('IconGridLayout.adaptToSize wasn\'t called before allocation');
 
-        const isRtl =
-            Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const isRtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         const childSize = this._getChildrenMaxSize();
 
         const [leftEmptySpace, topEmptySpace, hSpacing, vSpacing] =
@@ -1049,8 +1049,8 @@ var IconGridLayout = GObject.registerClass({
         const [leftEmptySpace, topEmptySpace, hSpacing, vSpacing] =
             this._calculateSpacing(childSize);
 
-        const isRtl =
-            Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const isRtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
 
         let page = this._orientation === Clutter.Orientation.VERTICAL
             ? Math.floor(y / this._pageHeight)

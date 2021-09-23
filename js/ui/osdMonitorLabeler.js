@@ -43,7 +43,8 @@ class OsdMonitorLabel extends St.Widget {
     _position() {
         let workArea = Main.layoutManager.getWorkAreaForMonitor(this._monitor);
 
-        if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
+        if (St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL)
             this._box.x = workArea.x + (workArea.width - this._box.width);
         else
             this._box.x = workArea.x;
