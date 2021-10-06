@@ -29,6 +29,7 @@ const Layout = imports.ui.layout;
 const LoginManager = imports.misc.loginManager;
 const Main = imports.ui.main;
 const PopupMenu = imports.ui.popupMenu;
+const PromiseUtils = imports.misc.promiseUtils;
 const Realmd = imports.gdm.realmd;
 const UserWidget = imports.ui.userWidget;
 
@@ -734,20 +735,18 @@ var LoginDialog = GObject.registerClass({
             this._sessionMenuButton.allocate(sessionMenuButtonAllocation);
     }
 
-    _ensureUserListLoaded() {
+    async _ensureUserListLoaded() {
         if (!this._userManager.is_loaded) {
-            this._userManagerLoadedId = this._userManager.connect('notify::is-loaded',
-                () => {
-                    if (this._userManager.is_loaded) {
-                        this._loadUserList();
-                        this._userManager.disconnect(this._userManagerLoadedId);
-                        this._userManagerLoadedId = 0;
-                    }
-                });
+            await this._userManager.connect_with_promise('notify::is-loaded',
+                promise => {
+                    if (this._userManager.is_loaded)
+                        promise.resolve();
+                }, PromiseUtils.SignalConnectionPromiseFull.Flags.MULTIPLE);
         } else {
-            let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, this._loadUserList.bind(this));
-            GLib.Source.set_name_by_id(id, '[gnome-shell] _loadUserList');
+            await new PromiseUtils.IdlePromise();
         }
+
+        this._loadUserList();
     }
 
     _updateDisableUserList() {
@@ -995,8 +994,9 @@ var LoginDialog = GObject.registerClass({
         });
     }
 
-    _onSessionOpened(client, serviceName) {
-        this._authPrompt.finish(() => this._startSession(serviceName));
+    async _onSessionOpened(client, serviceName) {
+        await this._authPrompt.finish();
+        this._startSession(serviceName);
     }
 
     _waitForItemForUser(userName) {
@@ -1307,7 +1307,7 @@ var LoginDialog = GObject.registerClass({
         // Don't allow type ahead at the login screen
     }
 
-    finish(onComplete) {
-        this._authPrompt.finish(onComplete);
+    async finish() {
+        await this._authPrompt.finish();
     }
 });

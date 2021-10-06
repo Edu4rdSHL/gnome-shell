@@ -845,8 +845,7 @@ class NotificationSection extends MessageList.MessageListSection {
             message.setSecondaryActor(new TimeLabel(notification.datetime));
             this.moveMessage(message, isUrgent ? 0 : this._nUrgent, this.mapped);
         });
-        let destroyId = notification.connect('destroy', () => {
-            notification.disconnect(destroyId);
+        notification.connect_once('destroy').then(() => {
             notification.disconnect(updatedId);
             if (isUrgent)
                 this._nUrgent--;

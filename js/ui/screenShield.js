@@ -348,16 +348,6 @@ var ScreenShield = class {
         this._ensureUnlockDialog(true);
     }
 
-    _hideLockScreenComplete() {
-        this._lockScreenState = MessageTray.State.HIDDEN;
-        this._lockScreenGroup.hide();
-
-        if (this._dialog) {
-            this._dialog.grab_key_focus();
-            this._dialog.navigate_focus(null, St.DirectionType.TAB_FORWARD, false);
-        }
-    }
-
     _showPointer() {
         this._cursorTracker.set_pointer_visible(true);
 
@@ -377,13 +367,15 @@ var ScreenShield = class {
         this._cursorTracker.set_pointer_visible(false);
     }
 
-    _hideLockScreen(animate) {
+    async _hideLockScreen(animate) {
         if (this._lockScreenState == MessageTray.State.HIDDEN)
             return;
 
         this._lockScreenState = MessageTray.State.HIDING;
 
         this._lockDialogGroup.remove_all_transitions();
+
+        this._showPointer();
 
         if (animate) {
             // Animate the lock screen out of screen
@@ -395,17 +387,20 @@ var ScreenShield = class {
             let velocity = global.stage.height / CURTAIN_SLIDE_TIME;
             let duration = delta / velocity;
 
-            this._lockDialogGroup.ease({
+            await this._lockDialogGroup.ease({
                 translation_y: -h,
                 duration,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => this._hideLockScreenComplete(),
             });
-        } else {
-            this._hideLockScreenComplete();
         }
 
-        this._showPointer();
+        this._lockScreenState = MessageTray.State.HIDDEN;
+        this._lockScreenGroup.hide();
+
+        if (this._dialog) {
+            this._dialog.grab_key_focus();
+            this._dialog.navigate_focus(null, St.DirectionType.TAB_FORWARD, false);
+        }
     }
 
     _ensureUnlockDialog(allowCancel) {
@@ -443,7 +438,7 @@ var ScreenShield = class {
                                 fadeToBlack: false });
     }
 
-    _resetLockScreen(params) {
+    async _resetLockScreen(params) {
         // Don't reset the lock screen unless it is completely hidden
         // This prevents the shield going down if the lock-delay timeout
         // fires while the user is dragging (which has the potential
@@ -456,23 +451,20 @@ var ScreenShield = class {
 
         let fadeToBlack = params.fadeToBlack;
 
+        this._dialog.grab_key_focus();
+
         if (params.animateLockScreen) {
             this._lockDialogGroup.translation_y = -global.screen_height;
             this._lockDialogGroup.remove_all_transitions();
-            this._lockDialogGroup.ease({
+            await this._lockDialogGroup.ease({
                 translation_y: 0,
                 duration: Overview.ANIMATION_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => {
-                    this._lockScreenShown({ fadeToBlack, animateFade: true });
-                },
             });
         } else {
             this._lockDialogGroup.translation_y = 0;
-            this._lockScreenShown({ fadeToBlack, animateFade: false });
         }
-
-        this._dialog.grab_key_focus();
+        this._lockScreenShown({ fadeToBlack, animateFade: false });
     }
 
     _lockScreenShown(params) {
@@ -518,14 +510,10 @@ var ScreenShield = class {
         return this._activationTime;
     }
 
-    deactivate(animate) {
+    async deactivate(animate) {
         if (this._dialog)
-            this._dialog.finish(() => this._continueDeactivate(animate));
-        else
-            this._continueDeactivate(animate);
-    }
+            await this._dialog.finish();
 
-    _continueDeactivate(animate) {
         this._hideLockScreen(animate);
 
         if (Main.sessionMode.currentMode == 'unlock-dialog')
@@ -557,15 +545,12 @@ var ScreenShield = class {
         this._longLightbox.lightOff();
         this._shortLightbox.lightOff();
 
-        this._lockDialogGroup.ease({
+        await this._lockDialogGroup.ease({
             translation_y: -global.screen_height,
             duration: Overview.ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => this._completeDeactivate(),
         });
-    }
 
-    _completeDeactivate() {
         if (this._dialog) {
             this._dialog.destroy();
             this._dialog = null;

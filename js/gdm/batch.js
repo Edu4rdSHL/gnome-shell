@@ -189,20 +189,17 @@ var ConcurrentBatch = class extends Batch {
 Signals.addSignalMethods(ConcurrentBatch.prototype);
 
 var ConsecutiveBatch = class extends Batch {
-    process() {
+    async process() {
         let hold = this.runTask();
 
         if (hold && hold.isAcquired()) {
             // This task is inhibiting the batch. Wait on it
             // before processing the next one.
-            let signalId = hold.connect('release', () => {
-                hold.disconnect(signalId);
-                this.nextTask();
-            });
-        } else {
-            // This task finished, process the next one
-            this.nextTask();
+            await hold.connect_once('release');
         }
+
+        // This task finished, process the next one
+        this.nextTask();
     }
 };
 Signals.addSignalMethods(ConsecutiveBatch.prototype);

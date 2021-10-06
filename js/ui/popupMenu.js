@@ -742,7 +742,7 @@ var PopupMenuBase = class {
                 menuItem.menu.close(BoxPointer.PopupAnimation.NONE);
             });
 
-            menuItem.connect('destroy', () => {
+            menuItem.connect_once('destroy').then(() => {
                 menuItem.menu.disconnect(subMenuActiveChangeId);
                 this.disconnect(closingId);
             });
@@ -756,10 +756,7 @@ var PopupMenuBase = class {
             let openStateChangeId = this.connect('open-state-changed', () => {
                 this._updateSeparatorVisibility(menuItem);
             });
-            let destroyId = menuItem.connect('destroy', () => {
-                this.disconnect(openStateChangeId);
-                menuItem.disconnect(destroyId);
-            });
+            menuItem.connect_once('destroy').then(() => this.disconnect(openStateChangeId));
         } else if (menuItem instanceof PopupBaseMenuItem) {
             this._connectItemSignals(menuItem);
         } else {
@@ -936,21 +933,19 @@ var PopupMenu = class extends PopupMenuBase {
         this.emit('open-state-changed', true);
     }
 
-    close(animate) {
+    async close(animate) {
         if (this._activeMenuItem)
             this._activeMenuItem.active = false;
 
-        if (this._boxPointer.visible) {
-            this._boxPointer.close(animate, () => {
-                this.emit('menu-closed');
-            });
+        if (this.isOpen) {
+            this.isOpen = false;
+            this.emit('open-state-changed', false);
         }
 
-        if (!this.isOpen)
-            return;
-
-        this.isOpen = false;
-        this.emit('open-state-changed', false);
+        if (this._boxPointer.visible) {
+            await this._boxPointer.close(animate);
+            this.emit('menu-closed');
+        }
     }
 
     destroy() {

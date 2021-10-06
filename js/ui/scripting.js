@@ -3,12 +3,13 @@
             destroyTestWindows, defineScriptEvent, scriptEvent,
             collectStatistics, runPerfScript */
 
-const { Gio, GLib, Meta, Shell } = imports.gi;
+const { Gio, Meta, Shell } = imports.gi;
 
 const Config = imports.misc.config;
 const Main = imports.ui.main;
 const Params = imports.misc.params;
 const Util = imports.misc.util;
+const PromiseUtils = imports.misc.promiseUtils;
 
 const { loadInterfaceXML } = imports.misc.fileUtils;
 
@@ -39,13 +40,7 @@ const { loadInterfaceXML } = imports.misc.fileUtils;
  * 'yield Scripting.sleep(500);'
  */
 function sleep(milliseconds) {
-    return new Promise(resolve => {
-        let id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, milliseconds, () => {
-            resolve();
-            return GLib.SOURCE_REMOVE;
-        });
-        GLib.Source.set_name_by_id(id, '[gnome-shell] sleep');
-    });
+    return new PromiseUtils.TimeoutPromise(milliseconds);
 }
 
 /**

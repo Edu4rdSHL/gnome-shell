@@ -1,10 +1,11 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported WorkspaceThumbnail, ThumbnailsBox */
 
-const { Clutter, Gio, GLib, GObject, Graphene, Meta, Shell, St } = imports.gi;
+const { Clutter, Gio, GObject, Graphene, Meta, Shell, St } = imports.gi;
 
 const DND = imports.ui.dnd;
 const Main = imports.ui.main;
+const PromiseUtils = imports.misc.promiseUtils;
 const Util = imports.misc.util;
 const Workspace = imports.ui.workspace;
 
@@ -375,7 +376,7 @@ var WorkspaceThumbnail = GObject.registerClass({
             clone.destroy();
     }
 
-    _doAddWindow(metaWin) {
+    async _doAddWindow(metaWin) {
         if (this._removed)
             return;
 
@@ -384,15 +385,11 @@ var WorkspaceThumbnail = GObject.registerClass({
         if (!win) {
             // Newly-created windows are added to a workspace before
             // the compositor finds out about them...
-            let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                if (!this._removed &&
-                    metaWin.get_compositor_private() &&
-                    metaWin.get_workspace() == this.metaWorkspace)
-                    this._doAddWindow(metaWin);
-                return GLib.SOURCE_REMOVE;
-            });
-            GLib.Source.set_name_by_id(id, '[gnome-shell] this._doAddWindow');
-            return;
+            await new PromiseUtils.IdlePromise();
+
+            win = metaWin.get_compositor_private();
+            if (this._removed || !win || metaWin.get_workspace() !== this.metaWorkspace)
+                return;
         }
 
         if (!this._allWindows.includes(metaWin)) {

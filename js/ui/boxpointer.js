@@ -76,7 +76,7 @@ var BoxPointer = GObject.registerClass({
         return this._arrowSide;
     }
 
-    open(animate, onComplete) {
+    async open(animate) {
         let themeNode = this.get_theme_node();
         let rise = themeNode.get_length('-arrow-rise');
         let animationTime = animate & PopupAnimation.FULL ? POPUP_ANIMATION_TIME : 0;
@@ -105,21 +105,18 @@ var BoxPointer = GObject.registerClass({
             }
         }
 
-        this.ease({
+        await this.ease({
             opacity: 255,
             translation_x: 0,
             translation_y: 0,
             duration: animationTime,
             mode: Clutter.AnimationMode.LINEAR,
-            onComplete: () => {
-                this._muteInput = false;
-                if (onComplete)
-                    onComplete();
-            },
         });
+
+        this._muteInput = false;
     }
 
-    close(animate, onComplete) {
+    async close(animate) {
         if (!this.visible)
             return;
 
@@ -150,21 +147,18 @@ var BoxPointer = GObject.registerClass({
         this._muteInput = true;
 
         this.remove_all_transitions();
-        this.ease({
+        await this.ease({
             opacity: fade ? 0 : 255,
             translation_x: translationX,
             translation_y: translationY,
             duration: animationTime,
             mode: Clutter.AnimationMode.LINEAR,
-            onComplete: () => {
-                this.hide();
-                this.opacity = 0;
-                this.translation_x = 0;
-                this.translation_y = 0;
-                if (onComplete)
-                    onComplete();
-            },
         });
+
+        this.hide();
+        this.opacity = 0;
+        this.translation_x = 0;
+        this.translation_y = 0;
     }
 
     _adjustAllocationForArrow(isWidth, minSize, natSize) {

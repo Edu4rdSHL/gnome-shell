@@ -11,6 +11,7 @@ const Vmware = imports.gdm.vmware;
 const Main = imports.ui.main;
 const { loadInterfaceXML } = imports.misc.fileUtils;
 const Params = imports.misc.params;
+const PromiseUtils = imports.misc.promiseUtils;
 const SmartcardManager = imports.misc.smartcardManager;
 
 const FprintManagerIface = loadInterfaceXML('net.reactivated.Fprint.Manager');
@@ -172,7 +173,6 @@ var ShellUserVerifier = class {
                                                                   this._checkForSmartcard.bind(this));
 
         this._messageQueue = [];
-        this._messageQueueTimeoutId = 0;
         this.reauthenticating = false;
 
         this._failCounter = 0;
@@ -267,17 +267,11 @@ var ShellUserVerifier = class {
         }
     }
 
-    answerQuery(serviceName, answer) {
-        if (!this.hasPendingMessages) {
-            this._userVerifier.call_answer_query(serviceName, answer, this._cancellable, null);
-        } else {
-            const cancellable = this._cancellable;
-            let signalId = this.connect('no-more-messages', () => {
-                this.disconnect(signalId);
-                if (!cancellable.is_cancelled())
-                    this._userVerifier.call_answer_query(serviceName, answer, cancellable, null);
-            });
-        }
+    async answerQuery(serviceName, answer) {
+        if (this.hasPendingMessages)
+            await this.connect_once('no-more-messages', this._cancellable);
+
+        this._userVerifier.call_answer_query(serviceName, answer, this._cancellable, null);
     }
 
     _getIntervalForMessage(message) {
@@ -297,9 +291,19 @@ var ShellUserVerifier = class {
         this.emit('no-more-messages');
     }
 
-    increaseCurrentMessageTimeout(interval) {
-        if (!this._messageQueueTimeoutId && interval > 0)
-            this._currentMessageExtraInterval = interval;
+    freezeCurrentMessage() {
+        if (!this._currentMessageFreezeCount)
+            this._currentMessageFreezeCount = 0;
+        this._currentMessageFreezeCount++;
+    }
+
+    thawCurrentMessage() {
+        if (!this._currentMessageFreezeCount)
+            return;
+
+        this._currentMessageFreezeCount--;
+        if (this._currentMessageFreezeCount === 0)
+            this.emit('current-message-thawed');
     }
 
     _serviceHasPendingMessages(serviceName) {
@@ -314,29 +318,37 @@ var ShellUserVerifier = class {
             this._queuePriorityMessage(serviceName, null, messageType);
     }
 
-    _queueMessageTimeout() {
-        if (this._messageQueueTimeoutId != 0)
+    async _queueMessageTimeout() {
+        if (this._messageQueueTimeout?.pending() || this._currentMessageFreezeCount)
             return;
 
         const message = this.currentMessage;
+        const cancellable = this._cancellable;
 
-        delete this._currentMessageExtraInterval;
+        delete this._currentMessageFreezeCount;
         this.emit('show-message', message.serviceName, message.text, message.type);
 
-        this._messageQueueTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-            message.interval + (this._currentMessageExtraInterval | 0), () => {
-                this._messageQueueTimeoutId = 0;
+        if (this._currentMessageFreezeCount)
+            await this.connect_once('current-message-thawed', cancellable);
 
-                if (this._messageQueue.length > 1) {
-                    this._messageQueue.shift();
-                    this._queueMessageTimeout();
-                } else {
-                    this.finishMessageQueue();
-                }
+        this._messageQueueTimeout = new PromiseUtils.TimeoutPromise(
+            message.interval, GLib.PRIORITY_DEFAULT, cancellable);
 
-                return GLib.SOURCE_REMOVE;
-            });
-        GLib.Source.set_name_by_id(this._messageQueueTimeoutId, '[gnome-shell] this._queueMessageTimeout');
+        try {
+            await this._messageQueueTimeout;
+
+            if (this._messageQueue.length > 1) {
+                this._messageQueue.shift();
+                this._queueMessageTimeout();
+            } else {
+                this.finishMessageQueue();
+            }
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
+        } finally {
+            delete this._messageQueueTimeout;
+        }
     }
 
     _queueMessage(serviceName, message, messageType) {
@@ -363,10 +375,7 @@ var ShellUserVerifier = class {
     _clearMessageQueue() {
         this.finishMessageQueue();
 
-        if (this._messageQueueTimeoutId != 0) {
-            GLib.source_remove(this._messageQueueTimeoutId);
-            this._messageQueueTimeoutId = 0;
-        }
+        this._messageQueueTimeout?.cancel();
         this.emit('show-message', null, null, MessageType.NONE);
     }
 
@@ -597,7 +606,7 @@ var ShellUserVerifier = class {
         }
     }
 
-    _onProblem(client, serviceName, problem) {
+    async _onProblem(client, serviceName, problem) {
         const isFingerprint = this.serviceIsFingerprint(serviceName);
 
         if (!this.serviceIsForeground(serviceName) && !isFingerprint)
@@ -619,16 +628,13 @@ var ShellUserVerifier = class {
 
             if (!this._canRetry()) {
                 if (this._fingerprintFailedId)
-                    GLib.source_remove(this._fingerprintFailedId);
+                    this._fingerprintFailedId.cancel();
 
-                const cancellable = this._cancellable;
-                this._fingerprintFailedId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-                    FINGERPRINT_ERROR_TIMEOUT_WAIT, () => {
-                        this._fingerprintFailedId = 0;
-                        if (!cancellable.is_cancelled())
-                            this._verificationFailed(serviceName, false);
-                        return GLib.SOURCE_REMOVE;
-                    });
+                this._fingerprintFailedId =
+                    await new PromiseUtils.TimeoutPromise(
+                        FINGERPRINT_ERROR_TIMEOUT_WAIT,
+                        GLib.PRIORITY_DEFAULT, this._cancellable);
+                this._verificationFailed(serviceName, false);
             }
         }
     }
@@ -685,7 +691,7 @@ var ShellUserVerifier = class {
             (this._reauthOnly || this._failCounter < this.allowedFailures);
     }
 
-    _verificationFailed(serviceName, shouldRetry) {
+    async _verificationFailed(serviceName, shouldRetry) {
         if (serviceName === FINGERPRINT_SERVICE_NAME) {
             if (this._fingerprintFailedId)
                 GLib.source_remove(this._fingerprintFailedId);
@@ -699,34 +705,20 @@ var ShellUserVerifier = class {
 
         const doneTrying = !shouldRetry || !this._canRetry();
 
-        if (doneTrying) {
+        if (doneTrying)
             this._disconnectSignals();
-
-            // eslint-disable-next-line no-lonely-if
-            if (!this.hasPendingMessages) {
-                this._cancelAndReset();
-            } else {
-                const cancellable = this._cancellable;
-                let signalId = this.connect('no-more-messages', () => {
-                    this.disconnect(signalId);
-                    if (!cancellable.is_cancelled())
-                        this._cancelAndReset();
-                });
-            }
-        }
 
         this.emit('verification-failed', serviceName, !doneTrying);
 
-        if (!this.hasPendingMessages) {
-            this._retry(serviceName);
-        } else {
-            const cancellable = this._cancellable;
-            let signalId = this.connect('no-more-messages', () => {
-                this.disconnect(signalId);
-                if (!cancellable.is_cancelled())
-                    this._retry(serviceName);
-            });
+        if (doneTrying) {
+            if (this.hasPendingMessages)
+                await this.connect_once('no-more-messages', this._cancellable);
+            this._cancelAndReset();
         }
+
+        if (this.hasPendingMessages)
+            await this.connect_once('no-more-messages', this._cancellable);
+        this._retry(serviceName);
     }
 
     _onServiceUnavailable(_client, serviceName, errorMessage) {

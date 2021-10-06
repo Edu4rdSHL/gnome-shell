@@ -18,6 +18,7 @@ const PopupMenu = imports.ui.popupMenu;
 const Search = imports.ui.search;
 const SwipeTracker = imports.ui.swipeTracker;
 const Params = imports.misc.params;
+const PromiseUtils = imports.misc.promiseUtils;
 const SystemActions = imports.misc.systemActions;
 
 var MENU_POPUP_TIMEOUT = 600;
@@ -298,7 +299,6 @@ var BaseAppView = GObject.registerClass({
         this._items = new Map();
         this._orderedItems = [];
 
-        this._animateLaterId = 0;
         this._viewLoadedHandlerId = 0;
         this._viewIsReady = false;
 
@@ -877,27 +877,17 @@ var BaseAppView = GObject.registerClass({
             log('No such application %s'.format(id));
     }
 
-    selectApp(id) {
+    async selectApp(id) {
         if (this._items.has(id)) {
             let item = this._items.get(id);
 
-            if (item.mapped) {
-                this._selectAppInternal(id);
-            } else {
-                // Need to wait until the view is mapped
-                let signalId = item.connect('notify::mapped', actor => {
-                    if (actor.mapped) {
-                        actor.disconnect(signalId);
-                        this._selectAppInternal(id);
-                    }
-                });
-            }
+            if (!item.mapped)
+                await item.connect_once('notify::mapped');
+            this._selectAppInternal(id);
         } else {
             // Need to wait until the view is built
-            let signalId = this.connect('view-loaded', () => {
-                this.disconnect(signalId);
-                this.selectApp(id);
-            });
+            await this.connect_once('view-loaded');
+            this.selectApp(id);
         }
     }
 
@@ -909,51 +899,26 @@ var BaseAppView = GObject.registerClass({
     }
 
     _clearAnimateLater() {
-        if (this._animateLaterId) {
-            Meta.later_remove(this._animateLaterId);
-            this._animateLaterId = 0;
-        }
-        if (this._viewLoadedHandlerId) {
-            this.disconnect(this._viewLoadedHandlerId);
-            this._viewLoadedHandlerId = 0;
-        }
+        this._animateLater?.cancel();
     }
 
-    animate(animationDirection, onComplete) {
-        if (onComplete) {
-            let animationDoneId = this._grid.connect('animation-done', () => {
-                this._grid.disconnect(animationDoneId);
-                onComplete();
-            });
-        }
-
+    async animate(animationDirection) {
         this._clearAnimateLater();
         this._grid.opacity = 255;
 
         if (animationDirection == IconGrid.AnimationDirection.IN) {
-            const doSpringAnimationLater = laterType => {
-                this._animateLaterId = Meta.later_add(laterType,
-                    () => {
-                        this._animateLaterId = 0;
-                        this._doSpringAnimation(animationDirection);
-                        return GLib.SOURCE_REMOVE;
-                    });
-            };
-
             if (this._viewIsReady) {
                 this._grid.opacity = 0;
-                doSpringAnimationLater(Meta.LaterType.IDLE);
+                this._animateLater = PromiseUtils.MetaLaterPromise(Meta.LaterType.IDLE);
             } else {
-                this._viewLoadedHandlerId = this.connect('view-loaded',
-                    () => {
-                        this._clearAnimateLater();
-                        this._grid.opacity = 255;
-                        doSpringAnimationLater(Meta.LaterType.BEFORE_REDRAW);
-                    });
+                await this.connect_once('view-loaded');
+                this._clearAnimateLater();
+                this._grid.opacity = 255;
+                this._animateLater = PromiseUtils.MetaLaterPromise(Meta.LaterType.BEFORE_REDRAW);
             }
-        } else {
-            this._doSpringAnimation(animationDirection);
+            await this._animateLater;
         }
+        this._doSpringAnimation(animationDirection);
     }
 
     _getDropTarget(x, y, source) {
@@ -1657,21 +1622,18 @@ class AppDisplay extends BaseAppView {
     }
 
     // Overridden from BaseAppView
-    animate(animationDirection, onComplete) {
+    async animate(animationDirection) {
         this._scrollView.reactive = false;
         this._swipeTracker.enabled = false;
-        let completionFunc = () => {
-            this._scrollView.reactive = true;
-            this._swipeTracker.enabled = this.mapped;
-            if (onComplete)
-                onComplete();
-        };
 
         if (animationDirection == IconGrid.AnimationDirection.OUT &&
-            this._displayingDialog && this._currentDialog)
+            this._displayingDialog && this._currentDialog) {
             this._currentDialog.popdown();
-        else
-            super.animate(animationDirection, completionFunc);
+        } else {
+            await super.animate(animationDirection);
+            this._scrollView.reactive = true;
+            this._swipeTracker.enabled = this.mapped;
+        }
     }
 
     animateSwitch(animationDirection) {
@@ -1907,17 +1869,15 @@ var AppSearchProvider = class AppSearchProvider {
         return results.slice(0, maxNumber);
     }
 
-    getInitialResultSet(terms, callback, _cancellable) {
+    async getInitialResultSet(terms, callback, _cancellable) {
         // Defer until the parental controls manager is initialised, so the
         // results can be filtered correctly.
         if (!this._parentalControlsManager.initialized) {
-            let initializedId = this._parentalControlsManager.connect('app-filter-changed', () => {
-                if (this._parentalControlsManager.initialized) {
-                    this._parentalControlsManager.disconnect(initializedId);
-                    this.getInitialResultSet(terms, callback, _cancellable);
-                }
-            });
-            return;
+            await this._parentalControlsManager.connect_with_promise(
+                'app-filter-changed', promise => {
+                    if (this._parentalControlsManager.initialized)
+                        promise.resolve();
+                }, PromiseUtils.SignalConnectionPromiseFull.Flags.MULTIPLE);
         }
 
         let query = terms.join(' ');
@@ -1996,7 +1956,7 @@ class AppViewItem extends St.Button {
         }
     }
 
-    _updateMultiline() {
+    async _updateMultiline() {
         if (!this._expandTitleOnHover || !this.icon.label)
             return;
 
@@ -2008,11 +1968,6 @@ class AppViewItem extends St.Button {
 
         label.remove_transition('allocation');
 
-        const id = label.connect('notify::allocation', () => {
-            label.restore_easing_state();
-            label.disconnect(id);
-        });
-
         const expand = this.hover || this.has_key_focus();
         label.save_easing_state();
         label.set_easing_duration(expand
@@ -2023,6 +1978,9 @@ class AppViewItem extends St.Button {
             line_wrap_mode: expand ? Pango.WrapMode.WORD_CHAR : Pango.WrapMode.NONE,
             ellipsize: expand ? Pango.EllipsizeMode.NONE : Pango.EllipsizeMode.END,
         });
+
+        await label.connect_once('notify::allocation');
+        label.restore_easing_state();
     }
 
     _onHover() {
@@ -2275,11 +2233,6 @@ class FolderView extends BaseAppView {
             return -1;
 
         return aPosition - bPosition;
-    }
-
-    // Overridden from BaseAppView
-    animate(animationDirection) {
-        this._grid.animatePulse(animationDirection);
     }
 
     createFolderIcon(size) {

@@ -444,11 +444,8 @@ class EndSessionDialog extends ModalDialog.ModalDialog {
             let label = dialogContent.confirmButtons[i].label;
             let button = this.addButton({
                 action: () => {
+                    this.connect_once('closed').then(() => this._confirm(signal));
                     this.close(true);
-                    let signalId = this.connect('closed', () => {
-                        this.disconnect(signalId);
-                        this._confirm(signal);
-                    });
                 },
                 label,
             });
@@ -458,11 +455,9 @@ class EndSessionDialog extends ModalDialog.ModalDialog {
                 this._rebootButton = button;
                 this._rebootButtonAlt = this.addButton({
                     action: () => {
+                        this.connect_once('closed').then(() =>
+                            this._confirmRebootToBootLoaderMenu());
                         this.close(true);
-                        let signalId = this.connect('closed', () => {
-                            this.disconnect(signalId);
-                            this._confirmRebootToBootLoaderMenu();
-                        });
                     },
                     label: C_('button', 'Boot Options'),
                 });
@@ -799,10 +794,8 @@ class EndSessionDialog extends ModalDialog.ModalDialog {
 
         this._sync();
 
-        let signalId = this.connect('opened', () => {
-            invocation.return_value(null);
-            this.disconnect(signalId);
-        });
+        await this.connect_once('opened');
+        invocation.return_value(null);
     }
 
     Close(_parameters, _invocation) {

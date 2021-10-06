@@ -1633,7 +1633,7 @@ var WindowManager = class {
         return !(this._allowedKeybindings[binding.get_name()] & Main.actionMode);
     }
 
-    _switchWorkspace(shellwm, from, to, direction) {
+    async _switchWorkspace(shellwm, from, to, direction) {
         if (!Main.sessionMode.hasWorkspaces || !this._shouldAnimate()) {
             shellwm.completed_switch_workspace();
             return;
@@ -1641,10 +1641,9 @@ var WindowManager = class {
 
         this._switchInProgress = true;
 
-        this._workspaceAnimation.animateSwitch(from, to, direction, () => {
-            this._shellwm.completed_switch_workspace();
-            this._switchInProgress = false;
-        });
+        await this._workspaceAnimation.animateSwitch(from, to, direction);
+        this._shellwm.completed_switch_workspace();
+        this._switchInProgress = false;
     }
 
     _switchWorkspaceDone() {

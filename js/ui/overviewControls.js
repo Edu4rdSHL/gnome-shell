@@ -673,7 +673,7 @@ class ControlsManager extends St.Widget {
         super.vfunc_unmap();
     }
 
-    animateToOverview(state, callback) {
+    async animateToOverview(state) {
         this._ignoreShowAppsButtonToggle = true;
 
         this._searchController.prepareToEnterOverview();
@@ -682,39 +682,33 @@ class ControlsManager extends St.Widget {
             Main.overview.fadeOutDesktop();
 
         this._stateAdjustment.value = ControlsState.HIDDEN;
-        this._stateAdjustment.ease(state, {
-            duration: Overview.ANIMATION_TIME,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onStopped: () => {
-                if (callback)
-                    callback();
-            },
-        });
-
         this.dash.showAppsButton.checked =
             state === ControlsState.APP_GRID;
 
         this._ignoreShowAppsButtonToggle = false;
+
+        await this._stateAdjustment.ease(state, {
+            duration: Overview.ANIMATION_TIME,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
     }
 
-    animateFromOverview(callback) {
+    async animateFromOverview() {
         this._ignoreShowAppsButtonToggle = true;
 
         this._workspacesDisplay.prepareToLeaveOverview();
         if (!this._workspacesDisplay.activeWorkspaceHasMaximizedWindows())
             Main.overview.fadeInDesktop();
 
-        this._stateAdjustment.ease(ControlsState.HIDDEN, {
-            duration: Overview.ANIMATION_TIME,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onStopped: () => {
-                this.dash.showAppsButton.checked = false;
-                this._ignoreShowAppsButtonToggle = false;
-
-                if (callback)
-                    callback();
-            },
-        });
+        try {
+            await this._stateAdjustment.ease(ControlsState.HIDDEN, {
+                duration: Overview.ANIMATION_TIME,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        } finally {
+            this.dash.showAppsButton.checked = false;
+            this._ignoreShowAppsButtonToggle = false;
+        }
     }
 
     getWorkspacesBoxForState(state) {
@@ -763,7 +757,7 @@ class ControlsManager extends St.Widget {
         this._stateAdjustment.gestureInProgress = false;
     }
 
-    async runStartupAnimation(callback) {
+    async runStartupAnimation() {
         this._ignoreShowAppsButtonToggle = true;
 
         this._searchController.prepareToEnterOverview();
@@ -808,12 +802,11 @@ class ControlsManager extends St.Widget {
         // The Dash rises from the bottom. This is the last animation to finish,
         // so run the callback there.
         this.dash.translation_y = this.dash.height;
-        this.dash.ease({
+        return this.dash.ease({
             translation_y: 0,
             delay: STARTUP_ANIMATION_TIME,
             duration: STARTUP_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => callback(),
         });
     }
 

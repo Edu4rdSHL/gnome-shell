@@ -311,18 +311,16 @@ var SwitcherPopup = GObject.registerClass({
         }
     }
 
-    fadeAndDestroy() {
+    async fadeAndDestroy() {
         this._popModal();
         if (this.opacity > 0) {
-            this.ease({
+            await this.ease({
                 opacity: 0,
                 duration: POPUP_FADE_OUT_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => this.destroy(),
             });
-        } else {
-            this.destroy();
         }
+        this.destroy();
     }
 
     _finish(_timestamp) {

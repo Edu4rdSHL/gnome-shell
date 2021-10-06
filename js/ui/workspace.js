@@ -8,6 +8,7 @@ const DND = imports.ui.dnd;
 const Main = imports.ui.main;
 const OverviewControls = imports.ui.overviewControls;
 const Params = imports.misc.params;
+const PromiseUtils = imports.misc.promiseUtils;
 const Util = imports.misc.util;
 const { WindowPreview } = imports.ui.windowPreview;
 
@@ -1221,20 +1222,16 @@ class Workspace extends St.Widget {
             '[gnome-shell] this._layoutFrozenId');
     }
 
-    _doAddWindow(metaWin) {
+    async _doAddWindow(metaWin) {
         let win = metaWin.get_compositor_private();
 
         if (!win) {
             // Newly-created windows are added to a workspace before
             // the compositor finds out about them...
-            let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                if (metaWin.get_compositor_private() &&
-                    metaWin.get_workspace() == this.metaWorkspace)
-                    this._doAddWindow(metaWin);
-                return GLib.SOURCE_REMOVE;
-            });
-            GLib.Source.set_name_by_id(id, '[gnome-shell] this._doAddWindow');
-            return;
+            await new PromiseUtils.IdlePromise();
+            win = metaWin.get_compositor_private();
+            if (!win || metaWin.get_workspace() !== this.metaWorkspace)
+                return;
         }
 
         // We might have the window in our list already if it was on all workspaces and

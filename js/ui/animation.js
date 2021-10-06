@@ -176,26 +176,22 @@ class Spinner extends AnimatedIcon {
         }
     }
 
-    stop() {
+    async stop() {
         this.remove_all_transitions();
 
         if (this._animate) {
-            this.ease({
+            await this.ease({
                 opacity: 0,
                 duration: SPINNER_ANIMATION_TIME,
                 mode: Clutter.AnimationMode.LINEAR,
-                onComplete: () => {
-                    super.stop();
-                    if (this._hideOnStop)
-                        this.hide();
-                },
             });
         } else {
             this.opacity = 0;
-            super.stop();
-
-            if (this._hideOnStop)
-                this.hide();
         }
+
+        super.stop();
+
+        if (this._hideOnStop)
+            this.hide();
     }
 });

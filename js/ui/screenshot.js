@@ -145,16 +145,12 @@ var ScreenshotService = class {
         return [null, null];
     }
 
-    _flashAsync(shooter) {
-        return new Promise((resolve, _reject) => {
-            shooter.connect('screenshot_taken', (s, area) => {
-                const flashspot = new Flashspot(area);
-                flashspot.fire(resolve);
+    async _flashAsync(shooter) {
+        const area = await shooter.connect_once('screenshot_taken');
+        await new Flashspot(area).fire();
 
-                global.display.get_sound_player().play_from_theme(
-                    'screen-capture', _('Screenshot taken'), null);
-            });
-        });
+        global.display.get_sound_player().play_from_theme(
+            'screen-capture', _('Screenshot taken'), null);
     }
 
     _onScreenshotComplete(stream, file, invocation) {
@@ -671,17 +667,13 @@ class Flashspot extends Lightbox.Lightbox {
         this.set_position(area.x, area.y);
     }
 
-    fire(doneCallback) {
+    async fire() {
         this.set({ visible: true, opacity: 255 });
-        this.ease({
+        await this.ease({
             opacity: 0,
             duration: FLASHSPOT_ANIMATION_OUT_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
-                if (doneCallback)
-                    doneCallback();
-                this.destroy();
-            },
         });
+        this.destroy();
     }
 });

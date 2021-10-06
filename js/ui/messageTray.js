@@ -1279,7 +1279,7 @@ var MessageTray = GObject.registerClass({
         this._resetNotificationLeftTimeout();
     }
 
-    _updateShowingNotification() {
+    async _updateShowingNotification() {
         this._notification.acknowledged = true;
         this._notification.playSound();
 
@@ -1289,16 +1289,15 @@ var MessageTray = GObject.registerClass({
             this._notification.source.policy.forceExpanded)
             this._expandBanner(true);
 
-        // We tween all notifications to full opacity. This ensures that both new notifications and
+        // We ease all notifications to full opacity. This ensures that both new notifications and
         // notifications that might have been in the process of hiding get full opacity.
         //
-        // We tween any notification showing in the banner mode to the appropriate height
+        // We ease any notification showing in the banner mode to the appropriate height
         // (which is banner height or expanded height, depending on the notification state)
         // This ensures that both new notifications and notifications in the banner mode that might
         // have been in the process of hiding are shown with the correct height.
         //
-        // We use this._showNotificationCompleted() onComplete callback to extend the time the updated
-        // notification is being shown.
+        // We eventually extend the time the updated notification is being shown.
 
         this._notificationState = State.SHOWING;
         this._bannerBin.remove_all_transitions();
@@ -1307,19 +1306,15 @@ var MessageTray = GObject.registerClass({
             duration: ANIMATION_TIME,
             mode: Clutter.AnimationMode.LINEAR,
         });
-        this._bannerBin.ease({
+        await this._bannerBin.ease({
             y: 0,
             duration: ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_BACK,
-            onComplete: () => {
-                this._notificationState = State.SHOWN;
-                this._showNotificationCompleted();
-                this._updateState();
-            },
         });
-    }
 
-    _showNotificationCompleted() {
+        this._notificationState = State.SHOWN;
+        this._updateState();
+
         if (this._notification.urgency != Urgency.CRITICAL)
             this._updateNotificationTimeout(NOTIFICATION_TIMEOUT);
     }

@@ -1158,7 +1158,6 @@ var IconGridLayout = GObject.registerClass({
 var IconGrid = GObject.registerClass({
     Signals: {
         'pages-changed': {},
-        'animation-done': {},
     },
 }, class IconGrid extends St.Viewport {
     _init(layoutParams = {}) {
@@ -1209,11 +1208,6 @@ var IconGrid = GObject.registerClass({
             clone.destroy();
         });
         this._clonesAnimating = [];
-    }
-
-    _animationDone() {
-        this._resetAnimationActors();
-        this.emit('animation-done');
     }
 
     _childAdded(grid, child) {
@@ -1482,10 +1476,8 @@ var IconGrid = GObject.registerClass({
         this._resetAnimationActors();
 
         let actors = this._getChildrenToAnimate();
-        if (actors.length === 0) {
-            this._animationDone();
+        if (actors.length === 0)
             return;
-        }
 
         await this.layout_manager.ensureIconSizeUpdated();
 
@@ -1523,7 +1515,7 @@ var IconGrid = GObject.registerClass({
          * v
          */
 
-        this._clonesAnimating.forEach(actorClone => {
+        await Promise.all(this._clonesAnimating.map(actorClone => {
             const actor = actorClone.source;
             actor.opacity = 0;
             actor.reactive = false;
@@ -1536,8 +1528,6 @@ var IconGrid = GObject.registerClass({
 
             let movementParams, fadeParams;
             if (animationDirection === AnimationDirection.IN) {
-                const isLastItem = actor._distance === minDist;
-
                 actorClone.opacity = 0;
                 actorClone.set_scale(scaleX, scaleY);
                 actorClone.set_translation(
@@ -1555,9 +1545,6 @@ var IconGrid = GObject.registerClass({
                     delay,
                 };
 
-                if (isLastItem)
-                    movementParams.onComplete = this._animationDone.bind(this);
-
                 fadeParams = {
                     opacity: 255,
                     duration: ANIMATION_FADE_IN_TIME_FOR_ITEM,
@@ -1565,8 +1552,6 @@ var IconGrid = GObject.registerClass({
                     delay,
                 };
             } else {
-                const isLastItem = actor._distance === maxDist;
-
                 let [startX, startY]  = actor._transformedPosition;
                 actorClone.set_translation(startX, startY, 0);
 
@@ -1581,9 +1566,6 @@ var IconGrid = GObject.registerClass({
                     delay,
                 };
 
-                if (isLastItem)
-                    movementParams.onComplete = this._animationDone.bind(this);
-
                 fadeParams = {
                     opacity: 0,
                     duration: ANIMATION_FADE_IN_TIME_FOR_ITEM,
@@ -1592,9 +1574,13 @@ var IconGrid = GObject.registerClass({
                 };
             }
 
-            actorClone.ease(movementParams);
-            actorClone.ease(fadeParams);
-        });
+            return Promise.all([
+                actorClone.ease(movementParams),
+                actorClone.ease(fadeParams),
+            ]);
+        }));
+
+        this._resetAnimationActors();
     }
 
     setGridModes(modes) {

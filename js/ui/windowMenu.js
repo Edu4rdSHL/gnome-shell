@@ -1,11 +1,12 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*
 /* exported WindowMenuManager */
 
-const { GLib, Meta, St } = imports.gi;
+const { Meta, St } = imports.gi;
 
 const BoxPointer = imports.ui.boxpointer;
 const Main = imports.ui.main;
 const PopupMenu = imports.ui.popupMenu;
+const PromiseUtils = imports.misc.promiseUtils;
 
 var WindowMenu = class extends PopupMenu.PopupMenu {
     constructor(window, sourceActor) {
@@ -171,24 +172,19 @@ var WindowMenu = class extends PopupMenu.PopupMenu {
             item.setSensitive(false);
     }
 
-    _grabAction(window, grabOp, time) {
+    async _grabAction(window, grabOp, time) {
         if (global.display.get_grab_op() == Meta.GrabOp.NONE) {
             window.begin_grab_op(grabOp, true, time);
             return;
         }
 
-        let waitId = 0;
-        let id = global.display.connect('grab-op-end', display => {
-            display.disconnect(id);
-            GLib.source_remove(waitId);
+        const shouldGrab = await Promise.race([
+            global.display.connect_once('grab-op-end').then(() => true),
+            new PromiseUtils.TimeoutPromise(100),
+        ]);
 
+        if (shouldGrab)
             window.begin_grab_op(grabOp, true, time);
-        });
-
-        waitId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-            global.display.disconnect(id);
-            return GLib.SOURCE_REMOVE;
-        });
     }
 };
 

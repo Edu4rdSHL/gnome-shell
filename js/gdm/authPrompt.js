@@ -349,6 +349,24 @@ var AuthPrompt = GObject.registerClass({
         this.reset();
     }
 
+    async _hideButtonWell(actor, animate) {
+        const wasSpinner = actor === this._spinner;
+
+        if (!animate) {
+            actor.opacity = 0;
+        } else {
+            await actor.ease({
+                opacity: 0,
+                duration: DEFAULT_BUTTON_WELL_ANIMATION_TIME,
+                delay: DEFAULT_BUTTON_WELL_ANIMATION_DELAY,
+                mode: Clutter.AnimationMode.LINEAR,
+            });
+        }
+
+        if (wasSpinner)
+            this._spinner?.stop();
+    }
+
     setActorInDefaultButtonWell(actor, animate) {
         if (!this._defaultButtonWellActor &&
             !actor)
@@ -359,41 +377,14 @@ var AuthPrompt = GObject.registerClass({
         if (oldActor)
             oldActor.remove_all_transitions();
 
-        let wasSpinner;
-        if (oldActor == this._spinner)
-            wasSpinner = true;
-        else
-            wasSpinner = false;
-
         let isSpinner;
         if (actor == this._spinner)
             isSpinner = true;
         else
             isSpinner = false;
 
-        if (this._defaultButtonWellActor != actor && oldActor) {
-            if (!animate) {
-                oldActor.opacity = 0;
-
-                if (wasSpinner) {
-                    if (this._spinner)
-                        this._spinner.stop();
-                }
-            } else {
-                oldActor.ease({
-                    opacity: 0,
-                    duration: DEFAULT_BUTTON_WELL_ANIMATION_TIME,
-                    delay: DEFAULT_BUTTON_WELL_ANIMATION_DELAY,
-                    mode: Clutter.AnimationMode.LINEAR,
-                    onComplete: () => {
-                        if (wasSpinner) {
-                            if (this._spinner)
-                                this._spinner.stop();
-                        }
-                    },
-                });
-            }
-        }
+        if (this._defaultButtonWellActor !== actor && oldActor)
+            this._hideButtonWell(oldActor, animate);
 
         if (actor) {
             if (isSpinner)
@@ -458,7 +449,7 @@ var AuthPrompt = GObject.registerClass({
         });
     }
 
-    setMessage(serviceName, message, type) {
+    async setMessage(serviceName, message, type) {
         if (type == GdmUtil.MessageType.ERROR)
             this._message.add_style_class_name('login-dialog-message-warning');
         else
@@ -479,14 +470,9 @@ var AuthPrompt = GObject.registerClass({
 
         if (type === GdmUtil.MessageType.ERROR &&
             this._userVerifier.serviceIsFingerprint(serviceName)) {
-            // TODO: Use Await for wiggle to be over before unfreezing the user verifier queue
-            const wiggleParameters = {
-                duration: 65,
-                wiggleCount: 3,
-            };
-            this._userVerifier.increaseCurrentMessageTimeout(
-                wiggleParameters.duration * (wiggleParameters.wiggleCount + 2));
-            Util.wiggle(this._message, wiggleParameters);
+            this._userVerifier.freezeCurrentMessage();
+            await Util.wiggle(this._message);
+            this._userVerifier.thawCurrentMessage();
         }
     }
 
@@ -598,18 +584,11 @@ var AuthPrompt = GObject.registerClass({
         this.verificationStatus = AuthPromptStatus.VERIFYING;
     }
 
-    finish(onComplete) {
-        if (!this._userVerifier.hasPendingMessages) {
-            this._userVerifier.clear();
-            onComplete();
-            return;
-        }
+    async finish() {
+        if (this._userVerifier.hasPendingMessages)
+            await this._userVerifier.connect_once('no-more-messages');
 
-        let signalId = this._userVerifier.connect('no-more-messages', () => {
-            this._userVerifier.disconnect(signalId);
-            this._userVerifier.clear();
-            onComplete();
-        });
+        this._userVerifier.clear();
     }
 
     cancel() {

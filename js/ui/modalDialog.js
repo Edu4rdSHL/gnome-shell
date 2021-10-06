@@ -161,16 +161,7 @@ var ModalDialog = GObject.registerClass({
         return true;
     }
 
-    _closeComplete() {
-        this._setState(State.CLOSED);
-        this.hide();
-        this.emit('closed');
-
-        if (this._destroyOnClose)
-            this.destroy();
-    }
-
-    close(timestamp) {
+    async close(timestamp) {
         if (this.state == State.CLOSED || this.state == State.CLOSING)
             return;
 
@@ -179,15 +170,19 @@ var ModalDialog = GObject.registerClass({
         this._savedKeyFocus = null;
 
         if (this._shouldFadeOut) {
-            this.ease({
+            await this.ease({
                 opacity: 0,
                 duration: OPEN_AND_CLOSE_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => this._closeComplete(),
             });
-        } else {
-            this._closeComplete();
         }
+
+        this._setState(State.CLOSED);
+        this.hide();
+        this.emit('closed');
+
+        if (this._destroyOnClose)
+            this.destroy();
     }
 
     // Drop modal status without closing the dialog; this makes the

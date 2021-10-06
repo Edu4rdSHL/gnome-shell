@@ -100,8 +100,13 @@ const Signals = imports.signals;
 const LoginManager = imports.misc.loginManager;
 const Main = imports.ui.main;
 const Params = imports.misc.params;
+const PromiseUtils = imports.misc.promiseUtils;
 
 Gio._promisify(Gio._LocalFilePrototype, 'query_info_async', 'query_info_finish');
+// The proto has not a finish function, so we need to define one
+GnomeDesktop.BGSlideShow.prototype.load_async_finish = () => {};
+Gio._promisify(GnomeDesktop.BGSlideShow.prototype,
+    'load_async', 'load_async_finish');
 
 var DEFAULT_BACKGROUND_COLOR = Clutter.Color.from_pixel(0x2e3436ff);
 
@@ -158,36 +163,20 @@ var BackgroundCache = class BackgroundCache {
         this._fileMonitors[key] = monitor;
     }
 
-    getAnimation(params) {
-        params = Params.parse(params, { file: null,
-                                        settingsSchema: null,
-                                        onLoaded: null });
+    async getAnimation(params) {
+        params = Params.parse(params, {
+            file: null,
+            settingsSchema: null,
+            cancellable: null,
+        });
 
         let animation = this._animations[params.settingsSchema];
-        if (animation && _fileEqual0(animation.file, params.file)) {
-            if (params.onLoaded) {
-                let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                    params.onLoaded(this._animations[params.settingsSchema]);
-                    return GLib.SOURCE_REMOVE;
-                });
-                GLib.Source.set_name_by_id(id, '[gnome-shell] params.onLoaded');
-            }
-            return;
-        }
+        if (animation && _fileEqual0(animation.file, params.file))
+            return animation;
 
         animation = new Animation({ file: params.file });
-
-        animation.load(() => {
-            this._animations[params.settingsSchema] = animation;
-
-            if (params.onLoaded) {
-                let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                    params.onLoaded(this._animations[params.settingsSchema]);
-                    return GLib.SOURCE_REMOVE;
-                });
-                GLib.Source.set_name_by_id(id, '[gnome-shell] params.onLoaded');
-            }
-        });
+        this._animations[params.settingsSchema] = await animation.loadAsync(params.cancellable);
+        return animation;
     }
 
     getBackgroundSource(layoutManager, settingsSchema) {
@@ -267,7 +256,6 @@ var Background = GObject.registerClass({
 
     destroy() {
         this._cancellable.cancel();
-        this._removeAnimationTimeout();
 
         let i;
         let keys = Object.keys(this._fileWatches);
@@ -289,24 +277,16 @@ var Background = GObject.registerClass({
         if (this._settingsChangedSignalId != 0)
             this._settings.disconnect(this._settingsChangedSignalId);
         this._settingsChangedSignalId = 0;
-
-        if (this._changedIdleId) {
-            GLib.source_remove(this._changedIdleId);
-            this._changedIdleId = 0;
-        }
     }
 
-    _emitChangedSignal() {
-        if (this._changedIdleId)
+    async _emitChangedSignal() {
+        if (this._changedIdle?.pending())
             return;
 
-        this._changedIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-            this._changedIdleId = 0;
-            this.emit('bg-changed');
-            return GLib.SOURCE_REMOVE;
-        });
-        GLib.Source.set_name_by_id(this._changedIdleId,
-            '[gnome-shell] Background._emitChangedSignal');
+        this._changedIdle = new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT,
+            this._cancellable);
+        await this._changedIdle;
+        this.emit('bg-changed');
     }
 
     updateResolution() {
@@ -322,17 +302,13 @@ var Background = GObject.registerClass({
         this._updateAnimation();
     }
 
-    _setLoaded() {
+    async _setLoaded() {
         if (this.isLoaded)
             return;
 
         this.isLoaded = true;
-
-        let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-            this.emit('loaded');
-            return GLib.SOURCE_REMOVE;
-        });
-        GLib.Source.set_name_by_id(id, '[gnome-shell] Background._setLoaded Idle');
+        await new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT_IDLE, this._cancellable);
+        this.emit('loaded');
     }
 
     _loadPattern() {
@@ -371,19 +347,16 @@ var Background = GObject.registerClass({
     }
 
     _removeAnimationTimeout() {
-        if (this._updateAnimationTimeoutId) {
-            GLib.source_remove(this._updateAnimationTimeoutId);
-            this._updateAnimationTimeoutId = 0;
-        }
+        this._updateAnimationTimeout?.cancel();
     }
 
-    _updateAnimation() {
-        this._updateAnimationTimeoutId = 0;
-
+    async _updateAnimation() {
         this._animation.update(this._layoutManager.monitors[this._monitorIndex]);
         let files = this._animation.keyFrameFiles;
 
-        let finish = () => {
+        try {
+            await Promise.all(files.map(f => this._loadImage(f)));
+
             this._setLoaded();
             if (files.length > 1) {
                 this.set_blend(files[0], files[1],
@@ -395,34 +368,14 @@ var Background = GObject.registerClass({
                 this.set_file(null, this._style);
             }
             this._queueUpdateAnimation();
-        };
-
-        let cache = Meta.BackgroundImageCache.get_default();
-        let numPendingImages = files.length;
-        for (let i = 0; i < files.length; i++) {
-            this._watchFile(files[i]);
-            let image = cache.load(files[i]);
-            if (image.is_loaded()) {
-                numPendingImages--;
-                if (numPendingImages == 0)
-                    finish();
-            } else {
-                // eslint-disable-next-line no-loop-func
-                let id = image.connect('loaded', () => {
-                    image.disconnect(id);
-                    numPendingImages--;
-                    if (numPendingImages == 0)
-                        finish();
-                });
-            }
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
         }
     }
 
-    _queueUpdateAnimation() {
-        if (this._updateAnimationTimeoutId != 0)
-            return;
-
-        if (!this._cancellable || this._cancellable.is_cancelled())
+    async _queueUpdateAnimation() {
+        if (this._updateAnimationTimeout?.pending())
             return;
 
         if (!this._animation.transitionDuration)
@@ -437,62 +390,68 @@ var Background = GObject.registerClass({
         if (interval > GLib.MAXUINT32)
             return;
 
-        this._updateAnimationTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-                                                          interval,
-                                                          () => {
-                                                              this._updateAnimationTimeoutId = 0;
-                                                              this._updateAnimation();
-                                                              return GLib.SOURCE_REMOVE;
-                                                          });
-        GLib.Source.set_name_by_id(this._updateAnimationTimeoutId, '[gnome-shell] this._updateAnimation');
+        this._updateAnimationTimeout = new PromiseUtils.TimeoutPromise(interval,
+            GLib.PRIORITY_DEFAULT, this._cancellable);
+        await this._updateAnimationTimeout;
+
+        this._updateAnimation();
     }
 
-    _loadAnimation(file) {
-        this._cache.getAnimation({
-            file,
-            settingsSchema: this._settings.schema_id,
-            onLoaded: animation => {
-                this._animation = animation;
+    async _loadAnimation(file) {
+        try {
+            this._animation = await this._cache.getAnimation({
+                file,
+                cancellable: this._cancellable,
+                settingsSchema: this._settings.schema_id,
+            });
 
-                if (!this._animation || this._cancellable.is_cancelled()) {
-                    this._setLoaded();
-                    return;
-                }
+            if (!this._animation)
+                throw new Error('No animation loaded');
 
-                this._updateAnimation();
-                this._watchFile(file);
-            },
-        });
+            await new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT_IDLE,
+                this._cancellable);
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
+            this._setLoaded();
+            return;
+        }
+
+        this._updateAnimation();
+        this._watchFile(file);
     }
 
-    _loadImage(file) {
-        this.set_file(file, this._style);
+    async _loadImage(file) {
         this._watchFile(file);
 
         let cache = Meta.BackgroundImageCache.get_default();
         let image = cache.load(file);
-        if (image.is_loaded()) {
-            this._setLoaded();
-        } else {
-            let id = image.connect('loaded', () => {
-                this._setLoaded();
-                image.disconnect(id);
-            });
-        }
+        if (!image.is_loaded())
+            await image.connect_once('loaded');
     }
 
     async _loadFile(file) {
-        const info = await file.query_info_async(
-            Gio.FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE,
-            Gio.FileQueryInfoFlags.NONE,
-            0,
-            null);
+        let info;
+        try {
+            info = await file.query_info_async(
+                Gio.FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE,
+                Gio.FileQueryInfoFlags.NONE,
+                GLib.PRIORITY_DEFAULT,
+                this._cancellable);
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
+            return;
+        }
 
         const contentType = info.get_content_type();
-        if (contentType === 'application/xml')
+        if (contentType === 'application/xml') {
             this._loadAnimation(file);
-        else
-            this._loadImage(file);
+        } else {
+            this.set_file(file, this._style);
+            await this._loadImage(file);
+            this._setLoaded();
+        }
     }
 
     _load() {
@@ -526,11 +485,8 @@ var SystemBackground = GObject.registerClass({
         });
         this.content.background = _systemBackground;
 
-        let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-            this.emit('loaded');
-            return GLib.SOURCE_REMOVE;
-        });
-        GLib.Source.set_name_by_id(id, '[gnome-shell] SystemBackground.loaded');
+        new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT).then(() =>
+            this.emit('loaded'));
     }
 });
 
@@ -634,12 +590,10 @@ class Animation extends GnomeDesktop.BGSlideShow {
         this.loaded = false;
     }
 
-    load(callback) {
-        this.load_async(null, () => {
-            this.loaded = true;
-            if (callback)
-                callback();
-        });
+    async loadAsync(cancellable) {
+        await this.load_async(cancellable);
+        this.loaded = true;
+        return this;
     }
 
     update(monitor) {
@@ -719,7 +673,7 @@ var BackgroundManager = class BackgroundManager {
         });
     }
 
-    _updateBackgroundActor() {
+    async _updateBackgroundActor(cancellable) {
         if (this._newBackgroundActor) {
             /* Skip displaying existing background queued for load */
             this._newBackgroundActor.destroy();
@@ -740,17 +694,10 @@ var BackgroundManager = class BackgroundManager {
 
         const { background } = newBackgroundActor.content;
 
-        if (background.isLoaded) {
-            this._swapBackgroundActor();
-        } else {
-            newBackgroundActor.loadedSignalId = background.connect('loaded',
-                () => {
-                    background.disconnect(newBackgroundActor.loadedSignalId);
-                    newBackgroundActor.loadedSignalId = 0;
+        if (!background.isLoaded)
+            await background.connect_once('loaded', cancellable);
 
-                    this._swapBackgroundActor();
-                });
-        }
+        this._swapBackgroundActor();
     }
 
     _createBackgroundActor() {
@@ -779,36 +726,21 @@ var BackgroundManager = class BackgroundManager {
             this._container.set_child_below_sibling(backgroundActor, null);
         }
 
-        let changeSignalId = background.connect('bg-changed', () => {
-            background.disconnect(changeSignalId);
-            changeSignalId = null;
-            this._updateBackgroundActor();
-        });
+        const cancellable = new Gio.Cancellable();
+        backgroundActor.connect('destroy', () => cancellable.cancel());
 
-        let loadedSignalId;
-        if (background.isLoaded) {
-            GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                this.emit('loaded');
-                return GLib.SOURCE_REMOVE;
-            });
-        } else {
-            loadedSignalId = background.connect('loaded', () => {
-                background.disconnect(loadedSignalId);
-                loadedSignalId = null;
-                this.emit('loaded');
-            });
-        }
+        const loadBackground = async () => {
+            if (background.isLoaded)
+                await new PromiseUtils.IdlePromise(GLib.PRIORITY_DEFAULT, cancellable);
+            else
+                await background.connect_once('loaded', cancellable);
 
-        backgroundActor.connect('destroy', () => {
-            if (changeSignalId)
-                background.disconnect(changeSignalId);
+            this.emit('loaded');
+        };
+        loadBackground();
 
-            if (loadedSignalId)
-                background.disconnect(loadedSignalId);
-
-            if (backgroundActor.loadedSignalId)
-                background.disconnect(backgroundActor.loadedSignalId);
-        });
+        background.connect_once('bg-changed', cancellable).then(
+            () => this._updateBackgroundActor(cancellable));
 
         return backgroundActor;
     }
