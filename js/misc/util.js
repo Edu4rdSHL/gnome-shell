@@ -205,6 +205,17 @@ function formatTimeSpan(date) {
                             "%d years ago", yearsAgo).format(yearsAgo);
 }
 
+/**
+ * @typedef {object} FormatTimeParams
+ * @param {boolean} [timeOnly]
+ * @param {boolean} [ampm]
+ */
+
+/**
+ * @param {GLib.DateTime | Date} time
+ * @param {FormatTimeParams} [params]
+ * @returns {string}
+ */
 function formatTime(time, params = {}) {
     let date;
     // HACK: The built-in Date type sucks at timezones, which we need for the
@@ -281,7 +292,7 @@ function formatTime(time, params = {}) {
              followed by a time string in 12h format.
              i.e. "May 25, 2:30 pm" */
             // xgettext:no-c-format
-            format = N_("%B %-d, %l\u2236%M %p");
+            format = N_('%B %-d, %l\u2236%M %p');
         else
             /* Translators: this is the month name, day number, year
              number followed by a time string in 12h format.
@@ -399,6 +410,17 @@ function ensureActorVisibleInScrollView(scrollView, actor) {
     });
 }
 
+/**
+ * @typedef {object} WiggleParams
+ * @param {number} [offset]
+ * @param {number} [duration]
+ * @param {number} [wiggleCount]
+ */
+
+/**
+ * @param {Clutter.Actor} actor
+ * @param {WiggleParams} params
+ */
 function wiggle(actor, params = {}) {
     if (!St.Settings.get().enable_animations)
         return;

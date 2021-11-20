@@ -421,8 +421,8 @@ var Notification = GObject.registerClass({
         if (clear)
             this.actions = [];
 
-        if (this._soundName != soundName ||
-            this._soundFile != soundFile) {
+        if (this._soundName !== soundName ||
+            this._soundFile !== soundFile) {
             this._soundName = soundName;
             this._soundFile = soundFile;
             this._soundPlayed = false;
