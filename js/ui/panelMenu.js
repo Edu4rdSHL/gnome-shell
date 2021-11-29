@@ -11,6 +11,7 @@ var ButtonBox = GObject.registerClass(
 class ButtonBox extends St.Widget {
     _init(params) {
         params = Params.parse(params, {
+            context: St.get_clutter_context(),
             style_class: 'panel-button',
             x_expand: true,
             y_expand: true,
@@ -20,7 +21,10 @@ class ButtonBox extends St.Widget {
 
         this._delegate = this;
 
-        this.container = new St.Bin({ child: this });
+        this.container = new St.Bin({
+            context: St.get_clutter_context(),
+            child: this
+        });
 
         this.connect('style-changed', this._onStyleChanged.bind(this));
         this.connect('destroy', this._onDestroy.bind(this));
@@ -202,6 +206,7 @@ var SystemIndicator = GObject.registerClass(
 class SystemIndicator extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'panel-status-indicators-box',
             reactive: true,
             visible: false,
@@ -221,7 +226,10 @@ class SystemIndicator extends St.BoxLayout {
     }
 
     _addIndicator() {
-        let icon = new St.Icon({ style_class: 'system-status-icon' });
+        let icon = new St.Icon({
+            context: St.get_clutter_context(),
+            style_class: 'system-status-icon'
+        });
         this.add_actor(icon);
         icon.connect('notify::visible', this._syncIndicatorsVisible.bind(this));
         this._syncIndicatorsVisible();

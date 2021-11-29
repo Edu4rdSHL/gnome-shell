@@ -33,9 +33,12 @@ var SwitcherPopup = GObject.registerClass({
     GTypeFlags: GObject.TypeFlags.ABSTRACT,
 }, class SwitcherPopup extends St.Widget {
     _init(items) {
-        super._init({ style_class: 'switcher-popup',
-                      reactive: true,
-                      visible: false });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'switcher-popup',
+            reactive: true,
+            visible: false
+        });
 
         this._switcherList = null;
 
@@ -356,8 +359,11 @@ var SwitcherPopup = GObject.registerClass({
 var SwitcherButton = GObject.registerClass(
 class SwitcherButton extends St.Button {
     _init(square) {
-        super._init({ style_class: 'item-box',
-                      reactive: true });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'item-box',
+            reactive: true
+        });
 
         this._square = square;
     }
@@ -376,12 +382,18 @@ var SwitcherList = GObject.registerClass({
                'item-removed': { param_types: [GObject.TYPE_INT] } },
 }, class SwitcherList extends St.Widget {
     _init(squareItems) {
-        super._init({ style_class: 'switcher-list' });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'switcher-list'
+        });
 
-        this._list = new St.BoxLayout({ style_class: 'switcher-list-item-container',
-                                        vertical: false,
-                                        x_expand: true,
-                                        y_expand: true });
+        this._list = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'switcher-list-item-container',
+            vertical: false,
+            x_expand: true,
+            y_expand: true
+        });
 
         let layoutManager = this._list.get_layout_manager();
 
@@ -390,21 +402,30 @@ var SwitcherList = GObject.registerClass({
             this._list.spacing = this._list.get_theme_node().get_length('spacing');
         });
 
-        this._scrollView = new St.ScrollView({ style_class: 'hfade',
-                                               enable_mouse_scrolling: false });
+        this._scrollView = new St.ScrollView({
+            context: St.get_clutter_context(),
+            style_class: 'hfade',
+            enable_mouse_scrolling: false
+        });
         this._scrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.NEVER);
 
         this._scrollView.add_actor(this._list);
         this.add_actor(this._scrollView);
 
         // Those arrows indicate whether scrolling in one direction is possible
-        this._leftArrow = new St.DrawingArea({ style_class: 'switcher-arrow',
-                                               pseudo_class: 'highlighted' });
+        this._leftArrow = new St.DrawingArea({
+            context: St.get_clutter_context(),
+            style_class: 'switcher-arrow',
+            pseudo_class: 'highlighted'
+        });
         this._leftArrow.connect('repaint', () => {
             drawArrow(this._leftArrow, St.Side.LEFT);
         });
-        this._rightArrow = new St.DrawingArea({ style_class: 'switcher-arrow',
-                                                pseudo_class: 'highlighted' });
+        this._rightArrow = new St.DrawingArea({
+            context: St.get_clutter_context(),
+            style_class: 'switcher-arrow',
+            pseudo_class: 'highlighted'
+        });
         this._rightArrow.connect('repaint', () => {
             drawArrow(this._rightArrow, St.Side.RIGHT);
         });

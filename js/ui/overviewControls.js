@@ -296,6 +296,7 @@ var ControlsManager = GObject.registerClass(
 class ControlsManager extends St.Widget {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'controls-manager',
             x_expand: true,
             y_expand: true,
@@ -305,6 +306,7 @@ class ControlsManager extends St.Widget {
         this._ignoreShowAppsButtonToggle = false;
 
         this._searchEntry = new St.Entry({
+            context: St.get_clutter_context(),
             style_class: 'search-entry',
             /* Translators: this is the text displayed
                in the search entry when no search is
@@ -316,6 +318,7 @@ class ControlsManager extends St.Widget {
         });
         this._searchEntry.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
         this._searchEntryBin = new St.Bin({
+            context: St.get_clutter_context(),
             child: this._searchEntry,
             x_align: Clutter.ActorAlign.CENTER,
         });

@@ -48,11 +48,14 @@ function arrowIcon(side) {
         break;
     }
 
-    let arrow = new St.Icon({ style_class: 'popup-menu-arrow',
-                              icon_name: iconName,
-                              accessible_role: Atk.Role.ARROW,
-                              y_expand: true,
-                              y_align: Clutter.ActorAlign.CENTER });
+    let arrow = new St.Icon({
+        context: St.get_clutter_context(),
+        style_class: 'popup-menu-arrow',
+        icon_name: iconName,
+        accessible_role: Atk.Role.ARROW,
+        y_expand: true,
+        y_align: Clutter.ActorAlign.CENTER
+    });
 
     return arrow;
 }
@@ -78,15 +81,21 @@ var PopupBaseMenuItem = GObject.registerClass({
             style_class: null,
             can_focus: true,
         });
-        super._init({ style_class: 'popup-menu-item',
-                      reactive: params.reactive,
-                      track_hover: params.reactive,
-                      can_focus: params.can_focus,
-                      accessible_role: Atk.Role.MENU_ITEM });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'popup-menu-item',
+            reactive: params.reactive,
+            track_hover: params.reactive,
+            can_focus: params.can_focus,
+            accessible_role: Atk.Role.MENU_ITEM
+        });
         this._delegate = this;
 
         this._ornament = Ornament.NONE;
-        this._ornamentLabel = new St.Label({ style_class: 'popup-menu-ornament' });
+        this._ornamentLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'popup-menu-ornament'
+        });
         this.add(this._ornamentLabel);
 
         this._parent = null;
@@ -272,7 +281,10 @@ class PopupMenuItem extends PopupBaseMenuItem {
     _init(text, params) {
         super._init(params);
 
-        this.label = new St.Label({ text });
+        this.label = new St.Label({
+            context: St.get_clutter_context(),
+            text: text
+        });
         this.add_child(this.label);
         this.label_actor = this.label;
     }
@@ -288,7 +300,10 @@ class PopupSeparatorMenuItem extends PopupBaseMenuItem {
             can_focus: false,
         });
 
-        this.label = new St.Label({ text: text || '' });
+        this.label = new St.Label({
+            context: St.get_clutter_context(),
+            text: text || ''
+        });
         this.add(this.label);
         this.label_actor = this.label;
 
@@ -297,6 +312,7 @@ class PopupSeparatorMenuItem extends PopupBaseMenuItem {
         this._syncVisibility();
 
         this._separator = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'popup-separator-menu-item-separator',
             x_expand: true,
             y_expand: true,
@@ -322,6 +338,7 @@ var Switch = GObject.registerClass({
         this._state = false;
 
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'toggle-switch',
             accessible_role: Atk.Role.CHECK_BOX,
             state,
@@ -356,7 +373,10 @@ var PopupSwitchMenuItem = GObject.registerClass({
     _init(text, active, params) {
         super._init(params);
 
-        this.label = new St.Label({ text });
+        this.label = new St.Label({
+            context: St.get_clutter_context(),
+            text: text
+        });
         this._switch = new Switch(active);
 
         this.accessible_role = Atk.Role.CHECK_MENU_ITEM;
@@ -366,12 +386,14 @@ var PopupSwitchMenuItem = GObject.registerClass({
         this.add_child(this.label);
 
         this._statusBin = new St.Bin({
+            context: St.get_clutter_context(),
             x_align: Clutter.ActorAlign.END,
             x_expand: true,
         });
         this.add_child(this._statusBin);
 
         this._statusLabel = new St.Label({
+            context: St.get_clutter_context(),
             text: '',
             style_class: 'popup-status-menu-item',
         });
@@ -439,10 +461,16 @@ class PopupImageMenuItem extends PopupBaseMenuItem {
     _init(text, icon, params) {
         super._init(params);
 
-        this._icon = new St.Icon({ style_class: 'popup-menu-icon',
-                                   x_align: Clutter.ActorAlign.END });
+        this._icon = new St.Icon({
+            context: St.get_clutter_context(),
+            style_class: 'popup-menu-icon',
+            x_align: Clutter.ActorAlign.END
+        });
         this.add_child(this._icon);
-        this.label = new St.Label({ text });
+        this.label = new St.Label({
+            context: St.get_clutter_context(),
+            text: text
+        });
         this.add_child(this.label);
         this.label_actor = this.label;
 
@@ -468,6 +496,7 @@ var PopupMenuBase = class {
         this._parent = null;
 
         this.box = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
             x_expand: true,
             y_expand: true,
@@ -1008,9 +1037,12 @@ var PopupSubMenu = class extends PopupMenuBase {
         // Since a function of a submenu might be to provide a "More.." expander
         // with long content, we make it scrollable - the scrollbar will only take
         // effect if a CSS max-height is set on the top menu.
-        this.actor = new St.ScrollView({ style_class: 'popup-sub-menu',
-                                         hscrollbar_policy: St.PolicyType.NEVER,
-                                         vscrollbar_policy: St.PolicyType.NEVER });
+        this.actor = new St.ScrollView({
+            context: St.get_clutter_context(),
+            style_class: 'popup-sub-menu',
+            hscrollbar_policy: St.PolicyType.NEVER,
+            vscrollbar_policy: St.PolicyType.NEVER
+        });
 
         this.actor.add_actor(this.box);
         this.actor._delegate = this;
@@ -1172,17 +1204,24 @@ class PopupSubMenuMenuItem extends PopupBaseMenuItem {
         this.add_style_class_name('popup-submenu-menu-item');
 
         if (wantIcon) {
-            this.icon = new St.Icon({ style_class: 'popup-menu-icon' });
+            this.icon = new St.Icon({
+                context: St.get_clutter_context(),
+                style_class: 'popup-menu-icon'
+            });
             this.add_child(this.icon);
         }
 
-        this.label = new St.Label({ text,
-                                    y_expand: true,
-                                    y_align: Clutter.ActorAlign.CENTER });
+        this.label = new St.Label({
+            context: St.get_clutter_context(),
+            text,
+            y_expand: true,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         this.add_child(this.label);
         this.label_actor = this.label;
 
         let expander = new St.Bin({
+            context: St.get_clutter_context(),
             style_class: 'popup-menu-item-expander',
             x_expand: true,
         });
@@ -1191,8 +1230,11 @@ class PopupSubMenuMenuItem extends PopupBaseMenuItem {
         this._triangle = arrowIcon(St.Side.RIGHT);
         this._triangle.pivot_point = new Graphene.Point({ x: 0.5, y: 0.6 });
 
-        this._triangleBin = new St.Widget({ y_expand: true,
-                                            y_align: Clutter.ActorAlign.CENTER });
+        this._triangleBin = new St.Widget({
+            context: St.get_clutter_context(),
+            y_expand: true,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         this._triangleBin.add_child(this._triangle);
 
         this.add_child(this._triangleBin);

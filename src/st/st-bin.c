@@ -324,15 +324,18 @@ st_bin_init (StBin *bin)
 
 /**
  * st_bin_new:
+ * @clutter_context: The clutter context
  *
  * Creates a new #StBin, a simple container for one child.
  *
  * Returns: the newly created #StBin actor
  */
 StWidget *
-st_bin_new (void)
+st_bin_new (ClutterContext *clutter_context)
 {
-  return g_object_new (ST_TYPE_BIN, NULL);
+  return g_object_new (ST_TYPE_BIN,
+                       "context", clutter_context,
+                       NULL);
 }
 
 /**

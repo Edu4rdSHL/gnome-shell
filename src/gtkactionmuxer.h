@@ -20,6 +20,7 @@
 #ifndef __GTK_ACTION_MUXER_H__
 #define __GTK_ACTION_MUXER_H__
 
+#include <clutter/clutter.h>
 #include <gio/gio.h>
 
 G_BEGIN_DECLS
@@ -33,7 +34,7 @@ G_BEGIN_DECLS
 typedef struct _GtkActionMuxer                              GtkActionMuxer;
 
 GType                   gtk_action_muxer_get_type                       (void);
-GtkActionMuxer *        gtk_action_muxer_new                            (void);
+GtkActionMuxer *        gtk_action_muxer_new                            (ClutterContext *clutter_Context);
 
 void                    gtk_action_muxer_insert                         (GtkActionMuxer *muxer,
                                                                          const gchar    *prefix,

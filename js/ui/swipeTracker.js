@@ -1,7 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported SwipeTracker */
 
-const { Clutter, Gio, GObject, Meta } = imports.gi;
+const { Clutter, Gio, GObject, Meta, St } = imports.gi;
 
 const Main = imports.ui.main;
 const Params = imports.misc.params;
@@ -300,7 +300,8 @@ const TouchSwipeGesture = GObject.registerClass({
     }
 
     vfunc_gesture_cancel(_actor) {
-        let time = Clutter.get_current_event_time();
+        const clutterContext = St.get_clutter_context();
+        let time = clutterContext.get_current_event_time();
 
         this.emit('cancel', time, this._distance);
     }
@@ -662,7 +663,8 @@ var SwipeTracker = GObject.registerClass({
         }
 
         if (this.orientation === Clutter.Orientation.HORIZONTAL &&
-            Clutter.get_default_text_direction() === Clutter.TextDirection.RTL)
+            St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL)
             delta = -delta;
 
         this._progress += delta / distance;

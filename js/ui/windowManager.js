@@ -388,7 +388,9 @@ var WorkspaceTracker = class {
 var TilePreview = GObject.registerClass(
 class TilePreview extends St.Widget {
     _init() {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
         global.window_group.add_actor(this);
 
         this._reset();
@@ -535,11 +537,17 @@ var AppSwitchAction = GObject.registerClass({
 var ResizePopup = GObject.registerClass(
 class ResizePopup extends St.Widget {
     _init() {
-        super._init({ layout_manager: new Clutter.BinLayout() });
-        this._label = new St.Label({ style_class: 'resize-popup',
-                                     x_align: Clutter.ActorAlign.CENTER,
-                                     y_align: Clutter.ActorAlign.CENTER,
-                                     x_expand: true, y_expand: true });
+        super._init({
+            context: St.get_clutter_context(),
+            layout_manager: new Clutter.BinLayout()
+        });
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'resize-popup',
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+            x_expand: true, y_expand: true
+        });
         this.add_child(this._label);
         Main.uiGroup.add_actor(this);
     }
@@ -1172,7 +1180,8 @@ var WindowManager = class {
                 }
                 xDest = monitor.x;
                 yDest = monitor.y;
-                if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
+                if (St.get_clutter_context().get_text_direction() ===
+                    Clutter.TextDirection.RTL)
                     xDest += monitor.width;
                 xScale = 0;
                 yScale = 0;
@@ -1235,7 +1244,8 @@ var WindowManager = class {
                     return;
                 }
                 actor.set_position(monitor.x, monitor.y);
-                if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
+                if (St.get_clutter_context().get_text_direction() ===
+                    Clutter.TextDirection.RTL)
                     actor.x += monitor.width;
                 actor.set_scale(0, 0);
             }
@@ -1284,7 +1294,10 @@ var WindowManager = class {
         // Position a clone of the window on top of the old position,
         // while actor updates are frozen.
         let actorContent = actor.paint_to_content(oldFrameRect);
-        let actorClone = new St.Widget({ content: actorContent });
+        let actorClone = new St.Widget({
+            context: St.get_clutter_context(),
+            content: actorContent
+        });
         actorClone.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
         actorClone.set_position(oldFrameRect.x, oldFrameRect.y);
         actorClone.set_size(oldFrameRect.width, oldFrameRect.height);
@@ -1752,7 +1765,8 @@ var WindowManager = class {
         let newWs;
         let direction;
         let vertical = workspaceManager.layout_rows == -1;
-        let rtl = Clutter.get_default_text_direction() == Clutter.TextDirection.RTL;
+        let rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
 
         if (action == 'move') {
             // "Moving" a window to another workspace doesn't make sense when
@@ -1877,7 +1891,8 @@ var WindowManager = class {
 
         const workspaceManager = global.workspace_manager;
         const vertical = workspaceManager.layout_rows === -1;
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         const activeWs = workspaceManager.get_active_workspace();
         let ws;
         switch (direction) {

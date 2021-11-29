@@ -305,7 +305,10 @@ function createTimeLabel(date, params) {
     if (_desktopSettings == null)
         _desktopSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
 
-    let label = new St.Label({ text: formatTime(date, params) });
+    let label = new St.Label({
+        context: St.get_clutter_context(),
+        text: formatTime(date, params)
+    });
     let id = _desktopSettings.connect('changed::clock-format', () => {
         label.text = formatTime(date, params);
     });

@@ -42,7 +42,8 @@ struct _StScrollBarClass
   void (*scroll_stop)  (StScrollBar *bar);
 };
 
-StWidget *st_scroll_bar_new (StAdjustment *adjustment);
+StWidget *st_scroll_bar_new (ClutterContext *clutter_context,
+                             StAdjustment   *adjustment);
 
 void          st_scroll_bar_set_adjustment (StScrollBar  *bar,
                                             StAdjustment *adjustment);

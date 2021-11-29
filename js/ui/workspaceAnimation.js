@@ -14,7 +14,9 @@ const WORKSPACE_SPACING = 100;
 const WorkspaceGroup = GObject.registerClass(
 class WorkspaceGroup extends Clutter.Actor {
     _init(workspace, monitor, movingWindow) {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
 
         this._workspace = workspace;
         this._monitor = monitor;
@@ -22,7 +24,9 @@ class WorkspaceGroup extends Clutter.Actor {
         this._windowRecords = [];
 
         if (this._workspace) {
-            this._background = new Meta.BackgroundGroup();
+            this._background = new Meta.BackgroundGroup({
+                context: St.get_clutter_context(),
+            });
 
             this.add_actor(this._background);
 
@@ -88,6 +92,7 @@ class WorkspaceGroup extends Clutter.Actor {
 
         for (const windowActor of windowActors) {
             const clone = new Clutter.Clone({
+                context: St.get_clutter_context(),
                 source: windowActor,
                 x: windowActor.x - this._monitor.x,
                 y: windowActor.y - this._monitor.y,
@@ -134,6 +139,7 @@ const MonitorGroup = GObject.registerClass({
 }, class MonitorGroup extends St.Widget {
     _init(monitor, workspaceIndices, movingWindow) {
         super._init({
+            context: St.get_clutter_context(),
             clip_to_allocation: true,
             style_class: 'workspace-animation',
         });
@@ -143,7 +149,9 @@ const MonitorGroup = GObject.registerClass({
         const constraint = new Layout.MonitorConstraint({ index: monitor.index });
         this.add_constraint(constraint);
 
-        this._container = new Clutter.Actor();
+        this._container = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
         this.add_child(this._container);
 
         const stickyGroup = new WorkspaceGroup(null, monitor, movingWindow);
@@ -177,7 +185,8 @@ const MonitorGroup = GObject.registerClass({
 
             if (vertical)
                 y += this.baseDistance;
-            else if (Clutter.get_default_text_direction() === Clutter.TextDirection.RTL)
+            else if (St.get_clutter_context().get_text_direction() ===
+                Clutter.TextDirection.RTL)
                 x -= this.baseDistance;
             else
                 x += this.baseDistance;
@@ -364,7 +373,8 @@ var WorkspaceAnimationController = class {
             break;
         }
 
-        if (Clutter.get_default_text_direction() === Clutter.TextDirection.RTL &&
+        if (St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL &&
             direction !== Meta.MotionDirection.UP &&
             direction !== Meta.MotionDirection.DOWN)
             workspaceIndices.reverse();

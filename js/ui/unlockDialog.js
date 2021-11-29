@@ -32,13 +32,18 @@ var NotificationsBox = GObject.registerClass({
 }, class NotificationsBox extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             vertical: true,
             name: 'unlockDialogNotifications',
             style_class: 'unlock-dialog-notifications-container',
         });
 
-        this._scrollView = new St.ScrollView({ hscrollbar_policy: St.PolicyType.NEVER });
+        this._scrollView = new St.ScrollView({
+            context: St.get_clutter_context(),
+            hscrollbar_policy: St.PolicyType.NEVER
+        });
         this._notificationBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
             style_class: 'unlock-dialog-notifications-container',
         });
@@ -80,6 +85,7 @@ var NotificationsBox = GObject.registerClass({
         box.add_child(sourceActor);
 
         let textBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             x_expand: true,
             y_expand: true,
             y_align: Clutter.ActorAlign.CENTER,
@@ -87,6 +93,7 @@ var NotificationsBox = GObject.registerClass({
         box.add_child(textBox);
 
         let title = new St.Label({
+            context: St.get_clutter_context(),
             text: source.title,
             style_class: 'unlock-dialog-notification-label',
             x_expand: true,
@@ -96,6 +103,7 @@ var NotificationsBox = GObject.registerClass({
 
         let count = source.unseenCount;
         let countLabel = new St.Label({
+            context: St.get_clutter_context(),
             text: count.toString(),
             visible: count > 1,
             style_class: 'unlock-dialog-notification-count-text',
@@ -108,13 +116,20 @@ var NotificationsBox = GObject.registerClass({
 
     _makeNotificationDetailedSource(source, box) {
         let sourceActor = new MessageTray.SourceActor(source, SUMMARY_ICON_SIZE);
-        let sourceBin = new St.Bin({ child: sourceActor });
+        let sourceBin = new St.Bin({
+            context: St.get_clutter_context(),
+            child: sourceActor
+        });
         box.add(sourceBin);
 
-        let textBox = new St.BoxLayout({ vertical: true });
+        let textBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
         box.add_child(textBox);
 
         let title = new St.Label({
+            context: St.get_clutter_context(),
             text: source.title.replace(/\n/g, ' '),
             style_class: 'unlock-dialog-notification-label',
         });
@@ -135,7 +150,10 @@ var NotificationsBox = GObject.registerClass({
                     : GLib.markup_escape_text(bodyText, -1);
             }
 
-            let label = new St.Label({ style_class: 'unlock-dialog-notification-count-text' });
+            let label = new St.Label({
+                context: St.get_clutter_context(),
+                style_class: 'unlock-dialog-notification-count-text'
+            });
             label.clutter_text.set_markup('<b>%s</b> %s'.format(n.title, body));
             textBox.add(label);
 
@@ -191,6 +209,7 @@ var NotificationsBox = GObject.registerClass({
         };
 
         obj.sourceBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'unlock-dialog-notification-source',
             x_expand: true,
         });
@@ -317,17 +336,24 @@ var NotificationsBox = GObject.registerClass({
 var Clock = GObject.registerClass(
 class UnlockDialogClock extends St.BoxLayout {
     _init() {
-        super._init({ style_class: 'unlock-dialog-clock', vertical: true });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'unlock-dialog-clock',
+            vertical: true
+        });
 
         this._time = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'unlock-dialog-clock-time',
             x_align: Clutter.ActorAlign.CENTER,
         });
         this._date = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'unlock-dialog-clock-date',
             x_align: Clutter.ActorAlign.CENTER,
         });
         this._hint = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'unlock-dialog-clock-hint',
             x_align: Clutter.ActorAlign.CENTER,
             opacity: 0,
@@ -474,6 +500,7 @@ var UnlockDialog = GObject.registerClass({
 }, class UnlockDialog extends St.Widget {
     _init(parentActor) {
         super._init({
+            context: St.get_clutter_context(),
             accessible_role: Atk.Role.WINDOW,
             style_class: 'unlock-dialog',
             visible: false,
@@ -521,7 +548,9 @@ var UnlockDialog = GObject.registerClass({
         this.add_action(tapAction);
 
         // Background
-        this._backgroundGroup = new Clutter.Actor();
+        this._backgroundGroup = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
         this.add_child(this._backgroundGroup);
 
         this._bgManagers = [];
@@ -541,7 +570,10 @@ var UnlockDialog = GObject.registerClass({
         // Authentication & Clock stack
         this._stack = new Shell.Stack();
 
-        this._promptBox = new St.BoxLayout({ vertical: true });
+        this._promptBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
         this._promptBox.set_pivot_point(0.5, 0.5);
         this._promptBox.hide();
         this._stack.add_child(this._promptBox);
@@ -561,13 +593,17 @@ var UnlockDialog = GObject.registerClass({
 
         // Switch User button
         this._otherUserButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'modal-dialog-button button switch-user-button',
             accessible_name: _('Log in as another user'),
             reactive: false,
             opacity: 0,
             x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.END,
-            child: new St.Icon({ icon_name: 'system-users-symbolic' }),
+            child: new St.Icon({
+                context: St.get_clutter_context(),
+                icon_name: 'system-users-symbolic'
+            }),
         });
         this._otherUserButton.set_pivot_point(0.5, 0.5);
         this._otherUserButton.connect('clicked', this._otherUserClicked.bind(this));
@@ -587,7 +623,9 @@ var UnlockDialog = GObject.registerClass({
         this._updateUserSwitchVisibility();
 
         // Main Box
-        let mainBox = new St.Widget();
+        let mainBox = new St.Widget({
+            context: St.get_clutter_context(),
+        });
         mainBox.add_constraint(new Layout.MonitorConstraint({ primary: true }));
         mainBox.add_child(this._stack);
         mainBox.add_child(this._notificationsBox);
@@ -629,6 +667,7 @@ var UnlockDialog = GObject.registerClass({
     _createBackground(monitorIndex) {
         let monitor = Main.layoutManager.monitors[monitorIndex];
         let widget = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'screen-shield-background',
             x: monitor.x,
             y: monitor.y,

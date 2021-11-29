@@ -31,10 +31,13 @@ var ModalDialog = GObject.registerClass({
     Signals: { 'opened': {}, 'closed': {} },
 }, class ModalDialog extends St.Widget {
     _init(params) {
-        super._init({ visible: false,
-                      x: 0,
-                      y: 0,
-                      accessible_role: Atk.Role.DIALOG });
+        super._init({
+            context: St.get_clutter_context(),
+            visible: false,
+            x: 0,
+            y: 0,
+            accessible_role: Atk.Role.DIALOG
+        });
 
         params = Params.parse(params, { shellReactive: false,
                                         styleClass: null,
@@ -58,11 +61,15 @@ var ModalDialog = GObject.registerClass({
         this.add_constraint(constraint);
 
         this.backgroundStack = new St.Widget({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
         });
-        this._backgroundBin = new St.Bin({ child: this.backgroundStack });
+        this._backgroundBin = new St.Bin({
+            context: St.get_clutter_context(),
+            child: this.backgroundStack
+        });
         this._monitorConstraint = new Layout.MonitorConstraint();
         this._backgroundBin.add_constraint(this._monitorConstraint);
         this.add_actor(this._backgroundBin);
@@ -77,7 +84,10 @@ var ModalDialog = GObject.registerClass({
                                                      radialEffect: true });
             this._lightbox.highlight(this._backgroundBin);
 
-            this._eventBlocker = new Clutter.Actor({ reactive: true });
+            this._eventBlocker = new Clutter.Actor({
+                context: St.get_clutter_context(),
+                reactive: true
+            });
             this.backgroundStack.add_actor(this._eventBlocker);
         }
 

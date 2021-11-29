@@ -12,6 +12,7 @@ var WorkspaceSwitcherPopupList = GObject.registerClass(
 class WorkspaceSwitcherPopupList extends St.Widget {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'workspace-switcher',
             offscreen_redirect: Clutter.OffscreenRedirect.ALWAYS,
         });
@@ -122,17 +123,23 @@ class WorkspaceSwitcherPopupList extends St.Widget {
 var WorkspaceSwitcherPopup = GObject.registerClass(
 class WorkspaceSwitcherPopup extends St.Widget {
     _init() {
-        super._init({ x: 0,
-                      y: 0,
-                      width: global.screen_width,
-                      height: global.screen_height,
-                      style_class: 'workspace-switcher-group' });
+        super._init({
+            context: St.get_clutter_context(),
+            x: 0,
+            y: 0,
+            width: global.screen_width,
+            height: global.screen_height,
+            style_class: 'workspace-switcher-group'
+        });
 
         Main.uiGroup.add_actor(this);
 
         this._timeoutId = 0;
 
-        this._container = new St.BoxLayout({ style_class: 'workspace-switcher-container' });
+        this._container = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'workspace-switcher-container'
+        });
         this.add_child(this._container);
 
         this._list = new WorkspaceSwitcherPopupList();
@@ -161,15 +168,30 @@ class WorkspaceSwitcherPopup extends St.Widget {
             let indicator = null;
 
             if (i == this._activeWorkspaceIndex && this._direction == Meta.MotionDirection.UP)
-                indicator = new St.Bin({ style_class: 'ws-switcher-active-up' });
+                indicator = new St.Bin({
+                    context: St.get_clutter_context(),
+                    style_class: 'ws-switcher-active-up'
+                });
             else if (i == this._activeWorkspaceIndex && this._direction == Meta.MotionDirection.DOWN)
-                indicator = new St.Bin({ style_class: 'ws-switcher-active-down' });
+                indicator = new St.Bin({
+                    context: St.get_clutter_context(),
+                    style_class: 'ws-switcher-active-down'
+                });
             else if (i == this._activeWorkspaceIndex && this._direction == Meta.MotionDirection.LEFT)
-                indicator = new St.Bin({ style_class: 'ws-switcher-active-left' });
+                indicator = new St.Bin({
+                    context: St.get_clutter_context(),
+                    style_class: 'ws-switcher-active-left'
+                });
             else if (i == this._activeWorkspaceIndex && this._direction == Meta.MotionDirection.RIGHT)
-                indicator = new St.Bin({ style_class: 'ws-switcher-active-right' });
+                indicator = new St.Bin({
+                    context: St.get_clutter_context(),
+                    style_class: 'ws-switcher-active-right'
+                });
             else
-                indicator = new St.Bin({ style_class: 'ws-switcher-box' });
+                indicator = new St.Bin({
+                    context: St.get_clutter_context(),
+                    style_class: 'ws-switcher-box'
+                });
 
             this._list.add_actor(indicator);
         }

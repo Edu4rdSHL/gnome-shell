@@ -28,14 +28,17 @@ var AppIconMode = {
 function _createWindowClone(window, size) {
     let [width, height] = window.get_size();
     let scale = Math.min(1.0, size / width, size / height);
-    return new Clutter.Clone({ source: window,
-                               width: width * scale,
-                               height: height * scale,
-                               x_align: Clutter.ActorAlign.CENTER,
-                               y_align: Clutter.ActorAlign.CENTER,
-                               // usual hack for the usual bug in ClutterBinLayout...
-                               x_expand: true,
-                               y_expand: true });
+    return new Clutter.Clone({
+        context: St.get_clutter_context(),
+        source: window,
+        width: width * scale,
+        height: height * scale,
+        x_align: Clutter.ActorAlign.CENTER,
+        y_align: Clutter.ActorAlign.CENTER,
+        // usual hack for the usual bug in ClutterBinLayout...
+        x_expand: true,
+        y_expand: true
+    });
 }
 
 function getWindows(workspace) {
@@ -164,7 +167,8 @@ class AppSwitcherPopup extends SwitcherPopup.SwitcherPopup {
     }
 
     _keyPressHandler(keysym, action) {
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         if (action == Meta.KeyBindingAction.SWITCH_GROUP) {
             if (!this._thumbnailsFocused)
                 this._select(this._selectedIndex, 0);
@@ -400,14 +404,22 @@ class AppSwitcherPopup extends SwitcherPopup.SwitcherPopup {
 var CyclerHighlight = GObject.registerClass(
 class CyclerHighlight extends St.Widget {
     _init() {
-        super._init({ layout_manager: new Clutter.BinLayout() });
+        super._init({
+            context: St.get_clutter_context(),
+            layout_manager: new Clutter.BinLayout(),
+        });
         this._window = null;
         this._sizeChangedId = 0;
 
-        this._clone = new Clutter.Clone();
+        this._clone = new Clutter.Clone({
+            context: St.get_clutter_context(),
+        });
         this.add_actor(this._clone);
 
-        this._highlight = new St.Widget({ style_class: 'cycler-highlight' });
+        this._highlight = new St.Widget({
+            context: St.get_clutter_context(),
+            style_class: 'cycler-highlight'
+        });
         this.add_actor(this._highlight);
 
         let coordinate = Clutter.BindCoordinate.ALL;
@@ -471,6 +483,12 @@ var CyclerList = GObject.registerClass({
                'item-removed': { param_types: [GObject.TYPE_INT] },
                'item-highlighted': { param_types: [GObject.TYPE_INT] } },
 }, class CyclerList extends St.Widget {
+    _init() {
+        super._init({
+            context: St.get_clutter_context(),
+        });
+    }
+
     highlight(index, _justOutline) {
         this.emit('item-highlighted', index);
     }
@@ -480,7 +498,9 @@ var CyclerPopup = GObject.registerClass({
     GTypeFlags: GObject.TypeFlags.ABSTRACT,
 }, class CyclerPopup extends SwitcherPopup.SwitcherPopup {
     _init() {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
 
         this._items = this._getWindows();
 
@@ -599,7 +619,8 @@ class WindowSwitcherPopup extends SwitcherPopup.SwitcherPopup {
     }
 
     _keyPressHandler(keysym, action) {
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         if (action == Meta.KeyBindingAction.SWITCH_WINDOWS)
             this._select(this._next());
         else if (action == Meta.KeyBindingAction.SWITCH_WINDOWS_BACKWARD)
@@ -657,15 +678,21 @@ class WindowCyclerPopup extends CyclerPopup {
 var AppIcon = GObject.registerClass(
 class AppIcon extends St.BoxLayout {
     _init(app) {
-        super._init({ style_class: 'alt-tab-app',
-                      vertical: true });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'alt-tab-app',
+            vertical: true
+        });
 
         this.app = app;
         this.icon = null;
-        this._iconBin = new St.Bin();
+        this._iconBin = new St.Bin({
+            context: St.get_clutter_context(),
+        });
 
         this.add_child(this._iconBin);
         this.label = new St.Label({
+            context: St.get_clutter_context(),
             text: this.app.get_name(),
             x_align: Clutter.ActorAlign.CENTER,
         });
@@ -858,7 +885,10 @@ class AppSwitcher extends SwitcherPopup.SwitcherList {
                 this._removeIcon(app);
         });
 
-        let arrow = new St.DrawingArea({ style_class: 'switcher-arrow' });
+        let arrow = new St.DrawingArea({
+            context: St.get_clutter_context(),
+            style_class: 'switcher-arrow'
+        });
         arrow.connect('repaint', () => SwitcherPopup.drawArrow(arrow, St.Side.BOTTOM));
         this.add_actor(arrow);
         this._arrows.push(arrow);
@@ -895,10 +925,16 @@ class ThumbnailSwitcher extends SwitcherPopup.SwitcherList {
         this._windows = windows;
 
         for (let i = 0; i < windows.length; i++) {
-            let box = new St.BoxLayout({ style_class: 'thumbnail-box',
-                                         vertical: true });
+            let box = new St.BoxLayout({
+                context: St.get_clutter_context(),
+                style_class: 'thumbnail-box',
+                vertical: true
+            });
 
-            let bin = new St.Bin({ style_class: 'thumbnail' });
+            let bin = new St.Bin({
+                context: St.get_clutter_context(),
+                style_class: 'thumbnail'
+            });
 
             box.add_actor(bin);
             this._thumbnailBins.push(bin);
@@ -906,6 +942,7 @@ class ThumbnailSwitcher extends SwitcherPopup.SwitcherList {
             let title = windows[i].get_title();
             if (title) {
                 let name = new St.Label({
+                    context: St.get_clutter_context(),
                     text: title,
                     // St.Label doesn't support text-align
                     x_align: Clutter.ActorAlign.CENTER,
@@ -982,15 +1019,24 @@ class ThumbnailSwitcher extends SwitcherPopup.SwitcherList {
 var WindowIcon = GObject.registerClass(
 class WindowIcon extends St.BoxLayout {
     _init(window, mode) {
-        super._init({ style_class: 'alt-tab-app',
-                      vertical: true });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'alt-tab-app',
+            vertical: true
+        });
 
         this.window = window;
 
-        this._icon = new St.Widget({ layout_manager: new Clutter.BinLayout() });
+        this._icon = new St.Widget({
+            context: St.get_clutter_context(),
+            layout_manager: new Clutter.BinLayout()
+        });
 
         this.add_child(this._icon);
-        this.label = new St.Label({ text: window.get_title() });
+        this.label = new St.Label({
+            context: St.get_clutter_context(),
+            text: window.get_title()
+        });
 
         let tracker = Shell.WindowTracker.get_default();
         this.app = tracker.get_window_app(window);
@@ -1029,7 +1075,10 @@ class WindowIcon extends St.BoxLayout {
     _createAppIcon(app, size) {
         let appIcon = app
             ? app.create_icon_texture(size)
-            : new St.Icon({ icon_name: 'icon-missing', icon_size: size });
+            : new St.Icon({
+                context: St.get_clutter_context(),
+                icon_name: 'icon-missing', icon_size: size
+            });
         appIcon.x_expand = appIcon.y_expand = true;
         appIcon.x_align = appIcon.y_align = Clutter.ActorAlign.END;
 
@@ -1042,8 +1091,11 @@ class WindowSwitcher extends SwitcherPopup.SwitcherList {
     _init(windows, mode) {
         super._init(true);
 
-        this._label = new St.Label({ x_align: Clutter.ActorAlign.CENTER,
-                                     y_align: Clutter.ActorAlign.CENTER });
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         this.add_actor(this._label);
 
         this.windows = windows;

@@ -114,21 +114,31 @@ var Notebook = GObject.registerClass({
 }, class Notebook extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             vertical: true,
             y_expand: true,
         });
 
-        this.tabControls = new St.BoxLayout({ style_class: 'labels' });
+        this.tabControls = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'labels'
+        });
 
         this._selectedIndex = -1;
         this._tabs = [];
     }
 
     appendPage(name, child) {
-        let labelBox = new St.BoxLayout({ style_class: 'notebook-tab',
-                                          reactive: true,
-                                          track_hover: true });
-        let label = new St.Button({ label: name });
+        let labelBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'notebook-tab',
+            reactive: true,
+            track_hover: true
+        });
+        let label = new St.Button({
+            context: St.get_clutter_context(),
+            label: name
+        });
         label.connect('clicked', () => {
             this.selectChild(child);
             return true;
@@ -136,7 +146,10 @@ var Notebook = GObject.registerClass({
         labelBox.add_child(label);
         this.tabControls.add(labelBox);
 
-        let scrollview = new St.ScrollView({ y_expand: true });
+        let scrollview = new St.ScrollView({
+            context: St.get_clutter_context(),
+            y_expand: true
+        });
         scrollview.get_hscroll_bar().hide();
         scrollview.add_actor(child);
 
@@ -263,6 +276,7 @@ class ObjLink extends St.Button {
         text = GLib.markup_escape_text(text, -1);
 
         super._init({
+            context: St.get_clutter_context(),
             reactive: true,
             track_hover: true,
             style_class: 'shell-link',
@@ -283,19 +297,30 @@ class ObjLink extends St.Button {
 var Result = GObject.registerClass(
 class Result extends St.BoxLayout {
     _init(lookingGlass, command, o, index) {
-        super._init({ vertical: true });
+        super._init({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
 
         this.index = index;
         this.o = o;
 
         this._lookingGlass = lookingGlass;
 
-        let cmdTxt = new St.Label({ text: command });
+        let cmdTxt = new St.Label({
+            context: St.get_clutter_context(),
+            text: command
+        });
         cmdTxt.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         this.add(cmdTxt);
-        let box = new St.BoxLayout({});
+        let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+        });
         this.add(box);
-        let resultTxt = new St.Label({ text: 'r(%d) = '.format(index) });
+        let resultTxt = new St.Label({
+            context: St.get_clutter_context(),
+            text: 'r(%d) = '.format(index)
+        });
         resultTxt.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         box.add(resultTxt);
         let objLink = new ObjLink(this._lookingGlass, o);
@@ -306,7 +331,12 @@ class Result extends St.BoxLayout {
 var WindowList = GObject.registerClass({
 }, class WindowList extends St.BoxLayout {
     _init(lookingGlass) {
-        super._init({ name: 'Windows', vertical: true, style: 'spacing: 8px' });
+        super._init({
+            context: St.get_clutter_context(),
+            name: 'Windows',
+            vertical: true,
+            style: 'spacing: 8px'
+        });
         let tracker = Shell.WindowTracker.get_default();
         this._updateId = Main.initializeDeferredWork(this, this._updateWindowList.bind(this));
         global.display.connect('window-created', this._updateWindowList.bind(this));
@@ -329,24 +359,43 @@ var WindowList = GObject.registerClass({
                 metaWindow.connect('unmanaged', this._updateWindowList.bind(this));
                 metaWindow._lookingGlassManaged = true;
             }
-            let box = new St.BoxLayout({ vertical: true });
+            let box = new St.BoxLayout({
+                context: St.get_clutter_context(),
+                vertical: true
+            });
             this.add(box);
             let windowLink = new ObjLink(this._lookingGlass, metaWindow, metaWindow.title);
             box.add_child(windowLink);
-            let propsBox = new St.BoxLayout({ vertical: true, style: 'padding-left: 6px;' });
+            let propsBox = new St.BoxLayout({
+                context: St.get_clutter_context(),
+                vertical: true,
+                style: 'padding-left: 6px;'
+            });
             box.add(propsBox);
-            propsBox.add(new St.Label({ text: 'wmclass: %s'.format(metaWindow.get_wm_class()) }));
+            propsBox.add(new St.Label({
+                context: St.get_clutter_context(),
+                text: 'wmclass: %s'.format(metaWindow.get_wm_class())
+            }));
             let app = tracker.get_window_app(metaWindow);
             if (app != null && !app.is_window_backed()) {
                 let icon = app.create_icon_texture(22);
-                let propBox = new St.BoxLayout({ style: 'spacing: 6px; ' });
+                let propBox = new St.BoxLayout({
+                    context: St.get_clutter_context(),
+                    style: 'spacing: 6px; '
+                });
                 propsBox.add(propBox);
-                propBox.add_child(new St.Label({ text: 'app: ' }));
+                propBox.add_child(new St.Label({
+                    context: St.get_clutter_context(),
+                    text: 'app: '
+                }));
                 let appLink = new ObjLink(this._lookingGlass, app, app.get_id());
                 propBox.add_child(appLink);
                 propBox.add_child(icon);
             } else {
-                propsBox.add(new St.Label({ text: '<untracked>' }));
+                propsBox.add(new St.Label({
+                    context: St.get_clutter_context(),
+                    text: '<untracked>'
+                }));
             }
         }
     }
@@ -360,6 +409,7 @@ var ObjInspector = GObject.registerClass(
 class ObjInspector extends St.ScrollView {
     _init(lookingGlass) {
         super._init({
+            context: St.get_clutter_context(),
             pivot_point: new Graphene.Point({ x: 0.5, y: 0.5 }),
         });
 
@@ -370,6 +420,7 @@ class ObjInspector extends St.ScrollView {
 
         this.get_hscroll_bar().hide();
         this._container = new St.BoxLayout({
+            context: St.get_clutter_context(),
             name: 'LookingGlassPropertyInspector',
             style_class: 'lg-dialog',
             vertical: true,
@@ -390,26 +441,44 @@ class ObjInspector extends St.ScrollView {
 
         this._container.destroy_all_children();
 
-        let hbox = new St.BoxLayout({ style_class: 'lg-obj-inspector-title' });
+        let hbox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'lg-obj-inspector-title'
+        });
         this._container.add_actor(hbox);
         let label = new St.Label({
+            context: St.get_clutter_context(),
             text: 'Inspecting: %s: %s'.format(typeof obj, objectToString(obj)),
             x_expand: true,
         });
         label.single_line_mode = true;
         hbox.add_child(label);
-        let button = new St.Button({ label: 'Insert', style_class: 'lg-obj-inspector-button' });
+        let button = new St.Button({
+            context: St.get_clutter_context(),
+            label: 'Insert',
+            style_class: 'lg-obj-inspector-button'
+        });
         button.connect('clicked', this._onInsert.bind(this));
         hbox.add(button);
 
         if (this._previousObj != null) {
-            button = new St.Button({ label: 'Back', style_class: 'lg-obj-inspector-button' });
+            button = new St.Button({
+                context: St.get_clutter_context(),
+                label: 'Back',
+                style_class: 'lg-obj-inspector-button'
+            });
             button.connect('clicked', this._onBack.bind(this));
             hbox.add(button);
         }
 
-        button = new St.Button({ style_class: 'window-close' });
-        button.add_actor(new St.Icon({ icon_name: 'window-close-symbolic' }));
+        button = new St.Button({
+            context: St.get_clutter_context(),
+            style_class: 'window-close'
+        });
+        button.add_actor(new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: 'window-close-symbolic'
+        }));
         button.connect('clicked', this.close.bind(this));
         hbox.add(button);
         if (typeof obj == typeof {}) {
@@ -425,10 +494,18 @@ class ObjInspector extends St.ScrollView {
                     let prop = obj[propName];
                     link = new ObjLink(this._lookingGlass, prop);
                 } catch (e) {
-                    link = new St.Label({ text: '<error>' });
+                    link = new St.Label({
+                        context: St.get_clutter_context(),
+                        text: '<error>'
+                    });
                 }
-                let box = new St.BoxLayout();
-                box.add(new St.Label({ text: '%s: '.format(propName) }));
+                let box = new St.BoxLayout({
+                    context: St.get_clutter_context(),
+                });
+                box.add(new St.Label({
+                    context: St.get_clutter_context(),
+                    text: '%s: '.format(propName)
+                }));
                 box.add(link);
                 this._container.add_actor(box);
             }
@@ -531,16 +608,26 @@ var Inspector = GObject.registerClass({
                'target': { param_types: [Clutter.Actor.$gtype, GObject.TYPE_DOUBLE, GObject.TYPE_DOUBLE] } },
 }, class Inspector extends Clutter.Actor {
     _init(lookingGlass) {
-        super._init({ width: 0, height: 0 });
+        super._init({
+            context: St.get_clutter_context(),
+            width: 0,
+            height: 0
+        });
 
         Main.uiGroup.add_actor(this);
 
-        let eventHandler = new St.BoxLayout({ name: 'LookingGlassDialog',
-                                              vertical: false,
-                                              reactive: true });
+        let eventHandler = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'LookingGlassDialog',
+            vertical: false,
+            reactive: true
+        });
         this._eventHandler = eventHandler;
         this.add_actor(eventHandler);
-        this._displayText = new St.Label({ x_expand: true });
+        this._displayText = new St.Label({
+            context: St.get_clutter_context(),
+            x_expand: true
+        });
         eventHandler.add_child(this._displayText);
 
         eventHandler.connect('key-press-event', this._onKeyPressEvent.bind(this));
@@ -669,14 +756,24 @@ var Inspector = GObject.registerClass({
 var Extensions = GObject.registerClass({
 }, class Extensions extends St.BoxLayout {
     _init(lookingGlass) {
-        super._init({ vertical: true, name: 'lookingGlassExtensions' });
+        super._init({
+            context: St.get_clutter_context(),
+            vertical: true,
+            name: 'lookingGlassExtensions'
+        });
 
         this._lookingGlass = lookingGlass;
-        this._noExtensions = new St.Label({ style_class: 'lg-extensions-none',
-                                            text: _("No extensions installed") });
+        this._noExtensions = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'lg-extensions-none',
+            text: _("No extensions installed")
+        });
         this._numExtensions = 0;
-        this._extensionsList = new St.BoxLayout({ vertical: true,
-                                                  style_class: 'lg-extensions-list' });
+        this._extensionsList = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true,
+            style_class: 'lg-extensions-list'
+        });
         this._extensionsList.add(this._noExtensions);
         this.add(this._extensionsList);
 
@@ -725,14 +822,23 @@ var Extensions = GObject.registerClass({
 
         if (shouldShow) {
             let errors = extension.errors;
-            let errorDisplay = new St.BoxLayout({ vertical: true });
+            let errorDisplay = new St.BoxLayout({
+                context: St.get_clutter_context(),
+                vertical: true
+            });
             if (errors && errors.length) {
                 for (let i = 0; i < errors.length; i++)
-                    errorDisplay.add(new St.Label({ text: errors[i] }));
+                    errorDisplay.add(new St.Label({
+                        context: St.get_clutter_context(),
+                        text: errors[i]
+                    }));
             } else {
                 /* Translators: argument is an extension UUID. */
                 let message = _("%s has not emitted any errors.").format(extension.uuid);
-                errorDisplay.add(new St.Label({ text: message }));
+                errorDisplay.add(new St.Label({
+                    context: St.get_clutter_context(),
+                    text: message
+                }));
             }
 
             actor._errorDisplay = errorDisplay;
@@ -765,49 +871,70 @@ var Extensions = GObject.registerClass({
     }
 
     _createExtensionDisplay(extension) {
-        let box = new St.BoxLayout({ style_class: 'lg-extension', vertical: true });
+        let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'lg-extension',
+            vertical: true
+        });
         box._extension = extension;
         let name = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'lg-extension-name',
             text: extension.metadata.name,
             x_expand: true,
         });
         box.add_child(name);
         let description = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'lg-extension-description',
             text: extension.metadata.description || 'No description',
             x_expand: true,
         });
         box.add_child(description);
 
-        let metaBox = new St.BoxLayout({ style_class: 'lg-extension-meta' });
+        let metaBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'lg-extension-meta'
+        });
         box.add(metaBox);
-        let state = new St.Label({ style_class: 'lg-extension-state',
-                                   text: this._stateToString(extension.state) });
+        let state = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'lg-extension-state',
+            text: this._stateToString(extension.state)
+        });
         metaBox.add(state);
 
-        let viewsource = new St.Button({ reactive: true,
-                                         track_hover: true,
-                                         style_class: 'shell-link',
-                                         label: _("View Source") });
+        let viewsource = new St.Button({
+            context: St.get_clutter_context(),
+            reactive: true,
+            track_hover: true,
+            style_class: 'shell-link',
+            label: _("View Source")
+        });
         viewsource._extension = extension;
         viewsource.connect('clicked', this._onViewSource.bind(this));
         metaBox.add(viewsource);
 
         if (extension.metadata.url) {
-            let webpage = new St.Button({ reactive: true,
-                                          track_hover: true,
-                                          style_class: 'shell-link',
-                                          label: _("Web Page") });
+            let webpage = new St.Button({
+                context: St.get_clutter_context(),
+                reactive: true,
+                track_hover: true,
+                style_class: 'shell-link',
+                label: _("Web Page")
+            });
             webpage._extension = extension;
             webpage.connect('clicked', this._onWebPage.bind(this));
             metaBox.add(webpage);
         }
 
-        let viewerrors = new St.Button({ reactive: true,
-                                         track_hover: true,
-                                         style_class: 'shell-link',
-                                         label: _("Show Errors") });
+        let viewerrors = new St.Button({
+            context: St.get_clutter_context(),
+            reactive: true,
+            track_hover: true,
+            style_class: 'shell-link',
+            label: _("Show Errors")
+        });
         viewerrors._extension = extension;
         viewerrors._parentBox = box;
         viewerrors._isShowing = false;
@@ -826,6 +953,7 @@ var ActorLink = GObject.registerClass({
 }, class ActorLink extends St.Button {
     _init(actor) {
         this._arrow = new St.Icon({
+            context: St.get_clutter_context(),
             icon_name: 'pan-end-symbolic',
             icon_size: 8,
             x_align: Clutter.ActorAlign.CENTER,
@@ -834,12 +962,15 @@ var ActorLink = GObject.registerClass({
         });
 
         const label = new St.Label({
+            context: St.get_clutter_context(),
             text: actor.toString(),
             x_align: Clutter.ActorAlign.START,
         });
 
         const inspectButton = new St.Button({
+            context: St.get_clutter_context(),
             child: new St.Icon({
+                context: St.get_clutter_context(),
                 icon_name: 'insert-object-symbolic',
                 icon_size: 12,
                 y_align: Clutter.ActorAlign.CENTER,
@@ -851,12 +982,15 @@ var ActorLink = GObject.registerClass({
         });
         inspectButton.connect('clicked', () => this.emit('inspect-actor'));
 
-        const box = new St.BoxLayout();
+        const box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+        });
         box.add_child(this._arrow);
         box.add_child(label);
         box.add_child(inspectButton);
 
         super._init({
+            context: St.get_clutter_context(),
             reactive: true,
             track_hover: true,
             toggle_mode: true,
@@ -879,7 +1013,9 @@ var ActorLink = GObject.registerClass({
 var ActorTreeViewer = GObject.registerClass(
 class ActorTreeViewer extends St.BoxLayout {
     _init(lookingGlass) {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
 
         this._lookingGlass = lookingGlass;
         this._actorData = new Map();
@@ -941,8 +1077,12 @@ class ActorTreeViewer extends St.BoxLayout {
             this._lookingGlass.inspectObject(actor, button);
         });
 
-        const mainContainer = new St.BoxLayout({ vertical: true });
+        const mainContainer = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
         const childrenContainer = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
             style: 'padding: 0 0 0 18px',
         });
@@ -1007,6 +1147,7 @@ var LookingGlass = GObject.registerClass(
 class LookingGlass extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             name: 'LookingGlassDialog',
             style_class: 'lg-dialog',
             vertical: true,
@@ -1043,10 +1184,16 @@ class LookingGlass extends St.BoxLayout {
         Main.uiGroup.add_actor(this._objInspector);
         this._objInspector.hide();
 
-        let toolbar = new St.BoxLayout({ name: 'Toolbar' });
+        let toolbar = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'Toolbar'
+        });
         this.add_actor(toolbar);
-        let inspectIcon = new St.Icon({ icon_name: 'find-location-symbolic',
-                                        icon_size: 24 });
+        let inspectIcon = new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: 'find-location-symbolic',
+            icon_size: 24
+        });
         toolbar.add_actor(inspectIcon);
         inspectIcon.reactive = true;
         inspectIcon.connect('button-press-event', () => {
@@ -1062,8 +1209,11 @@ class LookingGlass extends St.BoxLayout {
             return Clutter.EVENT_STOP;
         });
 
-        let gcIcon = new St.Icon({ icon_name: 'user-trash-full-symbolic',
-                                   icon_size: 24 });
+        let gcIcon = new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: 'user-trash-full-symbolic',
+            icon_size: 24
+        });
         toolbar.add_actor(gcIcon);
         gcIcon.reactive = true;
         gcIcon.connect('button-press-event', () => {
@@ -1085,14 +1235,21 @@ class LookingGlass extends St.BoxLayout {
         this._notebook = notebook;
         this.add_child(notebook);
 
-        let emptyBox = new St.Bin({ x_expand: true });
+        let emptyBox = new St.Bin({
+            context: St.get_clutter_context(),
+            x_expand: true
+        });
         toolbar.add_child(emptyBox);
         toolbar.add_actor(notebook.tabControls);
 
-        this._evalBox = new St.BoxLayout({ name: 'EvalBox', vertical: true });
+        this._evalBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'EvalBox', vertical: true
+        });
         notebook.appendPage('Evaluator', this._evalBox);
 
         this._resultsArea = new St.BoxLayout({
+            context: St.get_clutter_context(),
             name: 'ResultsArea',
             vertical: true,
             y_expand: true,
@@ -1100,15 +1257,20 @@ class LookingGlass extends St.BoxLayout {
         this._evalBox.add_child(this._resultsArea);
 
         this._entryArea = new St.BoxLayout({
+            context: St.get_clutter_context(),
             name: 'EntryArea',
             y_align: Clutter.ActorAlign.END,
         });
         this._evalBox.add_actor(this._entryArea);
 
-        let label = new St.Label({ text: CHEVRON });
+        let label = new St.Label({
+            context: St.get_clutter_context(),
+            text: CHEVRON
+        });
         this._entryArea.add(label);
 
         this._entry = new St.Entry({
+            context: St.get_clutter_context(),
             can_focus: true,
             x_expand: true,
         });
@@ -1191,7 +1353,11 @@ class LookingGlass extends St.BoxLayout {
 
     _showCompletions(completions) {
         if (!this._completionActor) {
-            this._completionActor = new St.Label({ name: 'LookingGlassAutoCompletionText', style_class: 'lg-completions-text' });
+            this._completionActor = new St.Label({
+                context: St.get_clutter_context(),
+                name: 'LookingGlassAutoCompletionText',
+                style_class: 'lg-completions-text'
+            });
             this._completionActor.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
             this._completionActor.clutter_text.line_wrap = true;
             this._evalBox.insert_child_below(this._completionActor, this._entryArea);

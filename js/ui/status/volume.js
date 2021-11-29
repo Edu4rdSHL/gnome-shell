@@ -52,7 +52,10 @@ var StreamSlider = class {
             this._notifyVolumeChange();
         });
 
-        this._icon = new St.Icon({ style_class: 'popup-menu-icon' });
+        this._icon = new St.Icon({
+            context: St.get_clutter_context(),
+            style_class: 'popup-menu-icon'
+        });
         this.item.add(this._icon);
         this.item.add_child(this._slider);
         this.item.connect('button-press-event', (actor, event) => {

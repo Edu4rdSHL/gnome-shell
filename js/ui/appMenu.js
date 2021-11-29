@@ -16,7 +16,8 @@ var AppMenu = class AppMenu extends PopupMenu.PopupMenu {
      * @param {bool} params.showSingleWindow - show window section for a single window
      */
     constructor(sourceActor, side = St.Side.TOP, params = {}) {
-        if (Clutter.get_default_text_direction() === Clutter.TextDirection.RTL) {
+        if (St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL) {
             if (side === St.Side.LEFT)
                 side = St.Side.RIGHT;
             else if (side === St.Side.RIGHT)

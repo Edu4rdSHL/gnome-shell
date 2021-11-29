@@ -76,11 +76,15 @@ class BaseIcon extends Shell.SquareBin {
         if (params.showLabel)
             styleClass += ' overview-icon-with-label';
 
-        super._init({ style_class: styleClass });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: styleClass
+        });
 
         this.connect('destroy', this._onDestroy.bind(this));
 
         this._box = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
             x_expand: true,
             y_expand: true,
@@ -88,12 +92,18 @@ class BaseIcon extends Shell.SquareBin {
         this.set_child(this._box);
 
         this.iconSize = ICON_SIZE;
-        this._iconBin = new St.Bin({ x_align: Clutter.ActorAlign.CENTER });
+        this._iconBin = new St.Bin({
+            context: St.get_clutter_context(),
+            x_align: Clutter.ActorAlign.CENTER
+        });
 
         this._box.add_actor(this._iconBin);
 
         if (params.showLabel) {
-            this.label = new St.Label({ text: label });
+            this.label = new St.Label({
+                context: St.get_clutter_context(),
+                text: label
+            });
             this.label.clutter_text.set({
                 x_align: Clutter.ActorAlign.CENTER,
                 y_align: Clutter.ActorAlign.CENTER,
@@ -198,6 +208,7 @@ function zoomOutActorAtPos(actor, x, y) {
         return;
 
     const actorClone = new Clutter.Clone({
+        context: St.get_clutter_context(),
         source: actor,
         reactive: false,
     });
@@ -680,8 +691,8 @@ var IconGridLayout = GObject.registerClass({
         const nEmpty = this.columnsPerPage - itemsInThisRow;
         const availableWidth = nEmpty * (spacing + childSize);
 
-        const isRtl =
-            Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const isRtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
 
         switch (align) {
         case Clutter.ActorAlign.CENTER:
@@ -772,8 +783,8 @@ var IconGridLayout = GObject.registerClass({
         if (this._pageWidth === 0 || this._pageHeight === 0)
             throw new Error('IconGridLayout.adaptToSize wasn\'t called before allocation');
 
-        const isRtl =
-            Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const isRtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         const childSize = this._getChildrenMaxSize();
 
         const [leftEmptySpace, topEmptySpace, hSpacing, vSpacing] =
@@ -1038,8 +1049,8 @@ var IconGridLayout = GObject.registerClass({
         const [leftEmptySpace, topEmptySpace, hSpacing, vSpacing] =
             this._calculateSpacing(childSize);
 
-        const isRtl =
-            Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
+        const isRtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
 
         let page = this._orientation === Clutter.Orientation.VERTICAL
             ? Math.floor(y / this._pageHeight)
@@ -1179,6 +1190,7 @@ var IconGrid = GObject.registerClass({
             () => this.emit('pages-changed'));
 
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'icon-grid',
             layoutManager,
             x_expand: true,
@@ -1510,7 +1522,10 @@ var IconGrid = GObject.registerClass({
         let normalization = maxDist - minDist;
 
         actors.forEach(actor => {
-            let clone = new Clutter.Clone({ source: actor });
+            let clone = new Clutter.Clone({
+                context: St.get_clutter_context(),
+                source: actor
+            });
             this._clonesAnimating.push(clone);
             Main.uiGroup.add_actor(clone);
         });

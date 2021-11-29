@@ -192,7 +192,8 @@ var LayoutManager = GObject.registerClass({
     _init() {
         super._init();
 
-        this._rtl = Clutter.get_default_text_direction() == Clutter.TextDirection.RTL;
+        this._rtl = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL;
         this.monitors = [];
         this.primaryMonitor = null;
         this.primaryIndex = -1;
@@ -211,7 +212,10 @@ var LayoutManager = GObject.registerClass({
         this._pendingLoadBackground = false;
 
         // Set up stage hierarchy to group all UI actors under one container.
-        this.uiGroup = new UiActor({ name: 'uiGroup' });
+        this.uiGroup = new UiActor({
+            context: St.get_clutter_context(),
+            name: 'uiGroup'
+        });
         this.uiGroup.set_flags(Clutter.ActorFlags.NO_LAYOUT);
 
         global.stage.add_child(this.uiGroup);
@@ -226,12 +230,16 @@ var LayoutManager = GObject.registerClass({
         global.stage.remove_actor(global.top_window_group);
         this.uiGroup.add_actor(global.top_window_group);
 
-        this.overviewGroup = new St.Widget({ name: 'overviewGroup',
-                                             visible: false,
-                                             reactive: true });
+        this.overviewGroup = new St.Widget({
+            context: St.get_clutter_context(),
+            name: 'overviewGroup',
+            visible: false,
+            reactive: true
+        });
         this.addChrome(this.overviewGroup);
 
         this.screenShieldGroup = new St.Widget({
+            context: St.get_clutter_context(),
             name: 'screenShieldGroup',
             visible: false,
             clip_to_allocation: true,
@@ -239,33 +247,49 @@ var LayoutManager = GObject.registerClass({
         });
         this.addChrome(this.screenShieldGroup);
 
-        this.panelBox = new St.BoxLayout({ name: 'panelBox',
-                                           vertical: true });
+        this.panelBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'panelBox',
+            vertical: true
+        });
         this.addChrome(this.panelBox, { affectsStruts: true,
                                         trackFullscreen: true });
         this.panelBox.connect('notify::allocation',
                               this._panelBoxChanged.bind(this));
 
-        this.modalDialogGroup = new St.Widget({ name: 'modalDialogGroup',
-                                                layout_manager: new Clutter.BinLayout() });
+        this.modalDialogGroup = new St.Widget({
+            context: St.get_clutter_context(),
+            name: 'modalDialogGroup',
+            layout_manager: new Clutter.BinLayout()
+        });
         this.uiGroup.add_actor(this.modalDialogGroup);
 
-        this.keyboardBox = new St.BoxLayout({ name: 'keyboardBox',
-                                              reactive: true,
-                                              track_hover: true });
+        this.keyboardBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'keyboardBox',
+            reactive: true,
+            track_hover: true
+        });
         this.addTopChrome(this.keyboardBox);
         this._keyboardHeightNotifyId = 0;
 
         // A dummy actor that tracks the mouse or text cursor, based on the
         // position and size set in setDummyCursorGeometry.
-        this.dummyCursor = new St.Widget({ width: 0, height: 0, opacity: 0 });
+        this.dummyCursor = new St.Widget({
+            context: St.get_clutter_context(),
+            width: 0,
+            height: 0,
+            opacity: 0
+        });
         this.uiGroup.add_actor(this.dummyCursor);
 
         let feedbackGroup = Meta.get_feedback_group_for_display(global.display);
         global.stage.remove_actor(feedbackGroup);
         this.uiGroup.add_actor(feedbackGroup);
 
-        this._backgroundGroup = new Meta.BackgroundGroup();
+        this._backgroundGroup = new Meta.BackgroundGroup({
+            context: St.get_clutter_context(),
+        });
         global.window_group.add_child(this._backgroundGroup);
         global.window_group.set_child_below_sibling(this._backgroundGroup, null);
         this._bgManagers = [];
@@ -643,10 +667,13 @@ var LayoutManager = GObject.registerClass({
     async _prepareStartupAnimation() {
         // During the initial transition, add a simple actor to block all events,
         // so they don't get delivered to X11 windows that have been transformed.
-        this._coverPane = new Clutter.Actor({ opacity: 0,
-                                              width: global.screen_width,
-                                              height: global.screen_height,
-                                              reactive: true });
+        this._coverPane = new Clutter.Actor({
+            context: St.get_clutter_context(),
+            opacity: 0,
+            width: global.screen_width,
+            height: global.screen_height,
+            reactive: true
+        });
         this.addChrome(this._coverPane);
 
         if (Meta.is_restart()) {
@@ -1066,7 +1093,9 @@ var LayoutManager = GObject.registerClass({
 var HotCorner = GObject.registerClass(
 class HotCorner extends Clutter.Actor {
     _init(layoutManager, monitor, x, y) {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
 
         // We use this flag to mark the case where the user has entered the
         // hot corner and has not left both the hot corner and a surrounding
@@ -1089,7 +1118,8 @@ class HotCorner extends Clutter.Actor {
 
         let px = 0.0;
         let py = 0.0;
-        if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL) {
+        if (St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.RTL) {
             px = 1.0;
             py = 0.0;
         }
@@ -1114,7 +1144,8 @@ class HotCorner extends Clutter.Actor {
         }
 
         if (size > 0) {
-            if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL) {
+            if (St.get_clutter_context().get_text_direction() ===
+                Clutter.TextDirection.RTL) {
                 this._verticalBarrier = new Meta.Barrier({ display: global.display,
                                                            x1: this._x, x2: this._x, y1: this._y, y2: this._y + size,
                                                            directions: Meta.BarrierDirection.NEGATIVE_X });
@@ -1146,17 +1177,21 @@ class HotCorner extends Clutter.Actor {
                 reactive: true,
             });
 
-            this._corner = new Clutter.Actor({ name: 'hot-corner',
-                                               width: 1,
-                                               height: 1,
-                                               opacity: 0,
-                                               reactive: true });
+            this._corner = new Clutter.Actor({
+                context: St.get_clutter_context(),
+                name: 'hot-corner',
+                width: 1,
+                height: 1,
+                opacity: 0,
+                reactive: true,
+            });
             this._corner._delegate = this;
 
             this.add_child(this._corner);
             layoutManager.addChrome(this);
 
-            if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL) {
+            if (St.get_clutter_context().get_text_direction() ===
+                Clutter.TextDirection.RTL) {
                 this._corner.set_position(this.width - this._corner.width, 0);
                 this.set_pivot_point(1.0, 0.0);
                 this.translation_x = -this.width;

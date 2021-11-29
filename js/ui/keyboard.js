@@ -53,7 +53,10 @@ const defaultKeysPost = [
 var AspectContainer = GObject.registerClass(
 class AspectContainer extends St.Widget {
     _init(params) {
-        super._init(params);
+        const defaultParams = {
+            context: St.get_clutter_context(),
+        };
+        super._init(Object.assign(defaultParams, params));
         this._ratio = 1;
     }
 
@@ -109,6 +112,7 @@ class KeyContainer extends St.Widget {
                                                   column_homogeneous: true,
                                                   row_homogeneous: true });
         super._init({
+            context: St.get_clutter_context(),
             layout_manager: gridLayout,
             x_expand: true,
             y_expand: true,
@@ -187,6 +191,7 @@ var Suggestions = GObject.registerClass(
 class Suggestions extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'word-suggestions',
             vertical: false,
             x_align: Clutter.ActorAlign.CENTER,
@@ -195,7 +200,10 @@ class Suggestions extends St.BoxLayout {
     }
 
     add(word, callback) {
-        let button = new St.Button({ label: word });
+        let button = new St.Button({
+            context: St.get_clutter_context(),
+            label: word
+        });
         button.connect('clicked', callback);
         this.add_child(button);
     }
@@ -277,7 +285,10 @@ var Key = GObject.registerClass({
     },
 }, class Key extends St.BoxLayout {
     _init(key, extendedKeys, icon = null) {
-        super._init({ style_class: 'key-container' });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'key-container'
+        });
 
         this.key = key || "";
         this.keyButton = this._makeKey(this.key, icon);
@@ -422,12 +433,16 @@ var Key = GObject.registerClass({
 
     _makeKey(key, icon) {
         let button = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'keyboard-key',
             x_expand: true,
         });
 
         if (icon) {
-            let child = new St.Icon({ icon_name: icon });
+            let child = new St.Icon({
+                context: St.get_clutter_context(),
+                icon_name: icon
+            });
             button.set_child(child);
             this._icon = child;
         } else {
@@ -477,6 +492,7 @@ var Key = GObject.registerClass({
 
     _getExtendedKeys() {
         this._extendedKeyboard = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'key-container',
             vertical: false,
         });
@@ -679,6 +695,7 @@ var EmojiPager = GObject.registerClass({
 }, class EmojiPager extends St.Widget {
     _init(sections, nCols, nRows) {
         super._init({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
             reactive: true,
             clip_to_allocation: true,
@@ -860,15 +877,20 @@ var EmojiPager = GObject.registerClass({
         let gridLayout = new Clutter.GridLayout({ orientation: Clutter.Orientation.HORIZONTAL,
                                                   column_homogeneous: true,
                                                   row_homogeneous: true });
-        let panel = new St.Widget({ layout_manager: gridLayout,
-                                    style_class: 'emoji-page',
-                                    x_expand: true,
-                                    y_expand: true });
+        let panel = new St.Widget({
+            context: St.get_clutter_context(),
+            layout_manager: gridLayout,
+            style_class: 'emoji-page',
+            x_expand: true,
+            y_expand: true
+        });
 
         /* Set an expander actor so all proportions are right despite the panel
          * not having all rows/cols filled in.
          */
-        let expander = new Clutter.Actor();
+        let expander = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
         gridLayout.attach(expander, 0, 0, this._nCols, this._nRows);
 
         let page = this._pages[nPage];
@@ -960,6 +982,7 @@ var EmojiSelection = GObject.registerClass({
 }, class EmojiSelection extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'emoji-panel',
             x_expand: true,
             y_expand: true,
@@ -1139,7 +1162,12 @@ var Keypad = GObject.registerClass({
         let gridLayout = new Clutter.GridLayout({ orientation: Clutter.Orientation.HORIZONTAL,
                                                   column_homogeneous: true,
                                                   row_homogeneous: true });
-        this._box = new St.Widget({ layout_manager: gridLayout, x_expand: true, y_expand: true });
+        this._box = new St.Widget({
+            context: St.get_clutter_context(),
+            layout_manager: gridLayout,
+            x_expand: true,
+            y_expand: true
+        });
         this.add_child(this._box);
 
         for (let i = 0; i < keys.length; i++) {
@@ -1274,7 +1302,12 @@ var Keyboard = GObject.registerClass({
     },
 }, class Keyboard extends St.BoxLayout {
     _init() {
-        super._init({ name: 'keyboard', reactive: true, vertical: true });
+        super._init({
+            context: St.get_clutter_context(),
+            name: 'keyboard',
+            reactive: true,
+            vertical: true
+        });
         this._focusInExtendedKeys = false;
         this._emojiActive = false;
 
@@ -2125,13 +2158,17 @@ var KeyboardController = class {
     }
 
     keyvalPress(keyval) {
-        this._virtualDevice.notify_keyval(Clutter.get_current_event_time() * 1000,
-                                          keyval, Clutter.KeyState.PRESSED);
+        const clutterContext = St.get_clutter_context();
+        this._virtualDevice.notify_keyval(
+            clutterContext.get_current_event_time() * 1000,
+            keyval, Clutter.KeyState.PRESSED);
     }
 
     keyvalRelease(keyval) {
-        this._virtualDevice.notify_keyval(Clutter.get_current_event_time() * 1000,
-                                          keyval, Clutter.KeyState.RELEASED);
+        const clutterContext = St.get_clutter_context();
+        this._virtualDevice.notify_keyval(
+            clutterContext.get_current_event_time() * 1000,
+            keyval, Clutter.KeyState.RELEASED);
     }
 };
 Signals.addSignalMethods(KeyboardController.prototype);

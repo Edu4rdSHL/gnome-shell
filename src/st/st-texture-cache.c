@@ -21,10 +21,12 @@
 
 #include "config.h"
 
+#include "st.h"
 #include "st-image-content.h"
 #include "st-texture-cache.h"
 #include "st-private.h"
 #include "st-settings.h"
+#include <clutter/clutter.h>
 #include <gtk/gtk.h>
 #include <math.h>
 #include <string.h>
@@ -76,6 +78,7 @@ static ClutterActor *
 create_invisible_actor (void)
 {
   return g_object_new (CLUTTER_TYPE_ACTOR,
+                       "context", st_get_clutter_context (),
                        "opacity", 0,
                        "request-mode", CLUTTER_REQUEST_CONTENT_SIZE,
                        NULL);
@@ -994,6 +997,7 @@ st_texture_cache_load_gicon (StTextureCache    *cache,
                              gint               paint_scale,
                              gfloat             resource_scale)
 {
+  ClutterContext *clutter_context = st_get_clutter_context ();
   AsyncTextureLoadData *request;
   ClutterActor *actor;
   gint scale;
@@ -1020,6 +1024,7 @@ st_texture_cache_load_gicon (StTextureCache    *cache,
         return NULL;
 
       return g_object_new (CLUTTER_TYPE_ACTOR,
+                           "context", st_get_clutter_context (),
                            "content-gravity", CLUTTER_CONTENT_GRAVITY_RESIZE_ASPECT,
                            "width", actor_size,
                            "height", actor_size,
@@ -1043,7 +1048,8 @@ st_texture_cache_load_gicon (StTextureCache    *cache,
   else if (icon_style == ST_ICON_STYLE_SYMBOLIC)
     lookup_flags |= GTK_ICON_LOOKUP_FORCE_SYMBOLIC;
 
-  if (clutter_get_default_text_direction () == CLUTTER_TEXT_DIRECTION_RTL)
+  if (clutter_context_get_text_direction (clutter_context) ==
+      CLUTTER_TEXT_DIRECTION_RTL)
     lookup_flags |= GTK_ICON_LOOKUP_DIR_RTL;
   else
     lookup_flags |= GTK_ICON_LOOKUP_DIR_LTR;
@@ -1120,6 +1126,7 @@ load_from_pixbuf (GdkPixbuf *pixbuf,
   image = pixbuf_to_st_content_image (pixbuf, -1, -1, paint_scale, resource_scale);
 
   actor = g_object_new (CLUTTER_TYPE_ACTOR,
+                        "context", st_get_clutter_context (),
                         "request-mode", CLUTTER_REQUEST_CONTENT_SIZE,
                         NULL);
   clutter_actor_set_content (actor, image);
@@ -1387,7 +1394,7 @@ st_texture_cache_load_sliced_image (StTextureCache *cache,
 {
   AsyncImageData *data;
   GTask *result;
-  ClutterActor *actor = clutter_actor_new ();
+  ClutterActor *actor = clutter_actor_new (st_get_clutter_context ());
   GCancellable *cancellable = g_cancellable_new ();
 
   g_return_val_if_fail (G_IS_FILE (file), NULL);

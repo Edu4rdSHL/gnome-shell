@@ -140,6 +140,7 @@ var BaseAppView = GObject.registerClass({
     },
 }, class BaseAppView extends St.Widget {
     _init(params = {}) {
+        params['context'] = St.get_clutter_context();
         super._init(params);
 
         this._grid = this._createGrid();
@@ -154,6 +155,7 @@ var BaseAppView = GObject.registerClass({
 
         // Scroll View
         this._scrollView = new St.ScrollView({
+            context: St.get_clutter_context(),
             style_class: 'apps-scroll-view',
             clip_to_allocation: true,
             x_expand: true,
@@ -211,6 +213,7 @@ var BaseAppView = GObject.registerClass({
 
         // Navigation indicators
         this._nextPageIndicator = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'page-navigation-hint next',
             opacity: 0,
             visible: false,
@@ -222,6 +225,7 @@ var BaseAppView = GObject.registerClass({
         });
 
         this._prevPageIndicator = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'page-navigation-hint previous',
             opacity: 0,
             visible: false,
@@ -235,6 +239,7 @@ var BaseAppView = GObject.registerClass({
         // Next/prev page arrows
         const rtl = this.get_text_direction() === Clutter.TextDirection.RTL;
         this._nextPageArrow = new St.Icon({
+            context: St.get_clutter_context(),
             style_class: 'page-navigation-arrow',
             icon_name: rtl
                 ? 'carousel-arrow-back-24-symbolic'
@@ -246,6 +251,7 @@ var BaseAppView = GObject.registerClass({
             x_align: Clutter.ActorAlign.END,
         });
         this._prevPageArrow = new St.Icon({
+            context: St.get_clutter_context(),
             style_class: 'page-navigation-arrow',
             icon_name: rtl
                 ? 'carousel-arrow-next-24-symbolic'
@@ -258,6 +264,7 @@ var BaseAppView = GObject.registerClass({
         });
 
         this._hintContainer = new St.Widget({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
@@ -266,6 +273,7 @@ var BaseAppView = GObject.registerClass({
         this._hintContainer.add_child(this._nextPageIndicator);
 
         const scrollContainer = new St.Widget({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
             clip_to_allocation: true,
             y_expand: true,
@@ -276,6 +284,7 @@ var BaseAppView = GObject.registerClass({
         scrollContainer.add_child(this._prevPageArrow);
 
         this._box = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
             x_expand: true,
             y_expand: true,
@@ -1386,6 +1395,7 @@ class AppDisplay extends BaseAppView {
         this._pageManager.connect('layout-changed', () => this._redisplay());
 
         this._stack = new St.Widget({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
@@ -1835,6 +1845,7 @@ var AppSearchProvider = class AppSearchProvider {
                 let iconName = this._systemActions.getIconName(id);
 
                 const createIcon = size => new St.Icon({
+                    context: St.get_clutter_context(),
                     icon_name: iconName,
                     width: size * scaleFactor,
                     height: size * scaleFactor,
@@ -1903,6 +1914,7 @@ var AppViewItem = GObject.registerClass(
 class AppViewItem extends St.Button {
     _init(params = {}, isDraggable = true, expandTitleOnHover = true) {
         super._init({
+            context: St.get_clutter_context(),
             pivot_point: new Graphene.Point({ x: 0.5, y: 0.5 }),
             reactive: true,
             button_mask: St.ButtonMask.ONE | St.ButtonMask.TWO,
@@ -2228,6 +2240,7 @@ class FolderView extends BaseAppView {
             column_homogeneous: true,
         });
         let icon = new St.Widget({
+            context: St.get_clutter_context(),
             layout_manager: layout,
             x_align: Clutter.ActorAlign.CENTER,
             style: 'width: %dpx; height: %dpx;'.format(size, size),
@@ -2239,7 +2252,10 @@ class FolderView extends BaseAppView {
         let rtl = icon.get_text_direction() == Clutter.TextDirection.RTL;
         for (let i = 0; i < 4; i++) {
             const style = 'width: %dpx; height: %dpx;'.format(subSize, subSize);
-            let bin = new St.Bin({ style });
+            let bin = new St.Bin({
+                context: St.get_clutter_context(),
+                style
+            });
             if (i < numItems)
                 bin.child = this._orderedItems[i].app.create_icon_texture(subSize);
             layout.attach(bin, rtl ? (i + 1) % 2 : i % 2, Math.floor(i / 2), 1, 1);
@@ -2539,6 +2555,7 @@ var AppFolderDialog = GObject.registerClass({
 }, class AppFolderDialog extends St.Bin {
     _init(source, folder, appDisplay) {
         super._init({
+            context: St.get_clutter_context(),
             visible: false,
             x_expand: true,
             y_expand: true,
@@ -2567,6 +2584,7 @@ var AppFolderDialog = GObject.registerClass({
         this._isOpen = false;
 
         this._viewBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'app-folder-dialog',
             x_expand: true,
             y_expand: true,
@@ -2576,6 +2594,7 @@ var AppFolderDialog = GObject.registerClass({
         });
 
         this.child = new St.Bin({
+            context: St.get_clutter_context(),
             style_class: 'app-folder-dialog-container',
             child: this._viewBox,
             x_align: Clutter.ActorAlign.CENTER,
@@ -2603,12 +2622,15 @@ var AppFolderDialog = GObject.registerClass({
 
     _addFolderNameEntry() {
         this._entryBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'folder-name-container',
         });
         this._viewBox.add_child(this._entryBox);
 
         // Empty actor to center the title
-        let ghostButton = new Clutter.Actor();
+        let ghostButton = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
         this._entryBox.add_child(ghostButton);
 
         let stack = new Shell.Stack({
@@ -2619,6 +2641,7 @@ var AppFolderDialog = GObject.registerClass({
 
         // Folder name label
         this._folderNameLabel = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'folder-name-label',
             x_expand: true,
             y_expand: true,
@@ -2630,6 +2653,7 @@ var AppFolderDialog = GObject.registerClass({
 
         // Folder name entry
         this._entry = new St.Entry({
+            context: St.get_clutter_context(),
             style_class: 'folder-name-entry',
             opacity: 0,
             reactive: false,
@@ -2647,6 +2671,7 @@ var AppFolderDialog = GObject.registerClass({
 
         // Edit button
         this._editButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'edit-folder-button',
             button_mask: St.ButtonMask.ONE,
             toggle_mode: true,
@@ -2655,6 +2680,7 @@ var AppFolderDialog = GObject.registerClass({
             x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.CENTER,
             child: new St.Icon({
+                context: St.get_clutter_context(),
                 icon_name: 'document-edit-symbolic',
                 icon_size: 16,
             }),
@@ -2874,7 +2900,8 @@ var AppFolderDialog = GObject.registerClass({
         // and TAB_BACKWARD for up key and left key on ltr
         // languages
         let direction;
-        let isLtr = Clutter.get_default_text_direction() == Clutter.TextDirection.LTR;
+        const isLtr = St.get_clutter_context().get_text_direction() ===
+            Clutter.TextDirection.LTR;
         switch (keyEvent.keyval) {
         case Clutter.KEY_Down:
             direction = St.DirectionType.TAB_FORWARD;
@@ -3041,8 +3068,12 @@ var AppIcon = GObject.registerClass({
         this._id = app.get_id();
         this._name = app.get_name();
 
-        this._iconContainer = new St.Widget({ layout_manager: new Clutter.BinLayout(),
-                                              x_expand: true, y_expand: true });
+        this._iconContainer = new St.Widget({
+            context: St.get_clutter_context(),
+            layout_manager: new Clutter.BinLayout(),
+            x_expand: true,
+            y_expand: true
+        });
 
         this.set_child(this._iconContainer);
 
@@ -3054,6 +3085,7 @@ var AppIcon = GObject.registerClass({
         this._iconContainer.add_child(this.icon);
 
         this._dot = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'app-well-app-running-dot',
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,

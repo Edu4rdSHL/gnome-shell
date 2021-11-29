@@ -160,7 +160,10 @@ function addContextMenu(entry, params) {
 var CapsLockWarning = GObject.registerClass(
 class CapsLockWarning extends St.Label {
     _init(params) {
-        let defaultParams = { style_class: 'caps-lock-warning-label' };
+        let defaultParams = {
+            context: St.get_clutter_context(),
+            style_class: 'caps-lock-warning-label'
+        };
         super._init(Object.assign(defaultParams, params));
 
         this.text = _('Caps lock is on.');

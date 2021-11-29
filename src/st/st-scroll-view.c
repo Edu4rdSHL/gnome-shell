@@ -284,6 +284,45 @@ st_scroll_view_dispose (GObject *object)
 }
 
 static void
+st_scroll_view_constructed (GObject *object)
+{
+  StScrollView *self = ST_SCROLL_VIEW (object);
+  StScrollViewPrivate *priv = self->priv = st_scroll_view_get_instance_private (self);
+  ClutterActor *actor = CLUTTER_ACTOR (self);
+  ClutterContext *clutter_context = clutter_actor_get_context (actor);
+
+  priv->hscrollbar_policy = ST_POLICY_AUTOMATIC;
+  priv->vscrollbar_policy = ST_POLICY_AUTOMATIC;
+
+  priv->hadjustment = g_object_new (ST_TYPE_ADJUSTMENT,
+                                    "actor", self,
+                                    NULL);
+  priv->hscroll = g_object_new (ST_TYPE_SCROLL_BAR,
+                                "context", clutter_context,
+                                "adjustment", priv->hadjustment,
+                                "vertical", FALSE,
+                                NULL);
+
+  priv->vadjustment = g_object_new (ST_TYPE_ADJUSTMENT,
+                                    "actor", self,
+                                    NULL);
+  priv->vscroll = g_object_new (ST_TYPE_SCROLL_BAR,
+                                "context", clutter_context,
+                                "adjustment", priv->vadjustment,
+                                "vertical", TRUE,
+                                NULL);
+
+  clutter_actor_add_child (CLUTTER_ACTOR (self), priv->hscroll);
+  clutter_actor_add_child (CLUTTER_ACTOR (self), priv->vscroll);
+
+  /* mouse scroll is enabled by default, so we also need to be reactive */
+  priv->mouse_scroll = TRUE;
+  g_object_set (G_OBJECT (self), "reactive", TRUE, NULL);
+
+  G_OBJECT_CLASS (st_scroll_view_parent_class)->constructed (object);
+}
+
+static void
 st_scroll_view_paint (ClutterActor        *actor,
                       ClutterPaintContext *paint_context)
 {
@@ -834,6 +873,7 @@ st_scroll_view_class_init (StScrollViewClass *klass)
   object_class->get_property = st_scroll_view_get_property;
   object_class->set_property = st_scroll_view_set_property;
   object_class->dispose = st_scroll_view_dispose;
+  object_class->constructed = st_scroll_view_constructed;
 
   actor_class->paint = st_scroll_view_paint;
   actor_class->pick = st_scroll_view_pick;
@@ -956,33 +996,6 @@ st_scroll_view_class_init (StScrollViewClass *klass)
 static void
 st_scroll_view_init (StScrollView *self)
 {
-  StScrollViewPrivate *priv = self->priv = st_scroll_view_get_instance_private (self);
-
-  priv->hscrollbar_policy = ST_POLICY_AUTOMATIC;
-  priv->vscrollbar_policy = ST_POLICY_AUTOMATIC;
-
-  priv->hadjustment = g_object_new (ST_TYPE_ADJUSTMENT,
-                                    "actor", self,
-                                    NULL);
-  priv->hscroll = g_object_new (ST_TYPE_SCROLL_BAR,
-                                "adjustment", priv->hadjustment,
-                                "vertical", FALSE,
-                                NULL);
-
-  priv->vadjustment = g_object_new (ST_TYPE_ADJUSTMENT,
-                                    "actor", self,
-                                    NULL);
-  priv->vscroll = g_object_new (ST_TYPE_SCROLL_BAR,
-                                "adjustment", priv->vadjustment,
-                                "vertical", TRUE,
-                                NULL);
-
-  clutter_actor_add_child (CLUTTER_ACTOR (self), priv->hscroll);
-  clutter_actor_add_child (CLUTTER_ACTOR (self), priv->vscroll);
-
-  /* mouse scroll is enabled by default, so we also need to be reactive */
-  priv->mouse_scroll = TRUE;
-  g_object_set (G_OBJECT (self), "reactive", TRUE, NULL);
 }
 
 static void
@@ -1059,15 +1072,18 @@ clutter_container_iface_init (ClutterContainerIface *iface)
 
 /**
  * st_scroll_view_new:
+ * @clutter_context: a Clutter context
  *
  * Create a new #StScrollView.
  *
  * Returns: (transfer full): a new #StScrollView
  */
 StWidget *
-st_scroll_view_new (void)
+st_scroll_view_new (ClutterContext *clutter_context)
 {
-  return g_object_new (ST_TYPE_SCROLL_VIEW, NULL);
+  return g_object_new (ST_TYPE_SCROLL_VIEW,
+                       "context", clutter_context,
+                       NULL);
 }
 
 /**
