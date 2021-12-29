@@ -98,7 +98,9 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._settingsItem = item;
         } else {
             log('Missing required core component Settings, expect trouble…');
-            this._settingsItem = new St.Widget();
+            this._settingsItem = new St.Widget({
+                context: St.get_clutter_context(),
+            });
         }
 
         item = new PopupMenu.PopupImageMenuItem(_('Lock'), 'changes-prevent-symbolic');

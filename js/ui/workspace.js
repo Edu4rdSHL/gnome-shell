@@ -929,6 +929,7 @@ var WorkspaceBackground = GObject.registerClass(
 class WorkspaceBackground extends St.Widget {
     _init(monitorIndex, stateAdjustment) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'workspace-background',
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
@@ -945,11 +946,13 @@ class WorkspaceBackground extends St.Widget {
         });
 
         this._bin = new Clutter.Actor({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
             clip_to_allocation: true,
         });
 
         this._backgroundGroup = new Meta.BackgroundGroup({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
@@ -1064,6 +1067,7 @@ var Workspace = GObject.registerClass(
 class Workspace extends St.Widget {
     _init(metaWorkspace, monitorIndex, overviewAdjustment) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'window-picker',
             pivot_point: new Graphene.Point({ x: 0.5, y: 0.5 }),
             layout_manager: new Clutter.BinLayout(),
@@ -1079,6 +1083,7 @@ class Workspace extends St.Widget {
 
         // Window previews
         this._container = new Clutter.Actor({
+            context: St.get_clutter_context(),
             reactive: true,
             x_expand: true,
             y_expand: true,

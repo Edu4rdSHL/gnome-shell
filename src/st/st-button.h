@@ -43,8 +43,9 @@ struct _StButtonClass
   void (* clicked) (StButton *button, int clicked_button);
 };
 
-StWidget    *st_button_new             (void);
-StWidget    *st_button_new_with_label  (const gchar  *text);
+StWidget    *st_button_new             (ClutterContext *clutter_context);
+StWidget    *st_button_new_with_label  (ClutterContext *clutter_context,
+                                        const char     *text);
 const gchar *st_button_get_label       (StButton     *button);
 void         st_button_set_label       (StButton     *button,
                                         const gchar  *text);

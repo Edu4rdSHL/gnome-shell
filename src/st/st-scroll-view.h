@@ -58,7 +58,7 @@ struct _StScrollView
   StScrollViewPrivate *priv;
 };
 
-StWidget *st_scroll_view_new (void);
+StWidget *st_scroll_view_new (ClutterContext *clutter_context);
 
 ClutterActor *st_scroll_view_get_hscroll_bar     (StScrollView *scroll);
 ClutterActor *st_scroll_view_get_vscroll_bar     (StScrollView *scroll);

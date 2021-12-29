@@ -119,6 +119,7 @@ var Lightbox = GObject.registerClass({
         });
 
         super._init({
+            context: St.get_clutter_context(),
             reactive: params.inhibitEvents,
             width: params.width,
             height: params.height,

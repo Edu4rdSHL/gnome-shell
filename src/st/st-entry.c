@@ -116,6 +116,27 @@ G_DEFINE_TYPE_WITH_PRIVATE (StEntry, st_entry, ST_TYPE_WIDGET);
 
 static GType st_entry_accessible_get_type (void) G_GNUC_CONST;
 
+static void clutter_text_reactive_changed_cb (ClutterActor *text,
+                                              GParamSpec   *pspec,
+                                              gpointer      user_data);
+
+static void clutter_text_focus_in_cb (ClutterText  *text,
+                                      ClutterActor *actor);
+
+static void clutter_text_focus_out_cb (ClutterText  *text,
+                                       ClutterActor *actor);
+
+static gboolean clutter_text_button_press_event (ClutterActor       *actor,
+                                                 ClutterButtonEvent *event,
+                                                 gpointer            user_data);
+
+static void clutter_text_cursor_changed (ClutterText *text,
+                                         StEntry     *entry);
+
+static void clutter_text_changed_cb (GObject    *object,
+                                     GParamSpec *pspec,
+                                     gpointer    user_data);
+
 static void
 st_entry_set_property (GObject      *gobject,
                        guint         prop_id,
@@ -217,6 +238,61 @@ st_entry_dispose (GObject *object)
   cogl_clear_object (&priv->text_shadow_material);
 
   G_OBJECT_CLASS (st_entry_parent_class)->dispose (object);
+}
+
+static void
+st_entry_constructed (GObject *object)
+{
+  StEntry *entry = ST_ENTRY (object);
+  ClutterActor *actor = CLUTTER_ACTOR (entry);
+  ClutterContext *clutter_context = clutter_actor_get_context (actor);
+  StEntryPrivate *priv;
+
+  priv = st_entry_get_instance_private (entry);
+
+  priv->entry = g_object_new (CLUTTER_TYPE_TEXT,
+                              "context", clutter_context,
+                              "line-alignment", PANGO_ALIGN_LEFT,
+                              "editable", TRUE,
+                              "reactive", TRUE,
+                              "single-line-mode", TRUE,
+                              NULL);
+
+  g_object_bind_property (G_OBJECT (entry), "reactive",
+                          priv->entry, "reactive",
+                          G_BINDING_DEFAULT);
+
+  g_signal_connect(priv->entry, "notify::reactive",
+                   G_CALLBACK (clutter_text_reactive_changed_cb), entry);
+
+  g_signal_connect (priv->entry, "key-focus-in",
+                    G_CALLBACK (clutter_text_focus_in_cb), entry);
+
+  g_signal_connect (priv->entry, "key-focus-out",
+                    G_CALLBACK (clutter_text_focus_out_cb), entry);
+
+  g_signal_connect (priv->entry, "button-press-event",
+                    G_CALLBACK (clutter_text_button_press_event), entry);
+
+  g_signal_connect (priv->entry, "cursor-changed",
+                    G_CALLBACK (clutter_text_cursor_changed), entry);
+
+  g_signal_connect (priv->entry, "notify::text",
+                    G_CALLBACK (clutter_text_changed_cb), entry);
+
+  priv->spacing = 6.0f;
+
+  priv->text_shadow_material = NULL;
+  priv->shadow_width = -1.;
+  priv->shadow_height = -1.;
+
+  clutter_actor_add_child (CLUTTER_ACTOR (entry), priv->entry);
+  clutter_actor_set_reactive ((ClutterActor *) entry, TRUE);
+
+  /* set cursor hidden until we receive focus */
+  clutter_text_set_cursor_visible ((ClutterText *) priv->entry, FALSE);
+
+  G_OBJECT_CLASS (st_entry_parent_class)->constructed (object);
 }
 
 static void
@@ -863,6 +939,7 @@ st_entry_class_init (StEntryClass *klass)
   gobject_class->set_property = st_entry_set_property;
   gobject_class->get_property = st_entry_get_property;
   gobject_class->dispose = st_entry_dispose;
+  gobject_class->constructed = st_entry_constructed;
 
   actor_class->get_preferred_width = st_entry_get_preferred_width;
   actor_class->get_preferred_height = st_entry_get_preferred_height;
@@ -1021,54 +1098,11 @@ st_entry_class_init (StEntryClass *klass)
 static void
 st_entry_init (StEntry *entry)
 {
-  StEntryPrivate *priv;
-
-  priv = st_entry_get_instance_private (entry);
-
-  priv->entry = g_object_new (CLUTTER_TYPE_TEXT,
-                              "line-alignment", PANGO_ALIGN_LEFT,
-                              "editable", TRUE,
-                              "reactive", TRUE,
-                              "single-line-mode", TRUE,
-                              NULL);
-
-  g_object_bind_property (G_OBJECT (entry), "reactive",
-                          priv->entry, "reactive",
-                          G_BINDING_DEFAULT);
-
-  g_signal_connect(priv->entry, "notify::reactive",
-                   G_CALLBACK (clutter_text_reactive_changed_cb), entry);
-
-  g_signal_connect (priv->entry, "key-focus-in",
-                    G_CALLBACK (clutter_text_focus_in_cb), entry);
-
-  g_signal_connect (priv->entry, "key-focus-out",
-                    G_CALLBACK (clutter_text_focus_out_cb), entry);
-
-  g_signal_connect (priv->entry, "button-press-event",
-                    G_CALLBACK (clutter_text_button_press_event), entry);
-
-  g_signal_connect (priv->entry, "cursor-changed",
-                    G_CALLBACK (clutter_text_cursor_changed), entry);
-
-  g_signal_connect (priv->entry, "notify::text",
-                    G_CALLBACK (clutter_text_changed_cb), entry);
-
-  priv->spacing = 6.0f;
-
-  priv->text_shadow_material = NULL;
-  priv->shadow_width = -1.;
-  priv->shadow_height = -1.;
-
-  clutter_actor_add_child (CLUTTER_ACTOR (entry), priv->entry);
-  clutter_actor_set_reactive ((ClutterActor *) entry, TRUE);
-
-  /* set cursor hidden until we receive focus */
-  clutter_text_set_cursor_visible ((ClutterText *) priv->entry, FALSE);
 }
 
 /**
  * st_entry_new:
+ * @clutter_context: The Clutter context
  * @text: (nullable): text to set the entry to
  *
  * Create a new #StEntry with the specified text.
@@ -1076,12 +1110,14 @@ st_entry_init (StEntry *entry)
  * Returns: a new #StEntry
  */
 StWidget *
-st_entry_new (const gchar *text)
+st_entry_new (ClutterContext *clutter_context,
+              const char     *text)
 {
   StWidget *entry;
 
   /* add the entry to the stage, but don't allow it to be visible */
   entry = g_object_new (ST_TYPE_ENTRY,
+                        "context", clutter_context,
                         "text", text,
                         NULL);
 
@@ -1166,7 +1202,8 @@ st_entry_set_hint_text (StEntry     *entry,
 
   g_return_if_fail (ST_IS_ENTRY (entry));
 
-  label = st_label_new (text);
+  label = st_label_new (clutter_actor_get_context (CLUTTER_ACTOR (entry)),
+                        text);
   st_widget_add_style_class_name (label, "hint-text");
 
   st_entry_set_hint_actor (ST_ENTRY (entry), CLUTTER_ACTOR (label));

@@ -13,7 +13,10 @@ function _setLabel(label, value) {
 var Dialog = GObject.registerClass(
 class Dialog extends St.Widget {
     _init(parentActor, styleClass) {
-        super._init({ layout_manager: new Clutter.BinLayout() });
+        super._init({
+            context: St.get_clutter_context(),
+            layout_manager: new Clutter.BinLayout()
+        });
         this.connect('destroy', this._onDestroy.bind(this));
 
         this._initialKeyFocus = null;
@@ -33,6 +36,7 @@ class Dialog extends St.Widget {
 
     _createDialog() {
         this._dialog = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'modal-dialog',
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
@@ -46,6 +50,7 @@ class Dialog extends St.Widget {
         this._dialog.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
 
         this.contentLayout = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
             style_class: 'modal-dialog-content-box',
             y_expand: true,
@@ -53,6 +58,7 @@ class Dialog extends St.Widget {
         this._dialog.add_child(this.contentLayout);
 
         this.buttonLayout = new St.Widget({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BoxLayout({ homogeneous: true }),
         });
         this._dialog.add_child(this.buttonLayout);
@@ -125,6 +131,7 @@ class Dialog extends St.Widget {
             keys = [];
 
         let button = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'modal-dialog-linked-button',
             button_mask: St.ButtonMask.ONE | St.ButtonMask.THREE,
             reactive: true,
@@ -172,13 +179,20 @@ var MessageDialogContent = GObject.registerClass({
     },
 }, class MessageDialogContent extends St.BoxLayout {
     _init(params) {
-        this._title = new St.Label({ style_class: 'message-dialog-title' });
-        this._description = new St.Label({ style_class: 'message-dialog-description' });
+        this._title = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'message-dialog-title'
+        });
+        this._description = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'message-dialog-description'
+        });
 
         this._description.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         this._description.clutter_text.line_wrap = true;
 
         let defaultParams = {
+            context: St.get_clutter_context(),
             style_class: 'message-dialog-content',
             x_expand: true,
             vertical: true,
@@ -257,20 +271,26 @@ var ListSection = GObject.registerClass({
     },
 }, class ListSection extends St.BoxLayout {
     _init(params) {
-        this._title = new St.Label({ style_class: 'dialog-list-title' });
+        this._title = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'dialog-list-title'
+        });
 
         this._listScrollView = new St.ScrollView({
+            context: St.get_clutter_context(),
             style_class: 'dialog-list-scrollview',
             hscrollbar_policy: St.PolicyType.NEVER,
         });
 
         this.list = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'dialog-list-box',
             vertical: true,
         });
         this._listScrollView.add_actor(this.list);
 
         let defaultParams = {
+            context: St.get_clutter_context(),
             style_class: 'dialog-list',
             x_expand: true,
             vertical: true,
@@ -311,24 +331,34 @@ var ListSectionItem = GObject.registerClass({
     },
 }, class ListSectionItem extends St.BoxLayout {
     _init(params) {
-        this._iconActorBin = new St.Bin();
+        this._iconActorBin = new St.Bin({
+            context: St.get_clutter_context(),
+        });
 
         let textLayout = new St.BoxLayout({
+            context: St.get_clutter_context(),
             vertical: true,
             y_expand: true,
             y_align: Clutter.ActorAlign.CENTER,
         });
 
-        this._title = new St.Label({ style_class: 'dialog-list-item-title' });
+        this._title = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'dialog-list-item-title'
+        });
 
         this._description = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'dialog-list-item-title-description',
         });
 
         textLayout.add_child(this._title);
         textLayout.add_child(this._description);
 
-        let defaultParams = { style_class: 'dialog-list-item' };
+        let defaultParams = {
+            context: St.get_clutter_context(),
+            style_class: 'dialog-list-item'
+        };
         super._init(Object.assign(defaultParams, params));
 
         this.label_actor = this._title;

@@ -41,13 +41,19 @@ var AppMenuButton = GObject.registerClass({
         this._targetApp = null;
         this._busyNotifyId = 0;
 
-        let bin = new St.Bin({ name: 'appMenu' });
+        let bin = new St.Bin({
+            context: St.get_clutter_context(),
+            name: 'appMenu'
+        });
         this.add_actor(bin);
 
         this.bind_property("reactive", this, "can-focus", 0);
         this.reactive = false;
 
-        this._container = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
+        this._container = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'panel-status-menu-box'
+        });
         bin.set_child(this._container);
 
         let textureCache = St.TextureCache.get_default();
@@ -56,6 +62,7 @@ var AppMenuButton = GObject.registerClass({
 
         let iconEffect = new Clutter.DesaturateEffect();
         this._iconBox = new St.Bin({
+            context: St.get_clutter_context(),
             style_class: 'app-menu-icon',
             y_align: Clutter.ActorAlign.CENTER,
         });
@@ -67,8 +74,11 @@ var AppMenuButton = GObject.registerClass({
             iconEffect.enabled = themeNode.get_icon_style() == St.IconStyle.SYMBOLIC;
         });
 
-        this._label = new St.Label({ y_expand: true,
-                                     y_align: Clutter.ActorAlign.CENTER });
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+            y_expand: true,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         this._container.add_actor(this._label);
 
         this._visible = !Main.overview.visible;
@@ -268,8 +278,11 @@ class ActivitiesButton extends PanelMenu.Button {
 
         /* Translators: If there is no suitable word for "Activities"
            in your language, you can use the word for "Overview". */
-        this._label = new St.Label({ text: _("Activities"),
-                                     y_align: Clutter.ActorAlign.CENTER });
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+            text: _("Activities"),
+            y_align: Clutter.ActorAlign.CENTER
+        });
         this.add_actor(this._label);
 
         this.label_actor = this._label;
@@ -349,7 +362,10 @@ class PanelCorner extends St.DrawingArea {
     _init(side) {
         this._side = side;
 
-        super._init({ style_class: 'panel-corner' });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'panel-corner'
+        });
     }
 
     _findRightmostButton(container) {
@@ -559,7 +575,10 @@ class AggregateMenu extends PanelMenu.Button {
         let menuLayout = new AggregateLayout();
         this.menu.box.set_layout_manager(menuLayout);
 
-        this._indicators = new St.BoxLayout({ style_class: 'panel-status-indicators-box' });
+        this._indicators = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'panel-status-indicators-box'
+        });
         this.add_child(this._indicators);
 
         if (Config.HAVE_NETWORKMANAGER)
@@ -637,8 +656,11 @@ const PANEL_ITEM_IMPLEMENTATIONS = {
 var Panel = GObject.registerClass(
 class Panel extends St.Widget {
     _init() {
-        super._init({ name: 'panel',
-                      reactive: true });
+        super._init({
+            context: St.get_clutter_context(),
+            name: 'panel',
+            reactive: true
+        });
 
         this.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
 
@@ -648,11 +670,20 @@ class Panel extends St.Widget {
 
         this.menuManager = new PopupMenu.PopupMenuManager(this);
 
-        this._leftBox = new St.BoxLayout({ name: 'panelLeft' });
+        this._leftBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'panelLeft'
+        });
         this.add_child(this._leftBox);
-        this._centerBox = new St.BoxLayout({ name: 'panelCenter' });
+        this._centerBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'panelCenter'
+        });
         this.add_child(this._centerBox);
-        this._rightBox = new St.BoxLayout({ name: 'panelRight' });
+        this._rightBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            name: 'panelRight'
+        });
         this.add_child(this._rightBox);
 
         this._leftCorner = new PanelCorner(St.Side.LEFT);

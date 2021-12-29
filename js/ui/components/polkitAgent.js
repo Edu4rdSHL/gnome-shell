@@ -58,6 +58,7 @@ var AuthenticationDialog = GObject.registerClass({
         this._user = AccountsService.UserManager.get_default().get_user(userName);
 
         let userBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'polkit-dialog-user-layout',
             vertical: true,
         });
@@ -70,6 +71,7 @@ var AuthenticationDialog = GObject.registerClass({
         userBox.add_child(this._userAvatar);
 
         this._userLabel = new St.Label({
+            context: St.get_clutter_context(),
             style_class: userName === 'root'
                 ? 'polkit-dialog-user-root-label'
                 : 'polkit-dialog-user-label',
@@ -81,11 +83,13 @@ var AuthenticationDialog = GObject.registerClass({
         userBox.add_child(this._userLabel);
 
         let passwordBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-password-layout',
             vertical: true,
         });
 
         this._passwordEntry = new St.PasswordEntry({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-password-entry',
             text: "",
             can_focus: true,
@@ -99,7 +103,10 @@ var AuthenticationDialog = GObject.registerClass({
             GObject.BindingFlags.SYNC_CREATE);
         passwordBox.add_child(this._passwordEntry);
 
-        let warningBox = new St.BoxLayout({ vertical: true });
+        let warningBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true
+        });
 
         let capsLockWarning = new ShellEntry.CapsLockWarning();
         this._passwordEntry.bind_property('visible',
@@ -108,6 +115,7 @@ var AuthenticationDialog = GObject.registerClass({
         warningBox.add_child(capsLockWarning);
 
         this._errorMessageLabel = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-error-label',
             visible: false,
         });
@@ -116,6 +124,7 @@ var AuthenticationDialog = GObject.registerClass({
         warningBox.add_child(this._errorMessageLabel);
 
         this._infoMessageLabel = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'prompt-dialog-info-label',
             visible: false,
         });
@@ -127,7 +136,10 @@ var AuthenticationDialog = GObject.registerClass({
          * infoMessage and errorMessageLabel - but it is still invisible because
          * gnome-shell.css sets the color to be transparent
          */
-        this._nullMessageLabel = new St.Label({ style_class: 'prompt-dialog-null-label' });
+        this._nullMessageLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'prompt-dialog-null-label'
+        });
         this._nullMessageLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         this._nullMessageLabel.clutter_text.line_wrap = true;
         warningBox.add_child(this._nullMessageLabel);

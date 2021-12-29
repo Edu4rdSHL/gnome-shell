@@ -94,6 +94,7 @@ var CtrlAltTabManager = class CtrlAltTabManager {
                         icon = app.create_icon_texture(POPUP_APPICON_SIZE);
                     } else {
                         icon = new St.Icon({
+                            context: St.get_clutter_context(),
                             gicon: textureCache.bind_cairo_surface_property(windows[i], 'icon'),
                             icon_size: POPUP_APPICON_SIZE,
                         });
@@ -171,17 +172,24 @@ class CtrlAltTabSwitcher extends SwitcherPopup.SwitcherList {
     }
 
     _addIcon(item) {
-        let box = new St.BoxLayout({ style_class: 'alt-tab-app',
-                                     vertical: true });
+        let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'alt-tab-app',
+            vertical: true
+        });
 
         let icon = item.iconActor;
         if (!icon) {
-            icon = new St.Icon({ icon_name: item.iconName,
-                                 icon_size: POPUP_APPICON_SIZE });
+            icon = new St.Icon({
+                context: St.get_clutter_context(),
+                icon_name: item.iconName,
+                icon_size: POPUP_APPICON_SIZE
+            });
         }
         box.add_child(icon);
 
         let text = new St.Label({
+            context: St.get_clutter_context(),
             text: item.name,
             x_align: Clutter.ActorAlign.CENTER,
         });

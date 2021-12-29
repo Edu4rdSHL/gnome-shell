@@ -86,6 +86,7 @@ var InhibitShortcutsDialog = GObject.registerClass({
         let restoreAccel = this._getRestoreAccel();
         if (restoreAccel) {
             let restoreLabel = new St.Label({
+                context: St.get_clutter_context(),
                 /* Translators: %s is a keyboard shortcut like "Super+x" */
                 text: _('You can restore shortcuts by pressing %s.').format(restoreAccel),
                 style_class: 'message-dialog-description',

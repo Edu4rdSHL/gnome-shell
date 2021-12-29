@@ -37,7 +37,10 @@ class WelcomeDialog extends ModalDialog.ModalDialog {
         const description = _('If you want to learn your way around, check out the tour.');
         const content = new Dialog.MessageDialogContent({ title, description });
 
-        const icon = new St.Widget({ style_class: 'welcome-dialog-image' });
+        const icon = new St.Widget({
+            context: St.get_clutter_context(),
+            style_class: 'welcome-dialog-image'
+        });
         content.insert_child_at_index(icon, 0);
 
         this.contentLayout.add_child(content);

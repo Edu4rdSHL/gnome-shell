@@ -190,6 +190,31 @@ st_label_dispose (GObject   *object)
 }
 
 static void
+st_label_constructed (GObject *object)
+{
+  StLabel *label = ST_LABEL (object);
+  ClutterActor *actor = CLUTTER_ACTOR (label);
+  ClutterContext *clutter_context = clutter_actor_get_context (actor);
+  StLabelPrivate *priv;
+
+  label->priv = priv = st_label_get_instance_private (label);
+
+  label->priv->label = g_object_new (CLUTTER_TYPE_TEXT,
+                                     "context", clutter_context,
+                                     "ellipsize", PANGO_ELLIPSIZE_END,
+                                     NULL);
+  label->priv->text_shadow_pipeline = NULL;
+  label->priv->shadow_width = -1.;
+  label->priv->shadow_height = -1.;
+
+  clutter_actor_add_child (actor, priv->label);
+
+  clutter_actor_set_offscreen_redirect (actor,
+                                        CLUTTER_OFFSCREEN_REDIRECT_ALWAYS);
+  G_OBJECT_CLASS (st_label_parent_class)->constructed (object);
+}
+
+static void
 st_label_paint (ClutterActor        *actor,
                 ClutterPaintContext *paint_context)
 {
@@ -264,6 +289,7 @@ st_label_class_init (StLabelClass *klass)
   gobject_class->set_property = st_label_set_property;
   gobject_class->get_property = st_label_get_property;
   gobject_class->dispose = st_label_dispose;
+  gobject_class->constructed = st_label_constructed;
 
   actor_class->paint = st_label_paint;
   actor_class->allocate = st_label_allocate;
@@ -304,26 +330,11 @@ st_label_class_init (StLabelClass *klass)
 static void
 st_label_init (StLabel *label)
 {
-  ClutterActor *actor = CLUTTER_ACTOR (label);
-  StLabelPrivate *priv;
-
-  label->priv = priv = st_label_get_instance_private (label);
-
-  label->priv->label = g_object_new (CLUTTER_TYPE_TEXT,
-                                     "ellipsize", PANGO_ELLIPSIZE_END,
-                                     NULL);
-  label->priv->text_shadow_pipeline = NULL;
-  label->priv->shadow_width = -1.;
-  label->priv->shadow_height = -1.;
-
-  clutter_actor_add_child (actor, priv->label);
-
-  clutter_actor_set_offscreen_redirect (actor,
-                                        CLUTTER_OFFSCREEN_REDIRECT_ALWAYS);
 }
 
 /**
  * st_label_new:
+ * @clutter_context: the Clutter context
  * @text: (nullable): text to set the label to
  *
  * Create a new #StLabel with the label specified by @text.
@@ -331,14 +342,22 @@ st_label_init (StLabel *label)
  * Returns: a new #StLabel
  */
 StWidget *
-st_label_new (const gchar *text)
+st_label_new (ClutterContext *clutter_context,
+              const char     *text)
 {
   if (text == NULL || *text == '\0')
-    return g_object_new (ST_TYPE_LABEL, NULL);
+    {
+      return g_object_new (ST_TYPE_LABEL,
+                           "context", clutter_context,
+                           NULL);
+    }
   else
-    return g_object_new (ST_TYPE_LABEL,
-                         "text", text,
-                         NULL);
+    {
+      return g_object_new (ST_TYPE_LABEL,
+                           "context", clutter_context,
+                           "text", text,
+                           NULL);
+    }
 }
 
 /**
