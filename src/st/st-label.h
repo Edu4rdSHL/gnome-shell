@@ -47,7 +47,8 @@ struct _StLabel
   StLabelPrivate *priv;
 };
 
-StWidget *     st_label_new              (const gchar *text);
+StWidget *     st_label_new              (ClutterContext *clutter_context,
+                                          const char     *text);
 const gchar *  st_label_get_text         (StLabel     *label);
 void           st_label_set_text         (StLabel     *label,
                                           const gchar *text);

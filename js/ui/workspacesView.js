@@ -27,6 +27,7 @@ var WorkspacesViewBase = GObject.registerClass({
 }, class WorkspacesViewBase extends St.Widget {
     _init(monitorIndex, overviewAdjustment) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'workspaces-view',
             x_expand: true,
             y_expand: true,
@@ -609,6 +610,7 @@ class SecondaryMonitorDisplay extends St.Widget {
         this._overviewAdjustment = overviewAdjustment;
 
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'secondary-monitor-workspaces',
             constraints: new Layout.MonitorConstraint({
                 index: this._monitorIndex,
@@ -835,6 +837,7 @@ var WorkspacesDisplay = GObject.registerClass(
 class WorkspacesDisplay extends St.Widget {
     _init(controls, scrollAdjustment, overviewAdjustment) {
         super._init({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
         });
 

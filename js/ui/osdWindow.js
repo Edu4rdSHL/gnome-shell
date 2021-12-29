@@ -45,6 +45,7 @@ var OsdWindow = GObject.registerClass(
 class OsdWindow extends St.Widget {
     _init(monitorIndex) {
         super._init({
+            context: St.get_clutter_context(),
             x_expand: true,
             y_expand: true,
             x_align: Clutter.ActorAlign.CENTER,
@@ -56,15 +57,23 @@ class OsdWindow extends St.Widget {
         this.add_constraint(constraint);
 
         this._boxConstraint = new OsdWindowConstraint();
-        this._box = new St.BoxLayout({ style_class: 'osd-window',
-                                       vertical: true });
+        this._box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'osd-window',
+            vertical: true
+        });
         this._box.add_constraint(this._boxConstraint);
         this.add_actor(this._box);
 
-        this._icon = new St.Icon({ y_expand: true });
+        this._icon = new St.Icon({
+            context: St.get_clutter_context(),
+            y_expand: true
+        });
         this._box.add_child(this._icon);
 
-        this._label = new St.Label();
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+        });
         this._box.add(this._label);
 
         this._level = new BarLevel.BarLevel({

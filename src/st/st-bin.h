@@ -43,7 +43,7 @@ struct _StBinClass
   StWidgetClass parent_class;
 };
 
-StWidget   *  st_bin_new           (void);
+StWidget   *  st_bin_new           (ClutterContext *clutter_context);
 void          st_bin_set_child     (StBin        *bin,
                                     ClutterActor *child);
 ClutterActor *st_bin_get_child     (StBin        *bin);

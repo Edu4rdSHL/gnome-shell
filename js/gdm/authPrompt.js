@@ -50,6 +50,7 @@ var AuthPrompt = GObject.registerClass({
 }, class AuthPrompt extends St.BoxLayout {
     _init(gdmClient, mode) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'login-dialog-prompt-layout',
             vertical: true,
             x_expand: true,
@@ -83,6 +84,7 @@ var AuthPrompt = GObject.registerClass({
         this.connect('destroy', this._onDestroy.bind(this));
 
         this._userWell = new St.Bin({
+            context: St.get_clutter_context(),
             x_expand: true,
             y_expand: true,
         });
@@ -92,7 +94,9 @@ var AuthPrompt = GObject.registerClass({
 
         this._initEntryRow();
 
-        let capsLockPlaceholder = new St.Label();
+        let capsLockPlaceholder = new St.Label({
+            context: St.get_clutter_context(),
+        });
         this.add_child(capsLockPlaceholder);
 
         this._capsLockWarningLabel = new ShellEntry.CapsLockWarning({
@@ -106,6 +110,7 @@ var AuthPrompt = GObject.registerClass({
             GObject.BindingFlags.SYNC_CREATE | GObject.BindingFlags.INVERT_BOOLEAN);
 
         this._message = new St.Label({
+            context: St.get_clutter_context(),
             opacity: 0,
             styleClass: 'login-dialog-message',
             y_expand: true,
@@ -131,12 +136,14 @@ var AuthPrompt = GObject.registerClass({
 
     _initEntryRow() {
         this._mainBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'login-dialog-button-box',
             vertical: false,
         });
         this.add_child(this._mainBox);
 
         this.cancelButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'modal-dialog-button button cancel-button',
             accessible_name: _('Cancel'),
             button_mask: St.ButtonMask.ONE | St.ButtonMask.THREE,
@@ -153,6 +160,7 @@ var AuthPrompt = GObject.registerClass({
         this._mainBox.add_child(this.cancelButton);
 
         let entryParams = {
+            context: St.get_clutter_context(),
             style_class: 'login-dialog-prompt-entry',
             can_focus: true,
             x_expand: true,
@@ -171,6 +179,7 @@ var AuthPrompt = GObject.registerClass({
         this._entry.grab_key_focus();
 
         this._timedLoginIndicator = new St.Bin({
+            context: St.get_clutter_context(),
             style_class: 'login-dialog-timed-login-indicator',
             scale_x: 0,
         });
@@ -191,6 +200,7 @@ var AuthPrompt = GObject.registerClass({
         });
 
         this._defaultButtonWell = new St.Widget({
+            context: St.get_clutter_context(),
             layout_manager: new Clutter.BinLayout(),
             x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.CENTER,

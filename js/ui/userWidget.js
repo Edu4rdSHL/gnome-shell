@@ -25,6 +25,7 @@ class Avatar extends St.Bin {
         });
 
         super._init({
+            context: St.get_clutter_context(),
             style_class: params.styleClass,
             reactive: params.reactive,
             width: params.iconSize * themeContext.scaleFactor,
@@ -97,6 +98,7 @@ class Avatar extends St.Bin {
         } else {
             this.style = null;
             this.child = new St.Icon({
+                context: St.get_clutter_context(),
                 icon_name: 'avatar-default-symbolic',
                 icon_size: this._iconSize,
             });
@@ -107,16 +109,25 @@ class Avatar extends St.Bin {
 var UserWidgetLabel = GObject.registerClass(
 class UserWidgetLabel extends St.Widget {
     _init(user) {
-        super._init({ layout_manager: new Clutter.BinLayout() });
+        super._init({
+            context: St.get_clutter_context(),
+            layout_manager: new Clutter.BinLayout()
+        });
 
         this._user = user;
 
-        this._realNameLabel = new St.Label({ style_class: 'user-widget-label',
-                                             y_align: Clutter.ActorAlign.CENTER });
+        this._realNameLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'user-widget-label',
+            y_align: Clutter.ActorAlign.CENTER
+        });
         this.add_child(this._realNameLabel);
 
-        this._userNameLabel = new St.Label({ style_class: 'user-widget-label',
-                                             y_align: Clutter.ActorAlign.CENTER });
+        this._userNameLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'user-widget-label',
+            y_align: Clutter.ActorAlign.CENTER
+        });
         this.add_child(this._userNameLabel);
 
         this._currentLabel = null;
@@ -198,6 +209,7 @@ class UserWidget extends St.BoxLayout {
         let styleClass = vertical ? 'user-widget vertical' : 'user-widget horizontal';
 
         super._init({
+            context: St.get_clutter_context(),
             styleClass,
             vertical,
             xAlign,
@@ -222,6 +234,7 @@ class UserWidget extends St.BoxLayout {
             this._userChangedId = this._user.connect('changed', this._updateUser.bind(this));
         } else {
             this._label = new St.Label({
+                context: St.get_clutter_context(),
                 style_class: 'user-widget-label',
                 text: 'Empty User',
                 opacity: 0,

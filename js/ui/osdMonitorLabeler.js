@@ -8,16 +8,26 @@ const Main = imports.ui.main;
 var OsdMonitorLabel = GObject.registerClass(
 class OsdMonitorLabel extends St.Widget {
     _init(monitor, label) {
-        super._init({ x_expand: true, y_expand: true });
+        super._init({
+            context: St.get_clutter_context(),
+            x_expand: true,
+            y_expand: true
+        });
 
         this._monitor = monitor;
 
-        this._box = new St.BoxLayout({ style_class: 'osd-window',
-                                       vertical: true });
+        this._box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'osd-window',
+            vertical: true
+        });
         this.add_actor(this._box);
 
-        this._label = new St.Label({ style_class: 'osd-monitor-label',
-                                     text: label });
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'osd-monitor-label',
+            text: label
+        });
         this._box.add(this._label);
 
         Main.uiGroup.add_child(this);

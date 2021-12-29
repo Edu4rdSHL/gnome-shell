@@ -18,6 +18,14 @@ var MAX_LIST_SEARCH_RESULTS_ROWS = 5;
 
 var MaxWidthBox = GObject.registerClass(
 class MaxWidthBox extends St.BoxLayout {
+    _init(params) {
+        const defaultParams = {
+            context: St.get_clutter_context(),
+        };
+
+        super._init(Object.assign(defaultParams, params));
+    }
+
     vfunc_allocate(box) {
         let themeNode = this.get_theme_node();
         let maxWidth = themeNode.get_max_width();
@@ -42,6 +50,7 @@ class SearchResult extends St.Button {
         this._resultsView = resultsView;
 
         super._init({
+            context: St.get_clutter_context(),
             reactive: true,
             can_focus: true,
             track_hover: true,
@@ -71,6 +80,7 @@ class ListSearchResult extends SearchResult {
         this.style_class = 'list-search-result';
 
         let content = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'list-search-result-content',
             vertical: false,
             x_align: Clutter.ActorAlign.START,
@@ -82,6 +92,7 @@ class ListSearchResult extends SearchResult {
         this._termsChangedId = 0;
 
         let titleBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'list-search-result-title',
             y_align: Clutter.ActorAlign.CENTER,
         });
@@ -94,6 +105,7 @@ class ListSearchResult extends SearchResult {
             titleBox.add(icon);
 
         let title = new St.Label({
+            context: St.get_clutter_context(),
             text: this.metaInfo['name'],
             y_align: Clutter.ActorAlign.CENTER,
         });
@@ -103,6 +115,7 @@ class ListSearchResult extends SearchResult {
 
         if (this.metaInfo['description']) {
             this._descriptionLabel = new St.Label({
+                context: St.get_clutter_context(),
                 style_class: 'list-search-result-description',
                 y_align: Clutter.ActorAlign.CENTER,
             });
@@ -144,6 +157,7 @@ class GridSearchResult extends SearchResult {
         this.icon = new IconGrid.BaseIcon(this.metaInfo['name'],
                                           { createIcon: this.metaInfo['createIcon'] });
         let content = new St.Bin({
+            context: St.get_clutter_context(),
             child: this.icon,
             x_align: Clutter.ActorAlign.START,
             x_expand: true,
@@ -164,7 +178,11 @@ var SearchResultsBase = GObject.registerClass({
     },
 }, class SearchResultsBase extends St.BoxLayout {
     _init(provider, resultsView) {
-        super._init({ style_class: 'search-section', vertical: true });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'search-section',
+            vertical: true
+        });
 
         this.provider = provider;
         this._resultsView = resultsView;
@@ -172,10 +190,15 @@ var SearchResultsBase = GObject.registerClass({
         this._terms = [];
         this._focusChild = null;
 
-        this._resultDisplayBin = new St.Bin();
+        this._resultDisplayBin = new St.Bin({
+            context: St.get_clutter_context(),
+        });
         this.add_child(this._resultDisplayBin);
 
-        let separator = new St.Widget({ style_class: 'search-section-separator' });
+        let separator = new St.Widget({
+            context: St.get_clutter_context(),
+            style_class: 'search-section-separator'
+        });
         this.add(separator);
 
         this._resultDisplays = {};
@@ -300,7 +323,10 @@ class ListSearchResults extends SearchResultsBase {
     _init(provider, resultsView) {
         super._init(provider, resultsView);
 
-        this._container = new St.BoxLayout({ style_class: 'search-section-content' });
+        this._container = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'search-section-content'
+        });
         this.providerInfo = new ProviderInfo(provider);
         this.providerInfo.connect('key-focus-in', this._keyFocusIn.bind(this));
         this.providerInfo.connect('clicked', () => {
@@ -312,6 +338,7 @@ class ListSearchResults extends SearchResultsBase {
         this._container.add_child(this.providerInfo);
 
         this._content = new St.BoxLayout({
+            context: St.get_clutter_context(),
             style_class: 'list-search-results',
             vertical: true,
             x_expand: true,
@@ -474,7 +501,10 @@ class GridSearchResults extends SearchResultsBase {
     _init(provider, resultsView) {
         super._init(provider, resultsView);
 
-        this._grid = new St.Widget({ style_class: 'grid-search-results' });
+        this._grid = new St.Widget({
+            context: St.get_clutter_context(),
+            style_class: 'grid-search-results'
+        });
         this._grid.layout_manager = new GridSearchResultsLayout();
 
         this._grid.connect('style-changed', () => {
@@ -483,6 +513,7 @@ class GridSearchResults extends SearchResultsBase {
         });
 
         this._resultDisplayBin.set_child(new St.Bin({
+            context: St.get_clutter_context(),
             child: this._grid,
             x_align: Clutter.ActorAlign.CENTER,
         }));
@@ -554,7 +585,11 @@ var SearchResultsView = GObject.registerClass({
     Signals: { 'terms-changed': {} },
 }, class SearchResultsView extends St.BoxLayout {
     _init() {
-        super._init({ name: 'searchResults', vertical: true });
+        super._init({
+            context: St.get_clutter_context(),
+            name: 'searchResults',
+            vertical: true
+        });
 
         this._parentalControlsManager = ParentalControlsManager.getDefault();
         this._parentalControlsManager.connect('app-filter-changed', this._reloadRemoteProviders.bind(this));
@@ -566,6 +601,7 @@ var SearchResultsView = GObject.registerClass({
         });
 
         this._scrollView = new St.ScrollView({
+            context: St.get_clutter_context(),
             overlay_scrollbars: true,
             style_class: 'search-display vfade',
             x_expand: true,
@@ -581,11 +617,15 @@ var SearchResultsView = GObject.registerClass({
         this.add_child(this._scrollView);
 
         this._statusText = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'search-statustext',
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._statusBin = new St.Bin({ y_expand: true });
+        this._statusBin = new St.Bin({
+            context: St.get_clutter_context(),
+            y_expand: true
+        });
         this.add_child(this._statusBin);
         this._statusBin.add_actor(this._statusText);
 
@@ -904,6 +944,7 @@ class ProviderInfo extends St.Button {
     _init(provider) {
         this.provider = provider;
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'search-provider-icon',
             reactive: true,
             can_focus: true,
@@ -912,21 +953,36 @@ class ProviderInfo extends St.Button {
             y_align: Clutter.ActorAlign.START,
         });
 
-        this._content = new St.BoxLayout({ vertical: false,
-                                           style_class: 'list-search-provider-content' });
+        this._content = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: false,
+            style_class: 'list-search-provider-content'
+        });
         this.set_child(this._content);
 
-        let icon = new St.Icon({ icon_size: this.PROVIDER_ICON_SIZE,
-                                 gicon: provider.appInfo.get_icon() });
+        let icon = new St.Icon({
+            context: St.get_clutter_context(),
+            icon_size: this.PROVIDER_ICON_SIZE,
+            gicon: provider.appInfo.get_icon()
+        });
 
-        let detailsBox = new St.BoxLayout({ style_class: 'list-search-provider-details',
-                                            vertical: true,
-                                            x_expand: true });
+        let detailsBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'list-search-provider-details',
+            vertical: true,
+            x_expand: true
+        });
 
-        let nameLabel = new St.Label({ text: provider.appInfo.get_name(),
-                                       x_align: Clutter.ActorAlign.START });
+        let nameLabel = new St.Label({
+            context: St.get_clutter_context(),
+            text: provider.appInfo.get_name(),
+            x_align: Clutter.ActorAlign.START
+        });
 
-        this._moreLabel = new St.Label({ x_align: Clutter.ActorAlign.START });
+        this._moreLabel = new St.Label({
+            context: St.get_clutter_context(),
+            x_align: Clutter.ActorAlign.START
+        });
 
         detailsBox.add_actor(nameLabel);
         detailsBox.add_actor(this._moreLabel);

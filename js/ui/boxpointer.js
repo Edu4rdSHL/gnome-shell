@@ -31,7 +31,9 @@ var BoxPointer = GObject.registerClass({
     Signals: { 'arrow-side-changed': {} },
 }, class BoxPointer extends St.Widget {
     _init(arrowSide, binProperties) {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
 
         this.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
 
@@ -39,9 +41,15 @@ var BoxPointer = GObject.registerClass({
         this._userArrowSide = arrowSide;
         this._arrowOrigin = 0;
         this._arrowActor = null;
-        this.bin = new St.Bin(binProperties);
+        const defaultBinProperties = {
+            context: St.get_clutter_context(),
+        };
+        this.bin = new St.Bin(Object.assign(
+            defaultBinProperties, binProperties));
         this.add_actor(this.bin);
-        this._border = new St.DrawingArea();
+        this._border = new St.DrawingArea({
+            context: St.get_clutter_context(),
+        });
         this._border.connect('repaint', this._drawBorder.bind(this));
         this.add_actor(this._border);
         this.set_child_above_sibling(this.bin, this._border);

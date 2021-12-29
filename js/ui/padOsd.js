@@ -27,6 +27,7 @@ var PadChooser = GObject.registerClass({
 }, class PadChooser extends St.Button {
     _init(device, groupDevices) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'pad-chooser-button',
             toggle_mode: true,
         });
@@ -34,6 +35,7 @@ var PadChooser = GObject.registerClass({
         this._padChooserMenu = null;
 
         let arrow = new St.Icon({
+            context: St.get_clutter_context(),
             style_class: 'popup-menu-arrow',
             icon_name: 'pan-down-symbolic',
             accessible_role: Atk.Role.ARROW,
@@ -92,7 +94,11 @@ var KeybindingEntry = GObject.registerClass({
     Signals: { 'keybinding-edited': { param_types: [GObject.TYPE_STRING] } },
 }, class KeybindingEntry extends St.Entry {
     _init() {
-        super._init({ hint_text: _("New shortcut…"), style: 'width: 10em' });
+        super._init({
+            context: St.get_clutter_context(),
+            hint_text: _("New shortcut…"),
+            style: 'width: 10em'
+        });
     }
 
     vfunc_captured_event(event) {
@@ -113,22 +119,34 @@ var ActionComboBox = GObject.registerClass({
     Signals: { 'action-selected': { param_types: [GObject.TYPE_INT] } },
 }, class ActionComboBox extends St.Button {
     _init() {
-        super._init({ style_class: 'button' });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'button'
+        });
         this.set_toggle_mode(true);
 
         let boxLayout = new Clutter.BoxLayout({ orientation: Clutter.Orientation.HORIZONTAL,
                                                 spacing: 6 });
-        let box = new St.Widget({ layout_manager: boxLayout });
+        let box = new St.Widget({
+            context: St.get_clutter_context(),
+            layout_manager: boxLayout
+        });
         this.set_child(box);
 
-        this._label = new St.Label({ style_class: 'combo-box-label' });
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'combo-box-label'
+        });
         box.add_child(this._label);
 
-        let arrow = new St.Icon({ style_class: 'popup-menu-arrow',
-                                  icon_name: 'pan-down-symbolic',
-                                  accessible_role: Atk.Role.ARROW,
-                                  y_expand: true,
-                                  y_align: Clutter.ActorAlign.CENTER });
+        let arrow = new St.Icon({
+            context: St.get_clutter_context(),
+            style_class: 'popup-menu-arrow',
+            icon_name: 'pan-down-symbolic',
+            accessible_role: Atk.Role.ARROW,
+            y_expand: true,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         box.add_child(arrow);
 
         this._editMenu = new PopupMenu.PopupMenu(this, 0, St.Side.TOP);
@@ -198,7 +216,10 @@ var ActionEditor = GObject.registerClass({
         let boxLayout = new Clutter.BoxLayout({ orientation: Clutter.Orientation.HORIZONTAL,
                                                 spacing: 12 });
 
-        super._init({ layout_manager: boxLayout });
+        super._init({
+            context: St.get_clutter_context(),
+            layout_manager: boxLayout
+        });
 
         this._actionComboBox = new ActionComboBox();
         this._actionComboBox.connect('action-selected', this._onActionSelected.bind(this));
@@ -208,9 +229,12 @@ var ActionEditor = GObject.registerClass({
         this._keybindingEdit.connect('keybinding-edited', this._onKeybindingEdited.bind(this));
         this.add_actor(this._keybindingEdit);
 
-        this._doneButton = new St.Button({ label: _("Done"),
-                                           style_class: 'button',
-                                           x_expand: false });
+        this._doneButton = new St.Button({
+            context: St.get_clutter_context(),
+            label: _("Done"),
+            style_class: 'button',
+            x_expand: false
+        });
         this._doneButton.connect('clicked', this._onEditingDone.bind(this));
         this.add_actor(this._doneButton);
     }
@@ -302,7 +326,10 @@ var PadDiagram = GObject.registerClass({
         this._css = new TextDecoder().decode(css);
         this._labels = [];
         this._activeButtons = [];
-        super._init(params);
+        const defaultParams = {
+            context: St.get_clutter_context(),
+        };
+        super._init(Object.assign(defaultParams, params));
     }
 
     get image() {
@@ -553,7 +580,9 @@ var PadDiagram = GObject.registerClass({
         if (!found)
             return false;
 
-        let label = new St.Label();
+        let label = new St.Label({
+            context: St.get_clutter_context(),
+        });
         this._labels.push({ label, action, idx, dir, x, y, arrangement });
         this.add_actor(label);
         return true;
@@ -626,6 +655,7 @@ var PadOsd = GObject.registerClass({
 }, class PadOsd extends St.BoxLayout {
     _init(padDevice, settings, imagePath, editionMode, monitorIndex) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'pad-osd-window',
             vertical: true,
             x_expand: true,
@@ -675,23 +705,35 @@ var PadOsd = GObject.registerClass({
         let constraint = new Layout.MonitorConstraint({ index: monitorIndex });
         this.add_constraint(constraint);
 
-        this._titleBox = new St.BoxLayout({ style_class: 'pad-osd-title-box',
-                                            vertical: false,
-                                            x_expand: false,
-                                            x_align: Clutter.ActorAlign.CENTER });
+        this._titleBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'pad-osd-title-box',
+            vertical: false,
+            x_expand: false,
+            x_align: Clutter.ActorAlign.CENTER
+        });
         this.add_actor(this._titleBox);
 
-        let labelBox = new St.BoxLayout({ style_class: 'pad-osd-title-menu-box',
-                                          vertical: true });
+        let labelBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'pad-osd-title-menu-box',
+            vertical: true
+        });
         this._titleBox.add_actor(labelBox);
 
-        this._titleLabel = new St.Label({ style: 'font-side: larger; font-weight: bold;',
-                                          x_align: Clutter.ActorAlign.CENTER });
+        this._titleLabel = new St.Label({
+            context: St.get_clutter_context(),
+            style: 'font-side: larger; font-weight: bold;',
+            x_align: Clutter.ActorAlign.CENTER
+        });
         this._titleLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.NONE);
         this._titleLabel.clutter_text.set_text(padDevice.get_device_name());
         labelBox.add_actor(this._titleLabel);
 
-        this._tipLabel = new St.Label({ x_align: Clutter.ActorAlign.CENTER });
+        this._tipLabel = new St.Label({
+            context: St.get_clutter_context(),
+            x_align: Clutter.ActorAlign.CENTER
+        });
         labelBox.add_actor(this._tipLabel);
 
         this._updatePadChooser();
@@ -707,12 +749,16 @@ var PadOsd = GObject.registerClass({
         this.add_actor(this._padDiagram);
         this._updateActionLabels();
 
-        let buttonBox = new St.Widget({ layout_manager: new Clutter.BinLayout(),
-                                        x_expand: true,
-                                        x_align: Clutter.ActorAlign.CENTER,
-                                        y_align: Clutter.ActorAlign.CENTER });
+        let buttonBox = new St.Widget({
+            context: St.get_clutter_context(),
+            layout_manager: new Clutter.BinLayout(),
+            x_expand: true,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         this.add_actor(buttonBox);
         this._editButton = new St.Button({
+            context: St.get_clutter_context(),
             label: _('Edit…'),
             style_class: 'button',
             can_focus: true,
