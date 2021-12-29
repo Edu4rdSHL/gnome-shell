@@ -14,6 +14,7 @@ var PageIndicators = GObject.registerClass({
     _init(orientation = Clutter.Orientation.VERTICAL) {
         let vertical = orientation == Clutter.Orientation.VERTICAL;
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'page-indicators',
             vertical,
             x_expand: true, y_expand: true,
@@ -54,12 +55,16 @@ var PageIndicators = GObject.registerClass({
         if (diff > 0) {
             for (let i = 0; i < diff; i++) {
                 let pageIndex = this._nPages + i;
-                let indicator = new St.Button({ style_class: 'page-indicator',
-                                                button_mask: St.ButtonMask.ONE |
-                                                             St.ButtonMask.TWO |
-                                                             St.ButtonMask.THREE,
-                                                reactive: this._reactive });
+                let indicator = new St.Button({
+                    context: St.get_clutter_context(),
+                    style_class: 'page-indicator',
+                    button_mask: St.ButtonMask.ONE |
+                                 St.ButtonMask.TWO |
+                                 St.ButtonMask.THREE,
+                    reactive: this._reactive
+                });
                 indicator.child = new St.Widget({
+                    context: St.get_clutter_context(),
                     style_class: 'page-indicator-icon',
                     pivot_point: new Graphene.Point({ x: 0.5, y: 0.5 }),
                 });

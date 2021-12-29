@@ -415,6 +415,7 @@ var Calendar = GObject.registerClass({
         this._shouldDateGrabFocus = false;
 
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'calendar',
             layout_manager: new Clutter.GridLayout(),
             reactive: true,
@@ -462,17 +463,26 @@ var Calendar = GObject.registerClass({
         this.destroy_all_children();
 
         // Top line of the calendar '<| September 2009 |>'
-        this._topBox = new St.BoxLayout();
+        this._topBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+        });
         layout.attach(this._topBox, 0, 0, offsetCols + 7, 1);
 
-        this._backButton = new St.Button({ style_class: 'calendar-change-month-back pager-button',
-                                           accessible_name: _("Previous month"),
-                                           can_focus: true });
-        this._backButton.add_actor(new St.Icon({ icon_name: 'pan-start-symbolic' }));
+        this._backButton = new St.Button({
+            context: St.get_clutter_context(),
+            style_class: 'calendar-change-month-back pager-button',
+            accessible_name: _("Previous month"),
+            can_focus: true
+        });
+        this._backButton.add_actor(new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: 'pan-start-symbolic'
+        }));
         this._topBox.add(this._backButton);
         this._backButton.connect('clicked', this._onPrevMonthButtonClicked.bind(this));
 
         this._monthLabel = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'calendar-month-label',
             can_focus: true,
             x_align: Clutter.ActorAlign.CENTER,
@@ -480,10 +490,16 @@ var Calendar = GObject.registerClass({
         });
         this._topBox.add_child(this._monthLabel);
 
-        this._forwardButton = new St.Button({ style_class: 'calendar-change-month-forward pager-button',
-                                              accessible_name: _("Next month"),
-                                              can_focus: true });
-        this._forwardButton.add_actor(new St.Icon({ icon_name: 'pan-end-symbolic' }));
+        this._forwardButton = new St.Button({
+            context: St.get_clutter_context(),
+            style_class: 'calendar-change-month-forward pager-button',
+            accessible_name: _("Next month"),
+            can_focus: true
+        });
+        this._forwardButton.add_actor(new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: 'pan-end-symbolic'
+        }));
         this._topBox.add(this._forwardButton);
         this._forwardButton.connect('clicked', this._onNextMonthButtonClicked.bind(this));
 
@@ -499,9 +515,12 @@ var Calendar = GObject.registerClass({
             // Could use iter.toLocaleFormat('%a') but that normally gives three characters
             // and we want, ideally, a single character for e.g. S M T W T F S
             let customDayAbbrev = _getCalendarDayAbbreviation(iter.getDay());
-            let label = new St.Label({ style_class: 'calendar-day-base calendar-day-heading',
-                                       text: customDayAbbrev,
-                                       can_focus: true });
+            let label = new St.Label({
+                context: St.get_clutter_context(),
+                style_class: 'calendar-day-base calendar-day-heading',
+                text: customDayAbbrev,
+                can_focus: true
+            });
             label.accessible_name = iter.toLocaleFormat('%A');
             let col;
             if (this.get_text_direction() == Clutter.TextDirection.RTL)
@@ -629,8 +648,11 @@ var Calendar = GObject.registerClass({
         let nRows = 8;
         while (row < nRows) {
             // xgettext:no-javascript-format
-            let button = new St.Button({ label: iter.toLocaleFormat(C_("date day number format", "%d")),
-                                         can_focus: true });
+            let button = new St.Button({
+                context: St.get_clutter_context(),
+                label: iter.toLocaleFormat(C_("date day number format", "%d")),
+                can_focus: true
+            });
             let rtl = button.get_text_direction() == Clutter.TextDirection.RTL;
 
             if (this._eventSource instanceof EmptyEventSource)
@@ -682,9 +704,12 @@ var Calendar = GObject.registerClass({
             this._buttons.push(button);
 
             if (this._useWeekdate && iter.getDay() == 4) {
-                let label = new St.Label({ text: iter.toLocaleFormat('%V'),
-                                           style_class: 'calendar-day-base calendar-week-number',
-                                           can_focus: true });
+                let label = new St.Label({
+                    context: St.get_clutter_context(),
+                    text: iter.toLocaleFormat('%V'),
+                    style_class: 'calendar-day-base calendar-week-number',
+                    can_focus: true
+                });
                 let weekFormat = Shell.util_translate_time_string(N_("Week %V"));
                 label.clutter_text.y_align = Clutter.ActorAlign.CENTER;
                 label.accessible_name = iter.toLocaleFormat(weekFormat);
@@ -752,8 +777,11 @@ class NotificationMessage extends MessageList.Message {
 
     _getIcon() {
         if (this.notification.gicon) {
-            return new St.Icon({ gicon: this.notification.gicon,
-                                 icon_size: MESSAGE_ICON_SIZE });
+            return new St.Icon({
+                context: St.get_clutter_context(),
+                gicon: this.notification.gicon,
+                icon_size: MESSAGE_ICON_SIZE
+            });
         } else {
             return this.notification.source.createIcon(MESSAGE_ICON_SIZE);
         }
@@ -794,6 +822,7 @@ var TimeLabel = GObject.registerClass(
 class NotificationTimeLabel extends St.Label {
     _init(datetime) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'event-time',
             x_align: Clutter.ActorAlign.START,
             y_align: Clutter.ActorAlign.END,
@@ -891,15 +920,25 @@ class NotificationSection extends MessageList.MessageListSection {
 var Placeholder = GObject.registerClass(
 class Placeholder extends St.BoxLayout {
     _init() {
-        super._init({ style_class: 'message-list-placeholder', vertical: true });
+        super._init({
+            context: St.get_clutter_context(),
+            style_class: 'message-list-placeholder',
+            vertical: true
+        });
         this._date = new Date();
 
         const file = Gio.File.new_for_uri(
             'resource:///org/gnome/shell/theme/no-notifications.svg');
-        this._icon = new St.Icon({ gicon: new Gio.FileIcon({ file }) });
+        this._icon = new St.Icon({
+            context: St.get_clutter_context(),
+            gicon: new Gio.FileIcon({ file })
+        });
         this.add_actor(this._icon);
 
-        this._label = new St.Label({ text: _('No Notifications') });
+        this._label = new St.Label({
+            context: St.get_clutter_context(),
+            text: _('No Notifications')
+        });
         this.add_actor(this._label);
     }
 });
@@ -928,6 +967,7 @@ var CalendarMessageList = GObject.registerClass(
 class CalendarMessageList extends St.Widget {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'message-list',
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
@@ -937,11 +977,16 @@ class CalendarMessageList extends St.Widget {
         this._placeholder = new Placeholder();
         this.add_actor(this._placeholder);
 
-        let box = new St.BoxLayout({ vertical: true,
-                                     x_expand: true, y_expand: true });
+        let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            vertical: true,
+            x_expand: true,
+            y_expand: true
+        });
         this.add_actor(box);
 
         this._scrollView = new St.ScrollView({
+            context: St.get_clutter_context(),
             style_class: 'vfade',
             overlay_scrollbars: true,
             x_expand: true, y_expand: true,
@@ -949,10 +994,14 @@ class CalendarMessageList extends St.Widget {
         this._scrollView.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
         box.add_actor(this._scrollView);
 
-        let hbox = new St.BoxLayout({ style_class: 'message-list-controls' });
+        let hbox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'message-list-controls'
+        });
         box.add_child(hbox);
 
         const dndLabel = new St.Label({
+            context: St.get_clutter_context(),
             text: _('Do Not Disturb'),
             y_align: Clutter.ActorAlign.CENTER,
         });
@@ -960,6 +1009,7 @@ class CalendarMessageList extends St.Widget {
 
         this._dndSwitch = new DoNotDisturbSwitch();
         this._dndButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'dnd-button',
             can_focus: true,
             toggle_mode: true,
@@ -973,6 +1023,7 @@ class CalendarMessageList extends St.Widget {
         hbox.add_child(this._dndButton);
 
         this._clearButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'message-list-clear-button button',
             label: _('Clear'),
             can_focus: true,
@@ -988,11 +1039,14 @@ class CalendarMessageList extends St.Widget {
             this._clearButton, 'visible',
             GObject.BindingFlags.INVERT_BOOLEAN);
 
-        this._sectionList = new St.BoxLayout({ style_class: 'message-list-sections',
-                                               vertical: true,
-                                               x_expand: true,
-                                               y_expand: true,
-                                               y_align: Clutter.ActorAlign.START });
+        this._sectionList = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'message-list-sections',
+            vertical: true,
+            x_expand: true,
+            y_expand: true,
+            y_align: Clutter.ActorAlign.START
+        });
         this._sectionList.connect('actor-added', this._sync.bind(this));
         this._sectionList.connect('actor-removed', this._sync.bind(this));
         this._scrollView.add_actor(this._sectionList);

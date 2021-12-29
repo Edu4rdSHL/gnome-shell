@@ -280,6 +280,7 @@ class EndSessionDialog extends ModalDialog.ModalDialog {
         this._messageDialogContent.add_child(this._checkBox);
 
         this._batteryWarning = new St.Label({
+            context: St.get_clutter_context(),
             style_class: 'end-session-dialog-battery-warning',
             text: _('Low battery power: please plug in before installing updates.'),
         });

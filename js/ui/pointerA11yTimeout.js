@@ -16,6 +16,7 @@ var PieTimer = GObject.registerClass({
     _init() {
         this._angle = 0;
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'pie-timer',
             opacity: 0,
             visible: false,

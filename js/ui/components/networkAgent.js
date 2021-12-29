@@ -43,6 +43,7 @@ class NetworkSecretDialog extends ModalDialog.ModalDialog {
             let reactive = secret.key != null;
 
             let entryParams = {
+                context: St.get_clutter_context(),
                 style_class: 'prompt-dialog-password-entry',
                 hint_text: secret.label,
                 text: secret.value,
@@ -89,6 +90,7 @@ class NetworkSecretDialog extends ModalDialog.ModalDialog {
 
         if (flags & NM.SecretAgentGetSecretsFlags.WPS_PBC_ACTIVE) {
             let descriptionLabel = new St.Label({
+                context: St.get_clutter_context(),
                 text: _('Alternatively you can connect by pushing the “WPS” button on your router.'),
                 style_class: 'message-dialog-description',
             });

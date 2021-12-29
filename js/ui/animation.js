@@ -15,6 +15,7 @@ class Animation extends St.Bin {
         const themeContext = St.ThemeContext.get_for_stage(global.stage);
 
         super._init({
+            context: St.get_clutter_context(),
             style: `width: ${width}px; height: ${height}px;`,
         });
 

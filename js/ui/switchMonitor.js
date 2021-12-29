@@ -100,14 +100,21 @@ class SwitchMonitorSwitcher extends SwitcherPopup.SwitcherList {
     }
 
     _addIcon(item) {
-        let box = new St.BoxLayout({ style_class: 'alt-tab-app',
-                                     vertical: true });
+        let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'alt-tab-app',
+            vertical: true
+        });
 
-        let icon = new St.Icon({ icon_name: item.icon,
-                                 icon_size: APP_ICON_SIZE });
+        let icon = new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: item.icon,
+            icon_size: APP_ICON_SIZE
+        });
         box.add_child(icon);
 
         let text = new St.Label({
+            context: St.get_clutter_context(),
             text: item.label,
             x_align: Clutter.ActorAlign.CENTER,
         });

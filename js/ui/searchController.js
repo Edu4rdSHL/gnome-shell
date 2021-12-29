@@ -9,6 +9,13 @@ const ShellEntry = imports.ui.shellEntry;
 
 var FocusTrap = GObject.registerClass(
 class FocusTrap extends St.Widget {
+    _init(params) {
+        const defaultParams = {
+            context: St.get_clutter_context(),
+        };
+        super._init(Object.assign(defaultParams, params));
+    }
+
     vfunc_navigate_focus(from, direction) {
         if (direction === St.DirectionType.TAB_FORWARD ||
             direction === St.DirectionType.TAB_BACKWARD)
@@ -34,6 +41,7 @@ var SearchController = GObject.registerClass({
 }, class SearchController extends St.Widget {
     _init(searchEntry, showAppsButton) {
         super._init({
+            context: St.get_clutter_context(),
             name: 'searchController',
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
@@ -71,10 +79,12 @@ var SearchController = GObject.registerClass({
         global.stage.connect('notify::key-focus', this._onStageKeyFocusChanged.bind(this));
 
         this._entry.set_primary_icon(new St.Icon({
+            context: St.get_clutter_context(),
             style_class: 'search-entry-icon',
             icon_name: 'edit-find-symbolic',
         }));
         this._clearIcon = new St.Icon({
+            context: St.get_clutter_context(),
             style_class: 'search-entry-icon',
             icon_name: 'edit-clear-symbolic',
         });

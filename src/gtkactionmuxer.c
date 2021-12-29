@@ -65,6 +65,8 @@ struct _GtkActionMuxer
 {
   GObject parent_instance;
 
+  ClutterContext *clutter_context;
+
   GHashTable *observed_actions;
   GHashTable *groups;
   GHashTable *primary_accels;
@@ -399,13 +401,14 @@ gtk_action_muxer_query_action (GActionGroup        *action_group,
 }
 
 static GVariant *
-get_platform_data (void)
+get_platform_data (GtkActionMuxer *muxer)
 {
   gchar time[32];
   GVariantBuilder *builder;
   GVariant *result;
 
-  g_snprintf (time, 32, "_TIME%d", clutter_get_current_event_time ());
+  g_snprintf (time, 32, "_TIME%d",
+              clutter_context_get_current_event_time (muxer->clutter_context));
 
   builder = g_variant_builder_new (G_VARIANT_TYPE ("a{sv}"));
 
@@ -434,7 +437,7 @@ gtk_action_muxer_activate_action (GActionGroup *action_group,
       if (G_IS_REMOTE_ACTION_GROUP (group->group))
 	g_remote_action_group_activate_action_full (G_REMOTE_ACTION_GROUP (group->group),
 						    unprefixed_name, parameter,
-						    get_platform_data ());
+						    get_platform_data (muxer));
       else
 	g_action_group_activate_action (group->group, unprefixed_name, parameter);
     }
@@ -459,7 +462,7 @@ gtk_action_muxer_change_action_state (GActionGroup *action_group,
         g_remote_action_group_change_action_state_full (G_REMOTE_ACTION_GROUP (group->group),
                                                         unprefixed_name,
                                                         state,
-                                                        get_platform_data ());
+                                                        get_platform_data (muxer));
       else
         g_action_group_change_action_state (group->group, unprefixed_name, state);
     }
@@ -773,9 +776,14 @@ gtk_action_muxer_remove (GtkActionMuxer *muxer,
  * Creates a new #GtkActionMuxer.
  */
 GtkActionMuxer *
-gtk_action_muxer_new (void)
+gtk_action_muxer_new (ClutterContext *clutter_context)
 {
-  return g_object_new (GTK_TYPE_ACTION_MUXER, NULL);
+  GtkActionMuxer *muxer;
+
+  muxer = g_object_new (GTK_TYPE_ACTION_MUXER, NULL);
+  muxer->clutter_context = clutter_context;
+
+  return muxer;
 }
 
 /**

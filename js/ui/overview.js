@@ -65,6 +65,7 @@ var OverviewActor = GObject.registerClass(
 class OverviewActor extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             name: 'overview',
             /* Translators: This is the main view to select
                 activities. See also note for "Activities" string. */
@@ -145,7 +146,9 @@ var Overview = class {
         if (this.isDummy)
             return;
 
-        this._desktopFade = new St.Widget();
+        this._desktopFade = new St.Widget({
+            context: St.get_clutter_context(),
+        });
         Main.layoutManager.overviewGroup.add_child(this._desktopFade);
 
         this._activationTime = 0;
@@ -159,8 +162,11 @@ var Overview = class {
         // During transitions, we raise this to the top to avoid having the overview
         // area be reactive; it causes too many issues such as double clicks on
         // Dash elements, or mouseover handlers in the workspaces.
-        this._coverPane = new Clutter.Actor({ opacity: 0,
-                                              reactive: true });
+        this._coverPane = new Clutter.Actor({
+            context: St.get_clutter_context(),
+            opacity: 0,
+            reactive: true
+        });
         Main.layoutManager.overviewGroup.add_child(this._coverPane);
         this._coverPane.connect('event', () => Clutter.EVENT_STOP);
         this._coverPane.hide();
@@ -325,8 +331,12 @@ var Overview = class {
             return null;
 
         let window = windows[0];
-        let clone = new Clutter.Clone({ source: window,
-                                        x: window.x, y: window.y });
+        let clone = new Clutter.Clone({
+            context: St.get_clutter_context(),
+            source: window,
+            x: window.x,
+            y: window.y
+        });
         clone.source.connect('destroy', () => {
             clone.destroy();
         });
@@ -568,7 +578,8 @@ var Overview = class {
         if (!this._shown)
             return;
 
-        let event = Clutter.get_current_event();
+        const clutterContext = St.get_clutter_context();
+        const event = clutterContext.get_current_event();
         if (event) {
             let type = event.type();
             let button = type == Clutter.EventType.BUTTON_PRESS ||

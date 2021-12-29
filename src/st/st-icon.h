@@ -54,7 +54,7 @@ struct _StIcon {
   StIconPrivate *priv;
 };
 
-ClutterActor* st_icon_new (void);
+ClutterActor* st_icon_new (ClutterContext *clutter_context);
 
 GIcon       *st_icon_get_gicon (StIcon *icon);
 void         st_icon_set_gicon (StIcon *icon,

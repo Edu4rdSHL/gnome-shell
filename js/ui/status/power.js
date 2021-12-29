@@ -30,6 +30,7 @@ class Indicator extends PanelMenu.SystemIndicator {
 
         this._indicator = this._addIndicator();
         this._percentageLabel = new St.Label({
+            context: St.get_clutter_context(),
             y_expand: true,
             y_align: Clutter.ActorAlign.CENTER,
         });

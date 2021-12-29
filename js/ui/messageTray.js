@@ -561,16 +561,22 @@ var NotificationBanner = GObject.registerClass({
 
     _addSecondaryIcon() {
         if (this.notification.secondaryGIcon) {
-            let icon = new St.Icon({ gicon: this.notification.secondaryGIcon,
-                                     x_align: Clutter.ActorAlign.END });
+            let icon = new St.Icon({
+                context: St.get_clutter_context(),
+                gicon: this.notification.secondaryGIcon,
+                x_align: Clutter.ActorAlign.END
+            });
             this.setSecondaryActor(icon);
         }
     }
 
     addButton(button, callback) {
         if (!this._buttonBox) {
-            this._buttonBox = new St.BoxLayout({ style_class: 'notification-actions',
-                                                 x_expand: true });
+            this._buttonBox = new St.BoxLayout({
+                context: St.get_clutter_context(),
+                style_class: 'notification-actions',
+                x_expand: true
+            });
             this.setActionArea(this._buttonBox);
             global.focus_manager.add_group(this._buttonBox);
         }
@@ -596,10 +602,13 @@ var NotificationBanner = GObject.registerClass({
     }
 
     addAction(label, callback) {
-        let button = new St.Button({ style_class: 'notification-button',
-                                     label,
-                                     x_expand: true,
-                                     can_focus: true });
+        let button = new St.Button({
+            context: St.get_clutter_context(),
+            style_class: 'notification-button',
+            label,
+            x_expand: true,
+            can_focus: true
+        });
 
         return this.addButton(button, callback);
     }
@@ -608,7 +617,9 @@ var NotificationBanner = GObject.registerClass({
 var SourceActor = GObject.registerClass(
 class SourceActor extends St.Widget {
     _init(source, size) {
-        super._init();
+        super._init({
+            context: St.get_clutter_context(),
+        });
 
         this._source = source;
         this._size = size;
@@ -620,9 +631,12 @@ class SourceActor extends St.Widget {
         this._actorDestroyed = false;
 
         let scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        this._iconBin = new St.Bin({ x_expand: true,
-                                     height: size * scaleFactor,
-                                     width: size * scaleFactor });
+        this._iconBin = new St.Bin({
+            context: St.get_clutter_context(),
+            x_expand: true,
+            height: size * scaleFactor,
+            width: size * scaleFactor
+        });
 
         this.add_actor(this._iconBin);
 
@@ -732,8 +746,11 @@ var Source = GObject.registerClass({
     // Provides a sane default implementation, override if you need
     // something more fancy.
     createIcon(size) {
-        return new St.Icon({ gicon: this.getIcon(),
-                             icon_size: size });
+        return new St.Icon({
+            context: St.get_clutter_context(),
+            gicon: this.getIcon(),
+            icon_size: size
+        });
     }
 
     getIcon() {
@@ -816,6 +833,7 @@ var MessageTray = GObject.registerClass({
 }, class MessageTray extends St.Widget {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             visible: false,
             clip_to_allocation: true,
             layout_manager: new Clutter.BinLayout(),
@@ -836,14 +854,17 @@ var MessageTray = GObject.registerClass({
                                                   GObject.BindingFlags.SYNC_CREATE);
         this.add_constraint(constraint);
 
-        this._bannerBin = new St.Widget({ name: 'notification-container',
-                                          reactive: true,
-                                          track_hover: true,
-                                          y_align: Clutter.ActorAlign.START,
-                                          x_align: Clutter.ActorAlign.CENTER,
-                                          y_expand: true,
-                                          x_expand: true,
-                                          layout_manager: new Clutter.BinLayout() });
+        this._bannerBin = new St.Widget({
+            context: St.get_clutter_context(),
+            name: 'notification-container',
+            reactive: true,
+            track_hover: true,
+            y_align: Clutter.ActorAlign.START,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_expand: true,
+            x_expand: true,
+            layout_manager: new Clutter.BinLayout()
+        });
         this._bannerBin.connect('key-release-event',
                                 this._onNotificationKeyRelease.bind(this));
         this._bannerBin.connect('notify::hover',

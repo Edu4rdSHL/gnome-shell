@@ -24,17 +24,27 @@ var CandidateArea = GObject.registerClass({
 }, class CandidateArea extends St.BoxLayout {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             vertical: true,
             reactive: true,
             visible: false,
         });
         this._candidateBoxes = [];
         for (let i = 0; i < MAX_CANDIDATES_PER_PAGE; ++i) {
-            let box = new St.BoxLayout({ style_class: 'candidate-box',
-                                         reactive: true,
-                                         track_hover: true });
-            box._indexLabel = new St.Label({ style_class: 'candidate-index' });
-            box._candidateLabel = new St.Label({ style_class: 'candidate-label' });
+            let box = new St.BoxLayout({
+                context: St.get_clutter_context(),
+                style_class: 'candidate-box',
+                reactive: true,
+                track_hover: true
+            });
+            box._indexLabel = new St.Label({
+                context: St.get_clutter_context(),
+                style_class: 'candidate-index'
+            });
+            box._candidateLabel = new St.Label({
+                context: St.get_clutter_context(),
+                style_class: 'candidate-label'
+            });
             box.add_child(box._indexLabel);
             box.add_child(box._candidateLabel);
             this._candidateBoxes.push(box);
@@ -47,20 +57,31 @@ var CandidateArea = GObject.registerClass({
             });
         }
 
-        this._buttonBox = new St.BoxLayout({ style_class: 'candidate-page-button-box' });
+        this._buttonBox = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'candidate-page-button-box'
+        });
 
         this._previousButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'candidate-page-button candidate-page-button-previous button',
             x_expand: true,
         });
-        this._previousButton.child = new St.Icon({ style_class: 'candidate-page-button-icon' });
+        this._previousButton.child = new St.Icon({
+            context: St.get_clutter_context(),
+            style_class: 'candidate-page-button-icon'
+        });
         this._buttonBox.add_child(this._previousButton);
 
         this._nextButton = new St.Button({
+            context: St.get_clutter_context(),
             style_class: 'candidate-page-button candidate-page-button-next button',
             x_expand: true,
         });
-        this._nextButton.child = new St.Icon({ style_class: 'candidate-page-button-icon' });
+        this._nextButton.child = new St.Icon({
+            context: St.get_clutter_context(),
+            style_class: 'candidate-page-button-icon'
+        });
         this._buttonBox.add_child(this._nextButton);
 
         this.add(this._buttonBox);
@@ -146,21 +167,33 @@ class IbusCandidatePopup extends BoxPointer.BoxPointer {
         this.visible = false;
         this.style_class = 'candidate-popup-boxpointer';
 
-        this._dummyCursor = new Clutter.Actor({ opacity: 0 });
+        this._dummyCursor = new Clutter.Actor({
+            context: St.get_clutter_context(),
+            opacity: 0
+        });
         Main.layoutManager.uiGroup.add_actor(this._dummyCursor);
 
         Main.layoutManager.addChrome(this);
 
-        let box = new St.BoxLayout({ style_class: 'candidate-popup-content',
-                                     vertical: true });
+        let box = new St.BoxLayout({
+            context: St.get_clutter_context(),
+            style_class: 'candidate-popup-content',
+            vertical: true
+        });
         this.bin.set_child(box);
 
-        this._preeditText = new St.Label({ style_class: 'candidate-popup-text',
-                                           visible: false });
+        this._preeditText = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'candidate-popup-text',
+            visible: false
+        });
         box.add(this._preeditText);
 
-        this._auxText = new St.Label({ style_class: 'candidate-popup-text',
-                                       visible: false });
+        this._auxText = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'candidate-popup-text',
+            visible: false
+        });
         box.add(this._auxText);
 
         this._candidateArea = new CandidateArea();

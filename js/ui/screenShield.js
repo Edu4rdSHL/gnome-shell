@@ -48,6 +48,7 @@ var ScreenShield = class {
 
         this._lockScreenState = MessageTray.State.HIDDEN;
         this._lockScreenGroup = new St.Widget({
+            context: St.get_clutter_context(),
             x_expand: true,
             y_expand: true,
             reactive: true,
@@ -57,6 +58,7 @@ var ScreenShield = class {
         });
 
         this._lockDialogGroup = new St.Widget({
+            context: St.get_clutter_context(),
             x_expand: true,
             y_expand: true,
             reactive: true,

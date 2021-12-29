@@ -574,19 +574,23 @@ st_button_init (StButton *button)
 
 /**
  * st_button_new:
+ * @clutter_context: The Clutter context
  *
  * Create a new button
  *
  * Returns: a new #StButton
  */
 StWidget *
-st_button_new (void)
+st_button_new (ClutterContext *clutter_context)
 {
-  return g_object_new (ST_TYPE_BUTTON, NULL);
+  return g_object_new (ST_TYPE_BUTTON,
+                       "context", clutter_context,
+                       NULL);
 }
 
 /**
  * st_button_new_with_label:
+ * @clutter_context: The Clutter context
  * @text: text to set the label to
  *
  * Create a new #StButton with the specified label
@@ -594,9 +598,13 @@ st_button_new (void)
  * Returns: a new #StButton
  */
 StWidget *
-st_button_new_with_label (const gchar *text)
+st_button_new_with_label (ClutterContext *clutter_context,
+                          const char     *text)
 {
-  return g_object_new (ST_TYPE_BUTTON, "label", text, NULL);
+  return g_object_new (ST_TYPE_BUTTON,
+                       "context", clutter_context,
+                       "label", text,
+                       NULL);
 }
 
 /**
@@ -628,11 +636,15 @@ st_button_set_label (StButton    *button,
                      const gchar *text)
 {
   StButtonPrivate *priv;
+  ClutterActor *actor;
+  ClutterContext *clutter_context;
   ClutterActor *label;
 
   g_return_if_fail (ST_IS_BUTTON (button));
 
   priv = st_button_get_instance_private (button);
+  actor = CLUTTER_ACTOR (button);
+  clutter_context = clutter_actor_get_context (actor);
 
   g_free (priv->text);
 
@@ -650,6 +662,7 @@ st_button_set_label (StButton    *button,
   else
     {
       label = g_object_new (CLUTTER_TYPE_TEXT,
+                            "context", clutter_context,
                             "text", priv->text,
                             "line-alignment", PANGO_ALIGN_CENTER,
                             "ellipsize", PANGO_ELLIPSIZE_END,

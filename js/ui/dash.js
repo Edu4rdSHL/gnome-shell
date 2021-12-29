@@ -58,6 +58,7 @@ var DashItemContainer = GObject.registerClass(
 class DashItemContainer extends St.Widget {
     _init() {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'dash-item-container',
             pivot_point: new Graphene.Point({ x: .5, y: .5 }),
             layout_manager: new Clutter.BinLayout(),
@@ -69,7 +70,10 @@ class DashItemContainer extends St.Widget {
         });
 
         this._labelText = "";
-        this.label = new St.Label({ style_class: 'dash-label' });
+        this.label = new St.Label({
+            context: St.get_clutter_context(),
+            style_class: 'dash-label'
+        });
         this.label.hide();
         Main.layoutManager.addChrome(this.label);
         this.label_actor = this.label;
@@ -196,10 +200,13 @@ class ShowAppsIcon extends DashItemContainer {
     _init() {
         super._init();
 
-        this.toggleButton = new St.Button({ style_class: 'show-apps',
-                                            track_hover: true,
-                                            can_focus: true,
-                                            toggle_mode: true });
+        this.toggleButton = new St.Button({
+            context: St.get_clutter_context(),
+            style_class: 'show-apps',
+            track_hover: true,
+            can_focus: true,
+            toggle_mode: true
+        });
         this._iconActor = null;
         this.icon = new IconGrid.BaseIcon(_("Show Applications"),
                                           { setSizeManually: true,
@@ -215,10 +222,13 @@ class ShowAppsIcon extends DashItemContainer {
     }
 
     _createIcon(size) {
-        this._iconActor = new St.Icon({ icon_name: 'view-app-grid-symbolic',
-                                        icon_size: size,
-                                        style_class: 'show-apps-icon',
-                                        track_hover: true });
+        this._iconActor = new St.Icon({
+            context: St.get_clutter_context(),
+            icon_name: 'view-app-grid-symbolic',
+            icon_size: size,
+            style_class: 'show-apps-icon',
+            track_hover: true
+        });
         return this._iconActor;
     }
 
@@ -274,7 +284,10 @@ var DragPlaceholderItem = GObject.registerClass(
 class DragPlaceholderItem extends DashItemContainer {
     _init() {
         super._init();
-        this.setChild(new St.Bin({ style_class: 'placeholder' }));
+        this.setChild(new St.Bin({
+            context: St.get_clutter_context(),
+            style_class: 'placeholder'
+        }));
     }
 });
 
@@ -282,7 +295,10 @@ var EmptyDropTargetItem = GObject.registerClass(
 class EmptyDropTargetItem extends DashItemContainer {
     _init() {
         super._init();
-        this.setChild(new St.Bin({ style_class: 'empty-dash-drop-target' }));
+        this.setChild(new St.Bin({
+            context: St.get_clutter_context(),
+            style_class: 'empty-dash-drop-target'
+        }));
     }
 });
 
@@ -320,17 +336,20 @@ var Dash = GObject.registerClass({
         this._labelShowing = false;
 
         super._init({
+            context: St.get_clutter_context(),
             name: 'dash',
             offscreen_redirect: Clutter.OffscreenRedirect.ALWAYS,
             layout_manager: new Clutter.BinLayout(),
         });
 
         this._dashContainer = new St.BoxLayout({
+            context: St.get_clutter_context(),
             x_align: Clutter.ActorAlign.CENTER,
             y_expand: true,
         });
 
         this._box = new St.Widget({
+            context: St.get_clutter_context(),
             clip_to_allocation: true,
             layout_manager: new DashIconsLayout(),
             y_expand: true,
@@ -348,10 +367,13 @@ var Dash = GObject.registerClass({
         this.showAppsButton = this._showAppsIcon.toggleButton;
 
         this._background = new St.Widget({
+            context: St.get_clutter_context(),
             style_class: 'dash-background',
         });
 
-        const sizerBox = new Clutter.Actor();
+        const sizerBox = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
         sizerBox.add_constraint(new Clutter.BindConstraint({
             source: this._showAppsIcon.icon,
             coordinate: Clutter.BindCoordinate.HEIGHT,
@@ -801,6 +823,7 @@ var Dash = GObject.registerClass({
         if (nFavorites > 0 && nFavorites < nIcons) {
             if (!this._separator) {
                 this._separator = new St.Widget({
+                    context: St.get_clutter_context(),
                     style_class: 'dash-separator',
                     y_align: Clutter.ActorAlign.CENTER,
                     height: this.iconSize,

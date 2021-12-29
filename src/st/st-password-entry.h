@@ -32,7 +32,7 @@ G_BEGIN_DECLS
 
 G_DECLARE_FINAL_TYPE (StPasswordEntry, st_password_entry, ST, PASSWORD_ENTRY, StEntry)
 
-StEntry            *st_password_entry_new                        (void);
+StEntry            *st_password_entry_new                        (ClutterContext  *clutter_context);
 gboolean            st_password_entry_get_password_visible       (StPasswordEntry *entry);
 void                st_password_entry_set_password_visible       (StPasswordEntry *entry,
                                                                   gboolean         value);

@@ -53,8 +53,12 @@ var WindowClone = GObject.registerClass({
     },
 }, class WindowClone extends Clutter.Actor {
     _init(realWindow) {
-        let clone = new Clutter.Clone({ source: realWindow });
+        let clone = new Clutter.Clone({
+            context: St.get_clutter_context(),
+            source: realWindow
+        });
         super._init({
+            context: St.get_clutter_context(),
             layout_manager: new PrimaryActorLayout(clone),
             reactive: true,
         });
@@ -138,7 +142,10 @@ var WindowClone = GObject.registerClass({
     }
 
     _doAddAttachedDialog(metaDialog, realDialog) {
-        let clone = new Clutter.Clone({ source: realDialog });
+        let clone = new Clutter.Clone({
+            context: St.get_clutter_context(),
+            source: realDialog
+        });
         this._updateDialogPosition(realDialog, clone);
 
         clone._updateId = realDialog.connect('notify::position', dialog => {
@@ -260,6 +267,7 @@ var WorkspaceThumbnail = GObject.registerClass({
 }, class WorkspaceThumbnail extends St.Widget {
     _init(metaWorkspace, monitorIndex) {
         super._init({
+            context: St.get_clutter_context(),
             clip_to_allocation: true,
             style_class: 'workspace-thumbnail',
             pivot_point: new Graphene.Point({ x: 0.5, y: 0.5 }),
@@ -271,10 +279,14 @@ var WorkspaceThumbnail = GObject.registerClass({
 
         this._removed = false;
 
-        this._viewport = new Clutter.Actor();
+        this._viewport = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
         this.add_child(this._viewport);
 
-        this._contents = new Clutter.Actor();
+        this._contents = new Clutter.Actor({
+            context: St.get_clutter_context(),
+        });
         this._viewport.add_child(this._contents);
 
         this.connect('destroy', this._onDestroy.bind(this));
@@ -625,6 +637,7 @@ var ThumbnailsBox = GObject.registerClass({
 }, class ThumbnailsBox extends St.Widget {
     _init(scrollAdjustment, monitorIndex) {
         super._init({
+            context: St.get_clutter_context(),
             style_class: 'workspace-thumbnails',
             reactive: true,
             x_align: Clutter.ActorAlign.CENTER,
@@ -633,7 +646,10 @@ var ThumbnailsBox = GObject.registerClass({
 
         this._delegate = this;
 
-        let indicator = new St.Bin({ style_class: 'workspace-thumbnail-indicator' });
+        let indicator = new St.Bin({
+            context: St.get_clutter_context(),
+            style_class: 'workspace-thumbnail-indicator'
+        });
 
         // We don't want the indicator to affect drag-and-drop
         Shell.util_set_hidden_from_pick(indicator, true);
@@ -645,7 +661,10 @@ var ThumbnailsBox = GObject.registerClass({
 
         this._dropWorkspace = -1;
         this._dropPlaceholderPos = -1;
-        this._dropPlaceholder = new St.Bin({ style_class: 'placeholder' });
+        this._dropPlaceholder = new St.Bin({
+            context: St.get_clutter_context(),
+            style_class: 'placeholder'
+        });
         this.add_actor(this._dropPlaceholder);
         this._spliceIndex = -1;
 

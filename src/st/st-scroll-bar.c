@@ -100,6 +100,34 @@ handle_button_press_event_cb (ClutterActor       *actor,
                               ClutterButtonEvent *event,
                               StScrollBar        *bar);
 
+static gboolean
+handle_button_release_event_cb (ClutterActor       *trough,
+                                ClutterButtonEvent *event,
+                                StScrollBar        *bar);
+
+static gboolean
+handle_motion_event_cb (ClutterActor       *trough,
+                        ClutterMotionEvent *event,
+                        StScrollBar        *bar);
+
+static void
+st_scroll_bar_notify_reactive (StScrollBar *self);
+
+static gboolean
+trough_button_press_event_cb (ClutterActor       *actor,
+                              ClutterButtonEvent *event,
+                              StScrollBar        *self);
+
+static gboolean
+trough_button_release_event_cb (ClutterActor       *actor,
+                                ClutterButtonEvent *event,
+                                StScrollBar        *self);
+
+static gboolean
+trough_leave_event_cb (ClutterActor *actor,
+                       ClutterEvent *event,
+                       StScrollBar  *self);
+
 static void stop_scrolling (StScrollBar *bar);
 
 static void
@@ -423,6 +451,44 @@ st_scroll_bar_constructor (GType                  type,
 }
 
 static void
+st_scroll_bar_constructed (GObject *object)
+{
+  StScrollBar *self = ST_SCROLL_BAR (object);
+  StScrollBarPrivate *priv = st_scroll_bar_get_instance_private (self);
+  ClutterContext *clutter_context =
+    clutter_actor_get_context (CLUTTER_ACTOR (object));
+
+  priv->trough = (ClutterActor *) st_bin_new (clutter_context);
+  clutter_actor_set_reactive ((ClutterActor *) priv->trough, TRUE);
+  clutter_actor_set_name (CLUTTER_ACTOR (priv->trough), "trough");
+  clutter_actor_add_child (CLUTTER_ACTOR (self),
+                           CLUTTER_ACTOR (priv->trough));
+  g_signal_connect (priv->trough, "button-press-event",
+                    G_CALLBACK (trough_button_press_event_cb), self);
+  g_signal_connect (priv->trough, "button-release-event",
+                    G_CALLBACK (trough_button_release_event_cb), self);
+  g_signal_connect (priv->trough, "leave-event",
+                    G_CALLBACK (trough_leave_event_cb), self);
+
+  priv->handle = (ClutterActor *) st_button_new (clutter_context);
+  clutter_actor_set_name (CLUTTER_ACTOR (priv->handle), "hhandle");
+  clutter_actor_add_child (CLUTTER_ACTOR (self),
+                           CLUTTER_ACTOR (priv->handle));
+  g_signal_connect (priv->handle, "button-press-event",
+                    G_CALLBACK (handle_button_press_event_cb), self);
+  g_signal_connect (priv->handle, "button-release-event",
+                    G_CALLBACK (handle_button_release_event_cb), self);
+  g_signal_connect (priv->handle, "motion-event",
+                    G_CALLBACK (handle_motion_event_cb), self);
+
+  clutter_actor_set_reactive (CLUTTER_ACTOR (self), TRUE);
+
+  g_signal_connect (self, "notify::reactive",
+                    G_CALLBACK (st_scroll_bar_notify_reactive), NULL);
+  G_OBJECT_CLASS (st_scroll_bar_parent_class)->constructed (object);
+}
+
+static void
 adjust_with_direction (StAdjustment           *adj,
                        ClutterScrollDirection  direction)
 {
@@ -505,6 +571,7 @@ st_scroll_bar_class_init (StScrollBarClass *klass)
   object_class->set_property = st_scroll_bar_set_property;
   object_class->dispose      = st_scroll_bar_dispose;
   object_class->constructor  = st_scroll_bar_constructor;
+  object_class->constructed  = st_scroll_bar_constructed;
 
   actor_class->get_preferred_width  = st_scroll_bar_get_preferred_width;
   actor_class->get_preferred_height = st_scroll_bar_get_preferred_height;
@@ -879,41 +946,14 @@ st_scroll_bar_notify_reactive (StScrollBar *self)
 static void
 st_scroll_bar_init (StScrollBar *self)
 {
-  StScrollBarPrivate *priv = st_scroll_bar_get_instance_private (self);
-
-  priv->trough = (ClutterActor *) st_bin_new ();
-  clutter_actor_set_reactive ((ClutterActor *) priv->trough, TRUE);
-  clutter_actor_set_name (CLUTTER_ACTOR (priv->trough), "trough");
-  clutter_actor_add_child (CLUTTER_ACTOR (self),
-                           CLUTTER_ACTOR (priv->trough));
-  g_signal_connect (priv->trough, "button-press-event",
-                    G_CALLBACK (trough_button_press_event_cb), self);
-  g_signal_connect (priv->trough, "button-release-event",
-                    G_CALLBACK (trough_button_release_event_cb), self);
-  g_signal_connect (priv->trough, "leave-event",
-                    G_CALLBACK (trough_leave_event_cb), self);
-
-  priv->handle = (ClutterActor *) st_button_new ();
-  clutter_actor_set_name (CLUTTER_ACTOR (priv->handle), "hhandle");
-  clutter_actor_add_child (CLUTTER_ACTOR (self),
-                           CLUTTER_ACTOR (priv->handle));
-  g_signal_connect (priv->handle, "button-press-event",
-                    G_CALLBACK (handle_button_press_event_cb), self);
-  g_signal_connect (priv->handle, "button-release-event",
-                    G_CALLBACK (handle_button_release_event_cb), self);
-  g_signal_connect (priv->handle, "motion-event",
-                    G_CALLBACK (handle_motion_event_cb), self);
-
-  clutter_actor_set_reactive (CLUTTER_ACTOR (self), TRUE);
-
-  g_signal_connect (self, "notify::reactive",
-                    G_CALLBACK (st_scroll_bar_notify_reactive), NULL);
 }
 
 StWidget *
-st_scroll_bar_new (StAdjustment *adjustment)
+st_scroll_bar_new (ClutterContext *clutter_context,
+                   StAdjustment   *adjustment)
 {
   return g_object_new (ST_TYPE_SCROLL_BAR,
+                       "context", clutter_context,
                        "adjustment", adjustment,
                        NULL);
 }
