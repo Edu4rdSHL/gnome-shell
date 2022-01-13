@@ -652,7 +652,12 @@ export const ThumbnailsBox = GObject.registerClass({
         this._settings = new Gio.Settings({schema_id: MUTTER_SCHEMA});
         this._settings.connect('changed::dynamic-workspaces',
             () => this._updateShouldShow());
+
+//            let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
         this._updateShouldShow();
+  //              return GLib.SOURCE_REMOVE;
+
+//});
 
         Main.layoutManager.connectObject('monitors-changed', () => {
             this._destroyThumbnails();
@@ -698,6 +703,8 @@ export const ThumbnailsBox = GObject.registerClass({
         const shouldShow = this._settings.get_boolean('dynamic-workspaces')
             ? nWorkspaces > NUM_WORKSPACES_THRESHOLD
             : nWorkspaces > 1;
+
+log("box shoudShow: " + shouldShow);
 
         if (this._shouldShow === shouldShow)
             return;

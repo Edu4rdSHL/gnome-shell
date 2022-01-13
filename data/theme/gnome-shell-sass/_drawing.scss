@@ -382,7 +382,7 @@
   font-weight: bold;
 
   // Trick due to St limitations. It needs a background to draw a box-shadow
-  background-color: rgba(0, 0, 0, 0, 0.01);
+  background-color: rgba(0, 0, 0, 0.01);
 
   @if $flat {
     box-shadow: none;
@@ -444,14 +444,14 @@
   }
 }
 
-@mixin panel($t:normal) {
+@mixin panel($t:default) {
 //
 // Top panel drawing function
 //
 // $t: panel type,
 //
 // possible $t values:
-// normal, noisy, dark, bright, window-near, overview, overview-noisy, login-screen, high-contrast
+// default, bg-noisy, bg-dark, bg-bright, window-near, overview, login-screen, high-contrast
 //
 
   $_opacity: 1;
@@ -459,14 +459,14 @@
   $_highlight_color: $selected_fg_color;
   $_shadow: none;
 
-  @if $t==noisy or $t==overview-noisy or $t==window-near or $t==high-contrast {
+  @if $t==default or $t==bg-noisy or $t==window-near or $t==high-contrast {
     .panel-button {
       &:active, &:focus {
         box-shadow: inset 0 -2px 0px lighten($selected_bg_color,5%);
       }
     }
   }
-  @else if $t==normal or $t==dark or $t==overview or $t==login-screen {
+  @else if $t==bg-dark or $t==overview or $t==login-screen {
     $_opacity: 0;
     $_color: #eee;
     $_highlight_color: white;
@@ -478,7 +478,7 @@
       }
     }
   }
-  @else if $t==bright {
+  @else if $t==bg-bright {
     $_opacity: 0;
     $_color: rgba(0, 0, 0, 0.75);
     $_highlight_color: black;
@@ -519,9 +519,7 @@
     }
   }
 
-  // We have to use opacity instead of background-color for the corner because
-  // the corner uses custom drawing code that we animate manually.
   .panel-corner {
-    opacity: 255 * $_opacity;
+    -panel-corner-opacity: $_opacity;
   }
 }

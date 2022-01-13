@@ -742,25 +742,20 @@ export class BackgroundManager extends Signals.EventEmitter {
         }
     }
 
-    getCharacteristicsForArea(x, y, width, height, returnRawValues) {
+    getCharacteristicsForArea(x, y, width, height) {
         const background = this._backgroundSource.getBackground(this._monitorIndex);
 
         let areaIsNoisy, areaIsDark, areaIsBright;
         areaIsNoisy = areaIsDark = areaIsBright = false;
 
-        // Always return false for animated backgrounds, we don't want to
-        // do those calculations on every animation frame.
-        if (background.isAnimated())
-            return [false];
-
-        let [retval, meanLuminance, luminanceVariance, meanAcutance, acutanceVariance] =
+        const [retval, meanLuminance, luminanceVariance, meanAcutance, acutanceVariance] =
             background.get_color_info(this._monitorIndex, x, y, width, height);
 
         if (!retval)
-            return [false];
+            return { success: false }
 
-        let luminanceStd = Math.sqrt(luminanceVariance);
-        let acutanceStd = Math.sqrt(acutanceVariance);
+        const luminanceStd = Math.sqrt(luminanceVariance);
+        const acutanceStd = Math.sqrt(acutanceVariance);
 
         if (meanLuminance < LUMINANCE_DARK_THRESHOLD)
             areaIsDark = true;
@@ -777,10 +772,18 @@ export class BackgroundManager extends Signals.EventEmitter {
              meanLuminance - luminanceStd < LUMINANCE_DARK_THRESHOLD))
             areaIsNoisy = true;
 
-        if (returnRawValues)
-            return [true, areaIsNoisy, areaIsDark, areaIsBright, meanLuminance, luminanceStd, meanAcutance, acutanceStd];
-        else
-            return [true, areaIsNoisy, areaIsDark, areaIsBright];
+        return {
+            success: true,
+            areaIsNoisy,
+            areaIsDark,
+            areaIsBright,
+            measured: {
+                meanLuminance,
+                luminanceStd,
+                meanAcutance,
+                acutanceStd
+            },
+        }
     }
 
     _swapBackgroundActor() {

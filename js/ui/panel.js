@@ -726,23 +726,8 @@ class Panel extends St.Widget {
             });
         }
 
-        Main.layoutManager.connect('monitors-changed', () => {
-            if (Main.layoutManager.primaryMonitor) {
-                let bgManager = Main.layoutManager._bgManagers[Main.layoutManager.primaryIndex];
-                bgManager.connect('changed', () => this._onBackgroundChanged(bgManager));
-                if (bgManager.isLoaded)
-                    this._onBackgroundChanged(bgManager);
-            }
-        });
-
-        Main.layoutManager.connect('startup-complete', () => {
-            if (Main.layoutManager.primaryMonitor) {
-                let bgManager = Main.layoutManager._bgManagers[Main.layoutManager.primaryIndex];
-                bgManager.connect('changed', () => this._onBackgroundChanged(bgManager));
-                if (bgManager.isLoaded)
-                    this._onBackgroundChanged(bgManager);
-            }
-        });
+        Main.layoutManager.connect('monitors-changed', () => this._reconnectWallpaperChanges());
+        Main.layoutManager.connect('startup-complete', () => this._reconnectWallpaperChanges());
 
         Main.layoutManager.panelBox.add(this);
         Main.ctrlAltTabManager.addGroup(this,
@@ -757,6 +742,17 @@ class Panel extends St.Widget {
 
         global.display.connect('workareas-changed', () => this.queue_relayout());
         this._updatePanel();
+    }
+
+    _reconnectWallpaperChanges() {
+log("panel: reconnecting changes");
+        if (Main.layoutManager.primaryMonitor) {
+            const bgManager = Main.layoutManager._bgManagers[Main.layoutManager.primaryIndex];
+
+            bgManager.connect('changed', () => this._onBackgroundChanged(bgManager));
+            if (bgManager.isLoaded)
+                this._onBackgroundChanged(bgManager);
+        }
     }
 
     _onWindowAdded(metaDisplay, metaWindow) {
@@ -1018,49 +1014,70 @@ class Panel extends St.Widget {
 
         // Reset the size cache since the panel relayout might not have
         // happened yet after a monitor change.
-        this.queue_relayout();
+        // FIXME: this is ugly, let's get rid of it and make sure monitor hotplugging still works
+      //  this.queue_relayout();
 
-        const transformedAllocation = this.get_transformed_allocation();
+        const panelExtents = this.get_transformed_extents();
 
         // We use a slightly bigger height to make sure the algorithm
         // can factor in sudden color changes right beneath the panel.
-        let height = parseInt(this.get_height() * 1.2);
+        const height = parseInt(panelExtents.size.height * 1.2);
 
-        let [success, bgIsNoisy, bgIsDark, bgIsBright, meanLuminance] =
-            bgManager.getCharacteristicsForArea(transformedAllocation.x1, transformedAllocation.y1, transformedAllocation.get_width(), transformedAllocation.get_height(), true);
+        const characteristics = bgManager.getCharacteristicsForArea(
+            panelExtents.origin.x, panelExtents.origin.y,
+            panelExtents.size.width, height, true);
+
+log("measured  : " + JSON.stringify(characteristics));
 
         let styleClassNames = [];
-        if (success) {
-            const centerBoxTransformedAllocation =
-                this._centerBox.get_transformed_allocation();
-            const rightBoxTransformedAllocation =
-                this._rightBox.get_transformed_allocation();
+        if (characteristics.success) {
+            let bgIsNoisy = characteristics.areaIsNoisy;
 
-            // Additionally, check the areas where widgets are most likely to be in, we
-            // want to have a stricter check for noisy wallpapers in these areas.
-            // Also make sure that if one area should have the opposite text color of the
-            // color we decided to use, we always call the image noisy.
-            let additionalCheckAreas =
-                [{ start: transformedAllocation.x1, width: BACKGROUND_CHECK_AREA_WIDTH },
-                 { start: centerBoxTransformedAllocation.x1,
-                   width: centerBoxTransformedAllocation.get_width() },
-                 { start: rightBoxTransformedAllocation.x1,
-                   width: rightBoxTransformedAllocation.get_width() }];
+            const centerBoxExtents =
+                this._centerBox.get_transformed_extents();
+            const rightBoxExtents =
+                this._rightBox.get_transformed_extents();
+
+            // Additionally, check the areas where widgets are most likely to
+            // be in, we want to have a stricter check for noisy wallpapers in
+            // these areas.
+            // The left box of the panel changes its size too often, so we use
+            // a fixed width there.
+            const additionalCheckAreas =
+                [{ start: panelExtents.origin.x, width: BACKGROUND_CHECK_AREA_WIDTH },
+                 { start: centerBoxExtents.origin.x,
+                   width: centerBoxExtents.size.width },
+                 { start: rightBoxExtents.origin.x,
+                   width: rightBoxExtents.size.width }];
 
             for (let point of additionalCheckAreas) {
-                let [boxSuccess, boxBgIsNoisy, boxBgIsDark, boxBgIsBright, boxMeanLuminance] =
-                    bgManager.getCharacteristicsForArea(point.start, transformedAllocation.y1, point.width, transformedAllocation.get_height(), true);
+                const boxCharacteristics = bgManager.getCharacteristicsForArea(
+                    point.start, panelExtents.origin.y,
+                    point.width, panelExtents.size.height, true);
 
-                if (boxSuccess)
-                    bgIsNoisy |= boxBgIsNoisy ||
-                                 (bgIsBright != boxBgIsBright && Math.abs(meanLuminance - boxMeanLuminance) > 15);
+log("BOX: measured  : " + JSON.stringify(boxCharacteristics));
+
+                if (boxCharacteristics.success) {
+                    bgIsNoisy |= boxCharacteristics.areaIsNoisy;
+
+                    // In case one area should have the opposite text color
+                    // of the color we decided to use, always call the image noisy.
+                    bgIsNoisy |=
+                        (characteristics.areaIsBright !== boxCharacteristics.areaIsBright &&
+                         Math.abs(characteristics.measured.meanLuminance - boxCharacteristics.measured.meanLuminance) > 15);
+                }
+            }
+
+//            if (debugFlags == debug-transparent-panel)
+            {
+                
             }
 
             if (bgIsNoisy)
                 styleClassNames.push('background-noisy');
-            if (bgIsDark)
+            if (characteristics.areaIsDark)
                 styleClassNames.push('background-dark');
-            if (bgIsBright)
+            if (characteristics.areaIsBright)
                 styleClassNames.push('background-bright');
         } else {
             // Always assume the background is noisy if the color check failed

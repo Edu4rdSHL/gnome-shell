@@ -12,7 +12,6 @@ $panel_height: 2.2em;
 $panel_transition_duration: 250ms; // same as the overview transition duration
 
 #panel {
-  @include panel();
   transition-duration: 300ms;
   font-weight: bold;
   height: $panel_height;
@@ -22,10 +21,10 @@ $panel_transition_duration: 250ms; // same as the overview transition duration
 
   // spacing between activities, app menu and such
   #panelLeft, #panelCenter {
-    spacing: $base_spacing;
+    spacing: $base_padding;
   }
 
-   // panel menus
+  // panel menus
   .panel-button {
     @include panel_button($panel_fg_color);
     -natural-hpadding: $base_padding * 2;
@@ -144,18 +143,14 @@ $panel_transition_duration: 250ms; // same as the overview transition duration
   .screencast-indicator,
   .remote-access-indicator { color: $warning_color; }
 
-  &.background-dark { @include panel(dark); }
-  &.background-bright { @include panel(bright); }
-  &.background-noisy { @include panel(noisy); }
+  @include panel(default);
+
+  &.background-dark { @include panel(bg-dark); }
+  &.background-bright { @include panel(bg-bright); }
+  &.background-noisy { @include panel(bg-noisy); }
   &.window-near { @include panel(window-near); }
 
-  &:overview {
-    @include panel(overview);
-
-    &.background-noisy {
-      @include panel(overview-noisy);
-    }
-  }
+  &:overview { @include panel(overview); }
 
   &.lock-screen, &.login-screen, &.unlock-screen {
     @include panel(login-screen);
@@ -164,9 +159,9 @@ $panel_transition_duration: 250ms; // same as the overview transition duration
     &.screen-shield {
       @include panel(normal);
 
-      &.background-dark { @include panel(dark); }
-      &.background-bright { @include panel(bright); }
-      &.background-noisy { @include panel(noisy); }
+      &.background-dark { @include panel(bg-dark); }
+      &.background-bright { @include panel(bg-bright); }
+      &.background-noisy { @include panel(bg-noisy); }
     }
   }
 }
