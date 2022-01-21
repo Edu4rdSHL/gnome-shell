@@ -1005,8 +1005,12 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
         const cornerRadius = scaleFactor * BACKGROUND_CORNER_RADIUS_PIXELS;
 
         const backgroundContent = this._bgManager.backgroundActor.content;
+
+        // Map ControlsState {0, 1, 2} to progress {0.0, 1.0, 1.0}
+        const roundedCornerProgress =
+            Math.clamp(this._stateAdjustment.value, 0, 1);
         backgroundContent.rounded_clip_radius =
-            Util.lerp(0, cornerRadius, this._stateAdjustment.value);
+            Util.lerp(0, cornerRadius, roundedCornerProgress);
     }
 
     _updateRoundedClipBounds() {
@@ -1048,7 +1052,7 @@ class Workspace extends St.Widget {
 
         // Background
         this._background =
-            new WorkspaceBackground(monitorIndex, layoutManager.stateAdjustment);
+            new WorkspaceBackground(monitorIndex, overviewAdjustment);
         this.add_child(this._background);
 
         // Window previews
