@@ -9,7 +9,6 @@ const Batch = imports.gdm.batch;
 const GdmUtil = imports.gdm.util;
 const OVirt = imports.gdm.oVirt;
 const Vmware = imports.gdm.vmware;
-const Params = imports.misc.params;
 const ShellEntry = imports.ui.shellEntry;
 const UserWidget = imports.ui.userWidget;
 const Util = imports.misc.util;
@@ -651,17 +650,15 @@ var AuthPrompt = GObject.registerClass({
         this._entry.clutter_text.insert_unichar(unichar);
     }
 
-    begin(params) {
-        params = Params.parse(params, { userName: null,
-                                        hold: null });
+    begin(params = {}) {
+        let { userName = null, hold = null } = params;
 
         this.updateSensitivity(false);
 
-        let hold = params.hold;
         if (!hold)
             hold = new Batch.Hold();
 
-        this._userVerifier.begin(params.userName, hold);
+        this._userVerifier.begin(userName, hold);
         this.verificationStatus = AuthPromptStatus.VERIFYING;
     }
 

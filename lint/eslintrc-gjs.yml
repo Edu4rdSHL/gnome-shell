@@ -47,7 +47,10 @@ rules:
     - error
     - property
   eol-last: error
-  eqeqeq: error
+  eqeqeq:
+    - error
+    - always
+    - "null": ignore
   func-call-spacing: error
   func-name-matching: error
   func-style:
@@ -71,7 +74,7 @@ rules:
   jsdoc/newline-after-description: error
   jsdoc/require-jsdoc: error
   jsdoc/require-param: error
-  jsdoc/require-param-description: error
+  jsdoc/require-param-description: off
   jsdoc/require-param-name: error
   jsdoc/require-param-type: error
   key-spacing:

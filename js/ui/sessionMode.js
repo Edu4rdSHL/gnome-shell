@@ -5,7 +5,6 @@ const GLib = imports.gi.GLib;
 const Signals = imports.signals;
 
 const FileUtils = imports.misc.fileUtils;
-const Params = imports.misc.params;
 
 const Config = imports.misc.config;
 
@@ -176,21 +175,22 @@ var SessionMode = class {
     }
 
     _sync() {
-        let params = _modes[this.currentMode];
-        let defaults;
-        if (params.parentMode) {
-            defaults = Params.parse(_modes[params.parentMode],
-                                    _modes[DEFAULT_MODE]);
-        } else {
-            defaults = _modes[DEFAULT_MODE];
-        }
-        params = Params.parse(params, defaults);
+        let { parentMode, ...params } = _modes[this.currentMode];
+
+        if (parentMode)
+            this.parentMode = parentMode;
+
+        const copiedParams = {
+            ..._modes[DEFAULT_MODE],
+            ...parentMode ? _modes[parentMode] : {},
+            ...params,
+        };
 
         // A simplified version of Lang.copyProperties, handles
         // undefined as a special case for "no change / inherit from previous mode"
-        for (let prop in params) {
-            if (params[prop] !== undefined)
-                this[prop] = params[prop];
+        for (const [prop, value] of Object.entries(copiedParams)) {
+            if (value !== undefined)
+                this[prop] = value;
         }
 
         this.emit('updated');

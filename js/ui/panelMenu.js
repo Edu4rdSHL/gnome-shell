@@ -4,19 +4,17 @@
 const { Atk, Clutter, GObject, St } = imports.gi;
 
 const Main = imports.ui.main;
-const Params = imports.misc.params;
 const PopupMenu = imports.ui.popupMenu;
 
 var ButtonBox = GObject.registerClass(
 class ButtonBox extends St.Widget {
     _init(params) {
-        params = Params.parse(params, {
+        super._init({
             style_class: 'panel-button',
             x_expand: true,
             y_expand: true,
-        }, true);
-
-        super._init(params);
+            ...params,
+        });
 
         this._delegate = this;
 

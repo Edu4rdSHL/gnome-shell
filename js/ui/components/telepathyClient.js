@@ -23,7 +23,6 @@ const History = imports.misc.history;
 const Main = imports.ui.main;
 const MessageList = imports.ui.messageList;
 const MessageTray = imports.ui.messageTray;
-const Params = imports.misc.params;
 const Util = imports.misc.util;
 
 const HAVE_TP = Tp != null && Tpl != null;
@@ -752,23 +751,23 @@ var ChatNotification = HAVE_TP ? GObject.registerClass({
 
     /**
      * _append:
-     * @param {Object} props: An object with the properties:
-     *  {string} props.body: The text of the message.
-     *  {string} props.group: The group of the message, one of:
+     * @param {Object} props An object with the properties:
+     * @param {string} props.body The text of the message.
+     * @param {string} props.group The group of the message, one of:
      *         'received', 'sent', 'meta'.
-     *  {string[]} props.styles: Style class names for the message to have.
-     *  {number} props.timestamp: The timestamp of the message.
-     *  {bool} props.noTimestamp: suppress timestamp signal?
+     * @param {string[]} props.styles Style class names for the message to have.
+     * @param {number} props.timestamp The timestamp of the message.
+     * @param {boolean} [props.noTimestamp] suppress timestamp signal?
      */
-    _append(props) {
+    _append(props = {}) {
         let currentTime = Date.now() / 1000;
-        props = Params.parse(props, { body: null,
-                                      group: null,
-                                      styles: [],
-                                      timestamp: currentTime,
-                                      noTimestamp: false });
-        const { noTimestamp } = props;
-        delete props.noTimestamp;
+        const {
+            noTimestamp = currentTime,
+            showTimestamp = false,
+            body = null,
+            group = null,
+            styles = [],
+        } = props;
 
         // Reset the old message timeout
         if (this._timestampTimeoutId)
@@ -777,8 +776,10 @@ var ChatNotification = HAVE_TP ? GObject.registerClass({
 
         let message = new ChatNotificationMessage({
             realMessage: props.group !== 'meta',
-            showTimestamp: false,
-            ...props,
+            showTimestamp,
+            body,
+            group,
+            styles,
         });
 
         this.messages.unshift(message);
