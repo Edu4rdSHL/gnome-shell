@@ -690,7 +690,7 @@ export const LayoutManager = GObject.registerClass({
                 if (this.primaryMonitor) {
                     this._systemBackground.show();
                     global.stage.show();
-                    this._prepareStartupAnimation().catch(logError);
+                    this._prepareStartupAnimation();
                     return GLib.SOURCE_REMOVE;
                 } else {
                     return GLib.SOURCE_CONTINUE;
@@ -715,7 +715,7 @@ export const LayoutManager = GObject.registerClass({
     // When starting a normal user session, we want to grow it out of the middle
     // of the screen.
 
-    async _prepareStartupAnimation() {
+    _prepareStartupAnimation() {
         // During the initial transition, add a simple actor to block all events,
         // so they don't get delivered to X11 windows that have been transformed.
         this._coverPane = new Clutter.Actor({
@@ -754,7 +754,7 @@ export const LayoutManager = GObject.registerClass({
 
             global.window_group.set_clip(monitor.x, monitor.y, monitor.width, monitor.height);
 
-            await this._updateBackgrounds();
+            this._updateBackgrounds();
         }
 
         // Hack: Work around grab issue when testing greeter UI in nested
