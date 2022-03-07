@@ -130,29 +130,15 @@ class LoginManagerSystemd extends Signals.EventEmitter {
         let sessionId = GLib.getenv('XDG_SESSION_ID');
         if (!sessionId) {
             log('Unset XDG_SESSION_ID, getCurrentSessionProxy() called outside a user session. Asking logind directly.');
-            let [session, objectPath] = this._userProxy.Display;
-            if (session) {
-                log(`Will monitor session ${session}`);
-                sessionId = session;
-            } else {
-                log('Failed to find "Display" session; are we the greeter?');
-
-                for ([session, objectPath] of this._userProxy.Sessions) {
-                    let sessionProxy = new SystemdLoginSession(Gio.DBus.system,
-                        'org.freedesktop.login1',
-                        objectPath);
-                    log(`Considering ${session}, class=${sessionProxy.Class}`);
-                    if (sessionProxy.Class === 'greeter') {
-                        log(`Yes, will monitor session ${session}`);
-                        sessionId = session;
-                        break;
-                    }
-                }
-
-                if (!sessionId) {
-                    log('No, failed to get session from logind.');
-                    return null;
-                }
+            try {
+                let session = new SystemdLoginSession(Gio.DBus.system,
+                    'org.freedesktop.login1',
+                    '/org/freedesktop/login1/session/auto');
+                log(`Will monitor session ${session.Id}`);
+                sessionId = session.Id;
+            } catch (error) {
+                logError(error, 'Failed to get session from logind');
+                return null;
             }
         }
 
