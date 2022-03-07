@@ -7,10 +7,12 @@ import * as Signals from './signals.js';
 import {loadInterfaceXML} from './fileUtils.js';
 
 const SystemdLoginManagerIface = loadInterfaceXML('org.freedesktop.login1.Manager');
+const SystemdLoginSeatIface = loadInterfaceXML('org.freedesktop.login1.Seat');
 const SystemdLoginSessionIface = loadInterfaceXML('org.freedesktop.login1.Session');
 const SystemdLoginUserIface = loadInterfaceXML('org.freedesktop.login1.User');
 
 const SystemdLoginManager = Gio.DBusProxy.makeProxyWrapper(SystemdLoginManagerIface);
+const SystemdLoginSeat = Gio.DBusProxy.makeProxyWrapper(SystemdLoginSeatIface);
 const SystemdLoginSession = Gio.DBusProxy.makeProxyWrapper(SystemdLoginSessionIface);
 const SystemdLoginUser = Gio.DBusProxy.makeProxyWrapper(SystemdLoginUserIface);
 
@@ -103,6 +105,22 @@ class LoginManagerSystemd extends Signals.EventEmitter {
             this._prepareForSleep.bind(this));
         this._proxy.connectSignal('SessionRemoved',
             this._sessionRemoved.bind(this));
+    }
+
+    async getCurrentSeatProxy() {
+        if (this._currentSeat)
+            return this._currentSeat;
+
+        try {
+            let session = await this.getCurrentSessionProxy();
+            const [seatName_, objectPath] = session.Seat;
+            this._currentSeat = new SystemdLoginSeat(Gio.DBus.system,
+                'org.freedesktop.login1', objectPath);
+            return this._currentSeat;
+        } catch (error) {
+            logError(error, 'Could not get a proxy for the current session');
+            return null;
+        }
     }
 
     async getCurrentSessionProxy() {
@@ -224,6 +242,10 @@ class LoginManagerDummy extends Signals.EventEmitter  {
         // expect (at the time of writing: connect() and connectSignal()
         // methods), but just never settling the promise should be safer
         return new Promise(() => {});
+    }
+
+    getCurrentSeatProxy() {
+        return new Promise(resolve => resolve(null));
     }
 
     canSuspend() {
