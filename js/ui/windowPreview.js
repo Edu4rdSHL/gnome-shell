@@ -107,6 +107,7 @@ export const WindowPreview = GObject.registerClass({
 
         this._draggable = DND.makeDraggable(this, {
             restoreOnSuccess: true,
+            timeoutThreshold: 250,
             dragActorMaxSize: WINDOW_DND_SIZE,
             dragActorOpacity: DRAGGING_WINDOW_OPACITY,
         });
@@ -115,15 +116,9 @@ export const WindowPreview = GObject.registerClass({
         this._draggable.connect('drag-end', this._onDragEnd.bind(this));
         this.inDrag = false;
 
-        let clickAction = new Clutter.ClickAction();
-        clickAction.connect('clicked', () => this._activate());
-        clickAction.connect('long-press', (action, actor, state) => {
-            if (state === Clutter.LongPressState.ACTIVATE)
-                this.showOverlay(true);
-            return true;
-        });
-
-        this._draggable.addClickAction(clickAction);
+        const clickGesture = new Clutter.ClickGesture();
+        clickGesture.connect('recognize', () => this._activate());
+        this.add_action(clickGesture);
 
         this._overlayEnabled = true;
         this._overlayShown = false;

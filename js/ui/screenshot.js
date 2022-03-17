@@ -3022,13 +3022,17 @@ class PickPixel extends St.Widget {
         });
         this.add_constraint(constraint);
 
-        const action = new Clutter.ClickAction();
-        action.connect('clicked', async () => {
-            await this._pickColor(...action.get_coords());
+        const clickGesture = new Clutter.ClickGesture();
+        clickGesture.connect('recognize', async () => {
+            const coords = clickGesture.get_coords();
+            const point = new Graphene.Point3D({x: coords.x, y: coords.y});
+            const transformedPoint = this.apply_transform_to_point(point);
+
+            await this._pickColor(transformedPoint.x, transformedPoint.y);
             this._result = this._color;
             this._grabHelper.ungrab();
         });
-        this.add_action(action);
+        this.add_action(clickGesture);
 
         this._recolorEffect = new RecolorEffect({
             chroma: new Clutter.Color({

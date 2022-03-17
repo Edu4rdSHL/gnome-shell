@@ -1,6 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 import Clutter from 'gi://Clutter';
+import Graphene from 'gi://Graphene';
 import St from 'gi://St';
 
 import * as BoxPointer from './boxpointer.js';
@@ -52,14 +53,15 @@ export function addBackgroundMenu(actor, layoutManager) {
     });
     actor.add_action(longPressGesture);
 
-    let clickAction = new Clutter.ClickAction();
-    clickAction.connect('clicked', action => {
-        if (action.get_button() === 3) {
-            let [x, y] = action.get_coords();
-            openMenu(x, y);
-        }
+    const clickGesture = new Clutter.ClickGesture();
+    clickGesture.set_required_button(Clutter.BUTTON_SECONDARY);
+    clickGesture.connect('recognize', () => {
+        const coords = clickGesture.get_coords();
+        const point = new Graphene.Point3D({x: coords.x, y: coords.y});
+        const transformedPoint = actor.apply_transform_to_point(point);
+        openMenu(transformedPoint.x, transformedPoint.y);
     });
-    actor.add_action(clickAction);
+    actor.add_action(clickGesture);
 
     actor.connect('destroy', () => {
         actor._backgroundMenu.destroy();

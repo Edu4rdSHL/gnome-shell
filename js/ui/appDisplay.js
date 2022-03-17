@@ -2507,16 +2507,19 @@ export const AppFolderDialog = GObject.registerClass({
 
         this.add_constraint(new Layout.MonitorConstraint({primary: true}));
 
-        const clickAction = new Clutter.ClickAction();
-        clickAction.connect('clicked', () => {
-            const [x, y] = clickAction.get_coords();
-            const actor =
-                global.stage.get_actor_at_pos(Clutter.PickMode.ALL, x, y);
+        const clickGesture = new Clutter.ClickGesture();
+        clickGesture.connect('may-recognize', () => {
+            const coords = clickGesture.get_coords();
+            const point = new Graphene.Point3D({x: coords.x, y: coords.y});
+            const transformedPoint = this.apply_transform_to_point(point);
 
-            if (actor === this)
-                this.popdown();
+            const actor = global.stage.get_actor_at_pos(
+                Clutter.PickMode.ALL, transformedPoint.x, transformedPoint.y);
+
+            return actor === this;
         });
-        this.add_action(clickAction);
+        clickGesture.connect('recognize', () => this.popdown());
+        this.add_action(clickGesture);
 
         this._source = source;
         this._folder = folder;
