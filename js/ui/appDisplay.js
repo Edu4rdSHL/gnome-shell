@@ -2081,7 +2081,7 @@ class AppViewItem extends St.Button {
     cancelActions() {
         if (this._draggable)
             this._draggable.fakeRelease();
-        this.fake_release();
+        this.get_click_gesture().set_state(Clutter.GestureState.CANCELLED);
     }
 
     get id() {
@@ -3074,21 +3074,14 @@ export const AppIcon = GObject.registerClass({
             this._dot.hide();
     }
 
-    vfunc_leave_event(event) {
-        const ret = super.vfunc_leave_event(event);
-
-        this.fake_release();
-        return ret;
-    }
-
     vfunc_button_press_event(event) {
-        const ret = super.vfunc_button_press_event(event);
         const button = event.get_button();
         if (button === Clutter.BUTTON_SECONDARY) {
             this.popupMenu();
             return Clutter.EVENT_STOP;
         }
-        return ret;
+
+        return Clutter.EVENT_PROPAGATE;
     }
 
     vfunc_clicked(button) {
@@ -3106,7 +3099,7 @@ export const AppIcon = GObject.registerClass({
 
     popupMenu(takeGrab = true) {
         this.setForcedHighlight(true);
-        this.fake_release();
+        this.get_click_gesture().set_state(Clutter.GestureState.CANCELLED);
 
         if (!this._menu) {
             this._menu = new AppMenu(this, this._popupMenuSide, {
