@@ -32,6 +32,7 @@ const LoginManager = imports.misc.loginManager;
 const Main = imports.ui.main;
 const PopupMenu = imports.ui.popupMenu;
 const Realmd = imports.gdm.realmd;
+const Fwupd = imports.gdm.fwupdChecker;
 const UserWidget = imports.ui.userWidget;
 
 const _FADE_ANIMATION_TIME = 250;
@@ -446,6 +447,8 @@ var LoginDialog = GObject.registerClass({
         });
         this.add_child(this._userSelectionBox);
 
+
+
         this._userList = new UserList();
         this._userSelectionBox.add_child(this._userList);
 
@@ -522,6 +525,32 @@ var LoginDialog = GObject.registerClass({
             this._onUserListActivated(item);
         });
 
+        this._warningBoxLayout = new St.BoxLayout({
+            style_class: 'login-dialog-secure-boot-warning-box',
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+            vertical: false,
+            visible: false,
+        });
+        this.add_child(this._warningBoxLayout);
+
+        this._secureBootWarningIcon = new St.Icon({
+            icon_name: 'dialog-warning-symbolic',
+            style_class: 'log-dialog-secure-boot-warning-icon',
+        });
+        this._warningBoxLayout.add_child(this._secureBootWarningIcon);
+
+        this._securebootWarningLabel = new St.Label({
+            text: _('Secure Boot is Inactive'),
+            style_class: 'login-dialog-secure-boot-warning-label',
+        });
+        this._warningBoxLayout.add_child(this._securebootWarningLabel);
+
+        this._warningBoxLayout.visible = false;
+
+        this._FwupdCheck = new Fwupd.FwupdChecker();
+        this._FwupdCheck.test(this);
+
         this._disableUserList = undefined;
         this._userListLoaded = false;
 
@@ -562,7 +591,18 @@ var LoginDialog = GObject.registerClass({
         actorBox.y1 = dialogBox.y2 - natHeight;
         actorBox.x2 = actorBox.x1 + natWidth;
         actorBox.y2 = actorBox.y1 + natHeight;
+        return actorBox;
+    }
 
+    _getWarningBinAllocation(dialogBox) {
+        let actorBox = new Clutter.ActorBox();
+
+        let [, , natWidth, natHeight] = this._warningBoxLayout.get_preferred_size();
+
+        actorBox.x1 = dialogBox.x1 + (natWidth * 0.1);
+        actorBox.y1 = dialogBox.y2 - natHeight - (natWidth * 0.1);
+        actorBox.x2 = actorBox.x1 + natWidth;
+        actorBox.y2 = actorBox.y1 + natHeight;
         return actorBox;
     }
 
@@ -638,6 +678,9 @@ var LoginDialog = GObject.registerClass({
             logoAllocation = this._getLogoBinAllocation(dialogBox);
             logoHeight = logoAllocation.y2 - logoAllocation.y1;
         }
+
+        let warningAllocation = null;
+        warningAllocation = this._getWarningBinAllocation(dialogBox);
 
         let sessionMenuButtonAllocation = null;
         if (this._sessionMenuButton.visible)
@@ -741,6 +784,9 @@ var LoginDialog = GObject.registerClass({
 
         if (logoAllocation)
             this._logoBin.allocate(logoAllocation);
+
+        if (warningAllocation)
+            this._warningBoxLayout.allocate(warningAllocation);
 
         if (sessionMenuButtonAllocation)
             this._sessionMenuButton.allocate(sessionMenuButtonAllocation);

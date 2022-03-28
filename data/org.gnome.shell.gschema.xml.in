@@ -362,4 +362,17 @@
       </description>
     </key>
   </schema>
+
+  <schema id="org.gnome.shell.sb-check"
+          path="/org/gnome/shell/sb-check/"
+          gettext-domain="@GETTEXT_PACKAGE@">
+    <key type="b" name="notification-present">
+      <default>true</default>
+      <summary>Present a notification when secure boot is disabled.</summary>
+      <description>
+	If true, a notification will be present if secure boot is not correctly configured.
+	Otherwise, the notification will not be shown.
+      </description>
+    </key>
+  </schema>
 </schemalist>

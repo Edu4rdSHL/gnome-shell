@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
   <gresource prefix="/org/gnome/shell">
+    <file>fwupd/fwupd.js</file>
+
     <file>gdm/authList.js</file>
     <file>gdm/authPrompt.js</file>
     <file>gdm/batch.js</file>
@@ -10,6 +12,7 @@
     <file>gdm/vmware.js</file>
     <file>gdm/realmd.js</file>
     <file>gdm/util.js</file>
+    <file>gdm/fwupdChecker.js</file>
 
     <file>misc/config.js</file>
     <file>misc/extensionUtils.js</file>
