@@ -621,9 +621,9 @@ const EmojiPager = GObject.registerClass({
             Clutter.Orientation.HORIZONTAL,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
             {allowDrag: true, allowScroll: true});
-        swipeTracker.connect('begin', this._onSwipeBegin.bind(this));
-        swipeTracker.connect('update', this._onSwipeUpdate.bind(this));
-        swipeTracker.connect('end', this._onSwipeEnd.bind(this));
+        swipeTracker.connect('swipe-begin', this._onSwipeBegin.bind(this));
+        swipeTracker.connect('swipe-update', this._onSwipeUpdate.bind(this));
+        swipeTracker.connect('swipe-end', this._onSwipeEnd.bind(this));
         this._swipeTracker = swipeTracker;
 
         this.connect('destroy', () => this._onDestroy());

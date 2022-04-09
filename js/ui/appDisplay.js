@@ -625,11 +625,15 @@ var BaseAppView = GObject.registerClass({
 
         // Swipe
         this._swipeTracker = new SwipeTracker.SwipeTracker(this._scrollView,
-            Clutter.Orientation.HORIZONTAL, this.gestureModes);
+            Clutter.Orientation.HORIZONTAL,
+            this.gestureModes,
+            {
+                name: 'AppDisplay swipe tracker',
+            });
         this._swipeTracker.orientation = Clutter.Orientation.HORIZONTAL;
-        this._swipeTracker.connect('begin', this._swipeBegin.bind(this));
-        this._swipeTracker.connect('update', this._swipeUpdate.bind(this));
-        this._swipeTracker.connect('end', this._swipeEnd.bind(this));
+        this._swipeTracker.connect('swipe-begin', this._swipeBegin.bind(this));
+        this._swipeTracker.connect('swipe-update', this._swipeUpdate.bind(this));
+        this._swipeTracker.connect('swipe-end', this._swipeEnd.bind(this));
 
         this._orientation = Clutter.Orientation.HORIZONTAL;
 

@@ -505,10 +505,13 @@ export const UnlockDialog = GObject.registerClass({
 
         this._swipeTracker = new SwipeTracker.SwipeTracker(this,
             Clutter.Orientation.VERTICAL,
-            Shell.ActionMode.UNLOCK_SCREEN);
-        this._swipeTracker.connect('begin', this._swipeBegin.bind(this));
-        this._swipeTracker.connect('update', this._swipeUpdate.bind(this));
-        this._swipeTracker.connect('end', this._swipeEnd.bind(this));
+            Shell.ActionMode.UNLOCK_SCREEN,
+            {
+                name: 'UnlockDialog swipe tracker',
+            });
+        this._swipeTracker.connect('swipe-begin', this._swipeBegin.bind(this));
+        this._swipeTracker.connect('swipe-update', this._swipeUpdate.bind(this));
+        this._swipeTracker.connect('swipe-end', this._swipeEnd.bind(this));
 
         this.connect('scroll-event', (o, event) => {
             if (this._swipeTracker.canHandleScrollEvent(event))
