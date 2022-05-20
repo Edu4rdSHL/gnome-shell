@@ -303,6 +303,31 @@ class IbusCandidatePopup extends BoxPointer.BoxPointer {
     }
 
     _setDummyCursorGeometry(x, y, w, h) {
+        // GTK4 IMContext does not provide the absolute position of the focused
+        // widgets and IM clients get the current window position instead
+        // using X APIs in Xorg and this cursor position is the window position.
+        // The IbusCandidatePopup could be placed off the screen easily and
+        // the cursor position is adjusted within the workarea here.
+        if (global.display.focus_window != null) {
+            let [, , natWidth, natHeight] = this.get_preferred_size();
+            let window = global.display.focus_window.get_compositor_private();
+            let monitorIndex = Main.layoutManager.findIndexForActor(this._dummyCursor);
+            let workArea = Main.layoutManager.getWorkAreaForMonitor(monitorIndex);
+            if (x + natWidth > workArea.width)
+                x = x - natWidth;
+            if (x < workArea.x)
+                x = workArea.x;
+            if (y + h + natHeight > workArea.height)
+                y = y - h - natHeight;
+            if (y + h < window.y && y + h + natHeight > window.y)
+                y = window.y - h - natHeight;
+            if (y < workArea.y) {
+                y = workArea.y;
+                // h would be the window height in GTK4 Xorg
+                if (h > 50)
+                    h = 5;
+            }
+        }
         this._dummyCursor.set_position(Math.round(x), Math.round(y));
         this._dummyCursor.set_size(Math.round(w), Math.round(h));
 
