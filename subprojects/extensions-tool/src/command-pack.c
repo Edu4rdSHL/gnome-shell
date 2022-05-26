@@ -30,9 +30,10 @@
 
 typedef struct _ExtensionPack {
   GHashTable *files;
-  JsonObject *metadata;
   GFile *tmpdir;
   char *srcdir;
+  char *metadata_uuid;
+  char *metadata_gettext_domain;
 } ExtensionPack;
 
 static void extension_pack_free (ExtensionPack *);
@@ -55,8 +56,9 @@ extension_pack_free (ExtensionPack *pack)
     file_delete_recursively (pack->tmpdir, NULL);
 
   g_clear_pointer (&pack->files, g_hash_table_destroy);
-  g_clear_pointer (&pack->metadata, json_object_unref);
   g_clear_pointer (&pack->srcdir, g_free);
+  g_clear_pointer (&pack->metadata_uuid, g_free);
+  g_clear_pointer (&pack->metadata_gettext_domain, g_free);
   g_clear_object (&pack->tmpdir);
   g_free (pack);
 }
@@ -103,15 +105,35 @@ ensure_tmpdir (ExtensionPack  *pack,
 }
 
 static gboolean
-ensure_metadata (ExtensionPack  *pack,
-                 GError        **error)
+ensure_metadata_ini (ExtensionPack  *pack,
+                     GError        **error)
+{
+  g_autoptr (GKeyFile) key_file = NULL;
+  const char *path;
+
+  if (!extension_pack_check_required_file (pack, "metadata.ini", error))
+    return FALSE;
+
+  path = g_file_peek_path (g_hash_table_lookup (pack->files, "metadata.ini"));
+  key_file = g_key_file_new ();
+
+  if (!g_key_file_load_from_file (key_file, path, G_KEY_FILE_NONE, error))
+    return FALSE;
+
+  pack->metadata_uuid = g_key_file_get_string (key_file, INI_GROUP_NAME, "Uuid", NULL);
+  pack->metadata_gettext_domain = g_key_file_get_string (key_file, INI_GROUP_NAME, "GettextDomain", NULL);
+  return TRUE;
+}
+
+static gboolean
+ensure_metadata_json (ExtensionPack  *pack,
+                      GError        **error)
 {
   g_autoptr (JsonParser) parser = NULL;
   g_autoptr (GInputStream) stream = NULL;
+  JsonObject *root;
   GFile *file = NULL;
-
-  if (pack->metadata != NULL)
-    return TRUE;
+  const char *str;
 
   if (!extension_pack_check_required_file (pack, "metadata.json", error))
     return FALSE;
@@ -127,8 +149,31 @@ ensure_metadata (ExtensionPack  *pack,
   if (!json_parser_load_from_stream (parser, stream, NULL, error))
     return FALSE;
 
-  pack->metadata = json_node_dup_object (json_parser_get_root (parser));
+  root = json_node_get_object (json_parser_get_root (parser));
+
+  str = json_object_get_string_member (root, "uuid");
+  pack->metadata_uuid = g_strdup (str);
+
+  if (json_object_has_member (root, "gettext-domain"))
+    {
+      str = json_object_get_string_member (root, "gettext-domain");
+      pack->metadata_gettext_domain = g_strdup (str);
+    }
+
   return TRUE;
+}
+
+static gboolean
+ensure_metadata (ExtensionPack  *pack,
+                 GError        **error)
+{
+  if (pack->metadata_uuid != NULL)
+    return TRUE;
+
+  if (g_hash_table_lookup (pack->files, "metadata.ini"))
+    return ensure_metadata_ini (pack, error);
+  else
+    return ensure_metadata_json (pack, error);
 }
 
 static gboolean
@@ -214,12 +259,10 @@ extension_pack_add_locales (ExtensionPack  *pack,
       if (!ensure_metadata (pack, error))
         return FALSE;
 
-      if (json_object_has_member (pack->metadata, "gettext-domain"))
-        gettext_domain = json_object_get_string_member (pack->metadata,
-                                                        "gettext-domain");
+      if (pack->metadata_gettext_domain)
+        gettext_domain = pack->metadata_gettext_domain;
       else
-        gettext_domain = json_object_get_string_member (pack->metadata,
-                                                        "uuid");
+        gettext_domain = pack->metadata_uuid;
     }
 
   dstpath = g_file_get_path (dstdir);
@@ -287,7 +330,7 @@ extension_pack_compress (ExtensionPack  *pack,
   if (!ensure_metadata (pack, error))
     return FALSE;
 
-  uuid = json_object_get_string_member (pack->metadata, "uuid");
+  uuid = pack->metadata_uuid;
   name = g_strdup_printf ("%s.shell-extension.zip", uuid);
   outfile = g_file_new_for_commandline_arg_and_cwd (name, outdir);
 
@@ -386,6 +429,7 @@ pack_extension (char      *srcdir,
 
   pack = extension_pack_new (srcdir);
   extension_pack_add_source (pack, "extension.js");
+  extension_pack_add_source (pack, "metadata.ini");
   extension_pack_add_source (pack, "metadata.json");
   extension_pack_add_source (pack, "stylesheet-dark.css");
   extension_pack_add_source (pack, "stylesheet-light.css");
@@ -398,8 +442,11 @@ pack_extension (char      *srcdir,
   if (!extension_pack_check_required_file (pack, "extension.js", &error))
     goto err;
 
-  if (!extension_pack_check_required_file (pack, "metadata.json", &error))
+  if (!extension_pack_check_required_file (pack, "metadata.ini", &error) &&
+      !extension_pack_check_required_file (pack, "metadata.json", NULL))
     goto err;
+
+  g_clear_error (&error);
 
   if (schemas == NULL)
     schemas = find_schemas (srcdir, &error);
