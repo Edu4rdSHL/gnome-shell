@@ -715,6 +715,8 @@ export class BackgroundManager extends Signals.EventEmitter {
         this._controlPosition = params.controlPosition;
         this._useContentSize = params.useContentSize;
 
+        this._loadedIdleId = 0;
+        this._loadedSignalId = 0;
         this.backgroundActor = this._createBackgroundActor();
         this._newBackgroundActor = null;
     }
@@ -788,6 +790,10 @@ export class BackgroundManager extends Signals.EventEmitter {
         }
     }
 
+    isLoading() {
+        return this._loadedSignalId !== 0;
+    }
+
     _createBackgroundActor() {
         let background = this._backgroundSource.getBackground(this._monitorIndex);
         let backgroundActor = new Meta.BackgroundActor({
@@ -820,16 +826,22 @@ export class BackgroundManager extends Signals.EventEmitter {
             this._updateBackgroundActor();
         });
 
-        let loadedSignalId;
         if (background.isLoaded) {
-            GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            if (this._loadedIdleId)  // via _updateBackgroundActor()
+                GLib.source_remove(this._loadedIdleId);
+
+            this._loadedIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                 this.emit('loaded');
+                this._loadedIdleId = 0;
                 return GLib.SOURCE_REMOVE;
             });
         } else {
-            loadedSignalId = background.connect('loaded', () => {
-                background.disconnect(loadedSignalId);
-                loadedSignalId = null;
+            if (this._loadedSignalId)  // via _updateBackgroundActor()
+                background.disconnect(this._loadedSignalId);
+
+            this._loadedSignalId = background.connect('loaded', () => {
+                background.disconnect(this._loadedSignalId);
+                this._loadedSignalId = 0;
                 this.emit('loaded');
             });
         }
@@ -838,8 +850,15 @@ export class BackgroundManager extends Signals.EventEmitter {
             if (changeSignalId)
                 background.disconnect(changeSignalId);
 
-            if (loadedSignalId)
-                background.disconnect(loadedSignalId);
+            if (this._loadedIdleId) {
+                GLib.source_remove(this._loadedIdleId);
+                this._loadedIdleId = 0;
+            }
+
+            if (this._loadedSignalId) {
+                background.disconnect(this._loadedSignalId);
+                this._loadedSignalId = 0;
+            }
 
             if (backgroundActor.loadedSignalId)
                 background.disconnect(backgroundActor.loadedSignalId);
