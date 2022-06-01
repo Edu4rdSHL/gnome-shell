@@ -132,13 +132,11 @@ $default_key_bg_color: if($variant=='light', darken($key_bg_color, 11%), darken(
 .word-suggestions {
   @include fontsize($base_font_size + 3);
   spacing: 12px;
-  min-height: 20pt;
-  padding: $base_padding*2;
   color: $osd_fg_color;
 
   // each suggestion
   StButton {
-    margin: 0 3px;
+    margin: $base_padding 3px;
     min-width: 32px;
     border-radius: $base_border_radius - 2px;
     padding: $base_padding $base_padding*3;
