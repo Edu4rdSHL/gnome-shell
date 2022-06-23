@@ -32,7 +32,7 @@ const LoginManager = imports.misc.loginManager;
 const Main = imports.ui.main;
 const PopupMenu = imports.ui.popupMenu;
 const Realmd = imports.gdm.realmd;
-const Fwupd = imports.gdm.fwupdChecker;
+const SecureBootCheck = imports.misc.secureBootChecker;
 const UserWidget = imports.ui.userWidget;
 
 const _FADE_ANIMATION_TIME = 250;
@@ -546,10 +546,16 @@ var LoginDialog = GObject.registerClass({
         });
         this._warningBoxLayout.add_child(this._securebootWarningLabel);
 
-        this._warningBoxLayout.visible = false;
+        this._secureBootCheck = new SecureBootCheck.secureBootChecker();
+        this._secureBootCheck.getSecureBootState().then(res => {
+            this._secureBootCheck.setSecureBootNotification(res);
 
-        this._FwupdCheck = new Fwupd.FwupdChecker();
-        this._FwupdCheck.test(this);
+            if (res === SecureBootCheck.SecureBootState.INACTIVE |
+                res === SecureBootCheck.SecureBootState.REDUCED) {
+                this._securebootWarningLabel.set_text(_('Secure Boot is not Available.'));
+                this._warningBoxLayout.visible = true;
+            }
+        });
 
         this._disableUserList = undefined;
         this._userListLoaded = false;
