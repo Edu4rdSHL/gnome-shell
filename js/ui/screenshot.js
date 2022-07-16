@@ -1,7 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported ScreenshotService, ScreenshotUI, showScreenshotUI, captureScreenshot */
 
-const { Clutter, Cogl, Gio, GObject, GLib, Graphene, Gtk, Meta, Shell, St } = imports.gi;
+const { Clutter, Cogl, Gio, GObject, GLib, Graphene, Gtk, Meta, Pango, Shell, St } = imports.gi;
 
 const Config = imports.misc.config;
 const GrabHelper = imports.ui.grabHelper;
@@ -113,6 +113,42 @@ class Tooltip extends St.Label {
     }
 });
 
+var SizeIndicator = GObject.registerClass(
+class SizeIndicator extends St.Widget {
+    _init() {
+        super._init({
+            style_class: 'screenshot-ui-size-indicator',
+            reactive: false,
+            visible: false,
+            layout_manager: new Clutter.BinLayout(),
+        });
+        this._label = new St.Label();
+        // We will hide indicator if space is not enough, so don't wrap text.
+        this._clutter_text = this._label.get_clutter_text();
+        this._clutter_text.set_single_line_mode(true);
+        this._clutter_text.set_ellipsize(Pango.EllipsizeMode.NONE);
+        this._clutter_text.set_line_alignment(Pango.Alignment.CENTER);
+        this.add_child(this._label);
+        // Prevent it from covering content.
+        this.set_opacity(160);
+    }
+
+    setParentSize(width, height) {
+        /* Translators: This represents the size of a window. The first number is
+         * the width of the window and the second is the height. */
+        let text = _("%d × %d").format(width, height);
+        this._label.set_text(text);
+        // If user selects a small area, this widget may block content or grow
+        // out of selection, so we hide it if too small.
+        const [, , natureWidth, natureHeight] = this.get_preferred_size();
+        if (width < natureWidth || height < natureHeight) {
+            this.hide();
+        } else {
+            this.show();
+        }
+    }
+});
+
 var UIAreaIndicator = GObject.registerClass(
 class UIAreaIndicator extends St.Widget {
     _init(params) {
@@ -188,8 +224,15 @@ class UIAreaIndicator extends St.Widget {
         }));
         this.add_child(this._rightRect);
 
-        this._selectionRect = new St.Widget({ style_class: 'screenshot-ui-area-indicator-selection' });
+        this._selectionRect = new St.Widget({
+            style_class: 'screenshot-ui-area-indicator-selection',
+            // To make size indicator in center.
+            layout_manager: new Clutter.BinLayout(),
+        });
         this.add_child(this._selectionRect);
+
+        this._sizeIndicator = new SizeIndicator();
+        this._selectionRect.add_child(this._sizeIndicator);
 
         this._topRect.add_constraint(new Clutter.SnapConstraint({
             source: this._selectionRect,
@@ -219,6 +262,7 @@ class UIAreaIndicator extends St.Widget {
     setSelectionRect(x, y, width, height) {
         this._selectionRect.set_position(x, y);
         this._selectionRect.set_size(width, height);
+        this._sizeIndicator.setParentSize(width, height);
     }
 });
 
