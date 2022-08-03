@@ -1,7 +1,8 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /* exported PopupMenuItem, PopupSeparatorMenuItem, Switch, PopupSwitchMenuItem,
             PopupImageMenuItem, PopupMenu, PopupDummyMenu, PopupSubMenu,
-            PopupMenuSection, PopupSubMenuMenuItem, PopupMenuManager */
+            PopupMenuSection, PopupSubMenuMenuItem, PopupAutoSubMenuMenuItem,
+            PopupMenuManager */
 
 const { Atk, Clutter, Gio, GObject, Graphene, Shell, St } = imports.gi;
 const Signals = imports.misc.signals;
@@ -479,6 +480,10 @@ class PopupImageMenuItem extends PopupBaseMenuItem {
             this._icon.gicon = icon;
         else
             this._icon.icon_name = icon;
+    }
+
+    setIconVisibility(visible) {
+        this._icon.visible = visible;
     }
 });
 
@@ -1205,6 +1210,21 @@ class PopupSubMenuMenuItem extends PopupBaseMenuItem {
         this.connect('destroy', () => this.menu.destroy());
     }
 
+    setText(text) {
+        this.label.text = text;
+    }
+
+    setIcon(icon) {
+        if (!this.icon)
+            return;
+
+        // The 'icon' parameter can be either a Gio.Icon or a string.
+        if (icon instanceof GObject.Object && GObject.type_is_a(icon, Gio.Icon))
+            this.icon.gicon = icon;
+        else
+            this.icon.icon_name = icon;
+    }
+
     _setParent(parent) {
         super._setParent(parent);
         this.menu._setParent(parent);
@@ -1281,6 +1301,152 @@ class PopupSubMenuMenuItem extends PopupBaseMenuItem {
             this._setOpenState(!this._getOpenState());
         }
         return Clutter.EVENT_PROPAGATE;
+    }
+});
+
+var PopupAutoSubMenuMenuItem = GObject.registerClass({
+    Signals: {
+        'items-visibility-changed': {},
+    },
+},
+class PopupAutoSubMenuMenuItem extends PopupSubMenuMenuItem {
+    _init(text, wantIcon) {
+        super._init(text, wantIcon);
+
+        this.menu.box.connect('actor-added', (_box, actor) => {
+            const menuItem = actor._delegate;
+            if (menuItem instanceof PopupBaseMenuItem) {
+                this._itemsVisibilityChanged();
+                menuItem._subMenuNotifyVisibleId = menuItem.connect('notify::visible',
+                    this._itemsVisibilityChanged.bind(this));
+            }
+        });
+
+        this.menu.box.connect('actor-removed', (_box, actor) => {
+            const menuItem = actor._delegate;
+            if (menuItem && menuItem._subMenuNotifyVisibleId) {
+                menuItem.disconnect(menuItem._subMenuNotifyVisibleId);
+                delete menuItem._subMenuNotifyVisibleId;
+                this._itemsVisibilityChanged();
+            }
+        });
+    }
+
+    getVisibleItems() {
+        return this.menu._getMenuItems().filter(v =>
+            v.visible && !(v instanceof PopupSeparatorMenuItem));
+    }
+
+    _itemsVisibilityChanged() {
+        const visibleItems = this.getVisibleItems();
+
+        if (visibleItems.length === 1) {
+            if (this._visibleItem === visibleItems[0])
+                return;
+
+            if (this._labelBinding)
+                this._labelBinding.unbind();
+            if (this._iconBinding)
+                this._iconBinding.unbind();
+            if (this._giconBinding)
+                this._giconBinding.unbind();
+
+            this._visibleItem = visibleItems[0];
+            this._triangle.visible = false;
+            this._defaultText = this.label.text;
+
+            const bindFlags = GObject.BindingFlags.DEFAULT | GObject.BindingFlags.SYNC_CREATE;
+            this._labelBinding = this._visibleItem.label.bind_property('text',
+                this.label, 'text', bindFlags);
+
+            if (this.icon && this._visibleItem instanceof PopupImageMenuItem) {
+                this._defaultIconProps = { gicon: this.icon.gicon, icon_name: this.icon.icon_name };
+                this._labelBinding = this._visibleItem._icon.bind_property('gicon',
+                    this.icon, 'gicon', bindFlags);
+                this._labelBinding = this._visibleItem._icon.bind_property('icon-name',
+                    this.icon, 'icon-name', bindFlags);
+            }
+            return;
+        } else if (this._visibleItem) {
+            this._labelBinding.unbind();
+            this._triangle.visible = this.sensitive;
+            this.label.text = this._defaultText;
+
+            if (this._iconBinding)
+                this._iconBinding.unbind();
+            if (this._giconBinding)
+                this._giconBinding.unbind();
+
+            if (this._defaultIconProps)
+                Object.assign(this.icon, this._defaultIconProps);
+
+            delete this._labelBinding;
+            delete this._iconBinding;
+            delete this._giconBinding;
+            delete this._visibleItem;
+            delete this._defaultText;
+            delete this._defaultIconProps;
+        }
+
+        this.emit('items-visibility-changed');
+    }
+
+    setText(text) {
+        if (this._visibleItem) {
+            this._defaultText = text;
+            return;
+        }
+
+        super.setText(text);
+    }
+
+    setIcon(icon) {
+        if (this._visibleItem) {
+            this._defaultIconProps = {};
+            // The 'icon' parameter can be either a Gio.Icon or a string.
+            if (icon instanceof GObject.Object && GObject.type_is_a(icon, Gio.Icon))
+                this._defaultIconProps.gicon = icon;
+            else
+                this._defaultIconProps.icon_name = icon;
+            return;
+        }
+
+        super.setIcon(icon);
+    }
+
+    activate(event) {
+        if (this._visibleItem)
+            this._visibleItem.activate(event);
+        else
+            super.activate(event);
+    }
+
+    syncSensitive() {
+        super.syncSensitive();
+
+        if (this._visibleItem)
+            this._triangle.visible = false;
+    }
+
+    vfunc_key_press_event(keyEvent) {
+        if (this._visibleItem)
+            return PopupBaseMenuItem.prototype.vfunc_key_press_event.call(this, keyEvent);
+
+        return super.vfunc_key_press_event(keyEvent);
+    }
+
+    vfunc_button_release_event() {
+        if (this._visibleItem)
+            return PopupBaseMenuItem.prototype.vfunc_button_release_event.call(this);
+
+        return super.vfunc_button_release_event();
+    }
+
+    vfunc_touch_event(touchEvent) {
+        if (this._visibleItem)
+            return PopupBaseMenuItem.prototype.vfunc_touch_event.call(this, touchEvent);
+
+        return super.vfunc_touch_event(touchEvent);
     }
 });
 

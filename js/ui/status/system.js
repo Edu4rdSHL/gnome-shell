@@ -19,16 +19,6 @@ class Indicator extends PanelMenu.SystemIndicator {
 
         this._createSubMenu();
 
-        this._loginScreenItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
-        this._logoutItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
-        this._suspendItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
-        this._powerOffItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
-        this._restartItem.connect('notify::visible',
-            () => this._updateSessionSubMenu());
         // Whether shutdown is available or not depends on both lockdown
         // settings (disable-log-out) and Polkit policy - the latter doesn't
         // notify, so we update the menu item each time the menu opens or
@@ -50,12 +40,23 @@ class Indicator extends PanelMenu.SystemIndicator {
     }
 
     _updateSessionSubMenu() {
-        this._sessionSubMenu.visible =
-            this._loginScreenItem.visible ||
-            this._logoutItem.visible ||
-            this._suspendItem.visible ||
-            this._restartItem.visible ||
-            this._powerOffItem.visible;
+        this._sessionSubMenu.visible = !!this._sessionSubMenu.getVisibleItems().length;
+    }
+
+    _getSessionLabel() {
+        if (this._systemActions.can_power_off && this._systemActions.can_logout)
+            return _('Power Off / Log Out');
+
+        if (this._systemActions.can_logout)
+            return _('Log Out');
+
+        if (this._systemActions.can_power_off)
+            return _('Power Off');
+
+        if (this._systemActions.can_suspend)
+            return _('Suspend');
+
+        return _('Power Off / Log Out');
     }
 
     _createSubMenu() {
@@ -86,71 +87,62 @@ class Indicator extends PanelMenu.SystemIndicator {
             this._systemActions.activateLockScreen();
         });
         this.menu.addMenuItem(item);
-        this._lockScreenItem = item;
-        this._systemActions.bind_property('can-lock-screen',
-            this._lockScreenItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-lock-screen', item, 'visible', bindFlags);
 
-        this._sessionSubMenu = new PopupMenu.PopupSubMenuMenuItem(
-            _('Power Off / Log Out'), true);
+        this._sessionSubMenu = new PopupMenu.PopupAutoSubMenuMenuItem(
+            this._getSessionLabel(), true);
         this._sessionSubMenu.icon.icon_name = 'system-shutdown-symbolic';
+        this._sessionSubMenu.connect('items-visibility-changed', () => {
+            this._updateSessionSubMenu();
+            this._sessionSubMenu.label.text = this._getSessionLabel();
+        });
 
-        item = new PopupMenu.PopupMenuItem(_('Suspend'));
+        item = new PopupMenu.PopupImageMenuItem(_('Suspend'), 'media-playback-pause-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activateSuspend();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._suspendItem = item;
-        this._systemActions.bind_property('can-suspend',
-            this._suspendItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-suspend', item, 'visible', bindFlags);
 
-        item = new PopupMenu.PopupMenuItem(_('Restart…'));
+        item = new PopupMenu.PopupImageMenuItem(_('Restart…'), 'system-reboot-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activateRestart();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._restartItem = item;
-        this._systemActions.bind_property('can-restart',
-            this._restartItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-restart', item, 'visible', bindFlags);
 
-        item = new PopupMenu.PopupMenuItem(_('Power Off…'));
+        item = new PopupMenu.PopupImageMenuItem(_('Power Off…'), 'system-shutdown-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activatePowerOff();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._powerOffItem = item;
-        this._systemActions.bind_property('can-power-off',
-            this._powerOffItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-power-off', item, 'visible', bindFlags);
 
         this._sessionSubMenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        item = new PopupMenu.PopupMenuItem(_('Log Out'));
+        item = new PopupMenu.PopupImageMenuItem(_('Log Out'), 'system-log-out-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activateLogout();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._logoutItem = item;
-        this._systemActions.bind_property('can-logout',
-            this._logoutItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-logout', item, 'visible', bindFlags);
 
-        item = new PopupMenu.PopupMenuItem(_('Switch User…'));
+        item = new PopupMenu.PopupImageMenuItem(_('Switch User…'), 'system-switch-user-symbolic');
+        item.setIconVisibility(false);
         item.connect('activate', () => {
             this.menu.itemActivated(BoxPointer.PopupAnimation.NONE);
             this._systemActions.activateSwitchUser();
         });
         this._sessionSubMenu.menu.addMenuItem(item);
-        this._loginScreenItem = item;
-        this._systemActions.bind_property('can-switch-user',
-            this._loginScreenItem, 'visible',
-            bindFlags);
+        this._systemActions.bind_property('can-switch-user', item, 'visible', bindFlags);
 
         this.menu.addMenuItem(this._sessionSubMenu);
     }
