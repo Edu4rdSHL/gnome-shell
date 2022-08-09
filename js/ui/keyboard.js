@@ -174,7 +174,7 @@ class KeyContainer extends St.Widget {
         this._maxCols = Math.max(this._currentCol, this._maxCols);
     }
 
-    layoutButtons(container) {
+    layoutButtons() {
         let nCol = 0, nRow = 0;
 
         for (let i = 0; i < this._rows.length; i++) {
@@ -201,9 +201,6 @@ class KeyContainer extends St.Widget {
             nRow += KEY_SIZE;
             nCol = 0;
         }
-
-        if (container)
-            container.setRatio(this._maxCols, this._rows.length);
     }
 });
 
@@ -1492,7 +1489,7 @@ var Keyboard = GObject.registerClass({
             this._loadRows(currentLevel, level, levels.length, layout);
             layers[level] = layout;
             this._aspectContainer.add_child(layout);
-            layout.layoutButtons(this._aspectContainer);
+            layout.layoutButtons();
 
             layout.hide();
         }
@@ -1699,22 +1696,11 @@ var Keyboard = GObject.registerClass({
         if (!monitor)
             return;
 
-        let maxHeight = monitor.height / 3;
-        this.width = monitor.width;
+        this._aspectContainer.height = monitor.height / 3;
+        this._aspectContainer.width = monitor.width;
 
-        if (monitor.width > monitor.height) {
-            this.height = maxHeight;
-        } else {
-            /* In portrait mode, lack of horizontal space means we won't be
-             * able to make the OSK that big while keeping size ratio, so
-             * we allow the OSK being smaller than 1/3rd of the monitor height
-             * there.
-             */
-            this.height = -1;
-            const forWidth = this.get_theme_node().adjust_for_width(monitor.width);
-            const [, natHeight] = this.get_preferred_height(forWidth);
-            this.height = Math.min(maxHeight, natHeight);
-        }
+        /* Update ratio of aspect container to resize keys */
+        this._aspectContainer.setRatio(this._aspectContainer.width, this._aspectContainer.height);
     }
 
     _onGroupChanged() {
