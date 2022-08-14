@@ -4,10 +4,10 @@
 imports.gi.versions.Gst = '1.0';
 imports.gi.versions.Gtk = '4.0';
 
-const { Gio, GLib, Gst, Gtk } = imports.gi;
+const {Gio, GLib, Gst, Gtk} = imports.gi;
 
-const { loadInterfaceXML, loadSubInterfaceXML } = imports.misc.dbusUtils;
-const { ServiceImplementation } = imports.dbusService;
+const {loadInterfaceXML, loadSubInterfaceXML} = imports.misc.dbusUtils;
+const {ServiceImplementation} = imports.dbusService;
 
 const ScreencastIface = loadInterfaceXML('org.gnome.Shell.Screencast');
 
@@ -27,13 +27,6 @@ const ScreenCastStreamProxy = Gio.DBusProxy.makeProxyWrapper(ScreenCastStreamIfa
 const DEFAULT_PIPELINE = 'videoconvert chroma-mode=GST_VIDEO_CHROMA_MODE_NONE dither=GST_VIDEO_DITHER_NONE matrix-mode=GST_VIDEO_MATRIX_MODE_OUTPUT_ONLY n-threads=%T ! queue ! vp8enc cpu-used=16 max-quantizer=17 deadline=1 keyframe-mode=disabled threads=%T static-threshold=1000 buffer-size=20000 ! queue ! webmmux';
 const DEFAULT_FRAMERATE = 30;
 const DEFAULT_DRAW_CURSOR = true;
-
-const PipelineState = {
-    INIT: 0,
-    PLAYING: 1,
-    FLUSHING: 2,
-    STOPPED: 3,
-};
 
 const SessionState = {
     INIT: 0,
@@ -114,17 +107,18 @@ var Recorder = class {
 
     _notifyStopped() {
         this._unwatchSender();
-        if (this._onStartedCallback)
+        if (this._onStartedCallback) {
             this._onStartedCallback(this, false);
-        else if (this._onStoppedCallback)
+            this._onStartedCallback = null;
+        } else if (this._onStoppedCallback) {
             this._onStoppedCallback(this);
-        else
-            this._onErrorCallback(this);
+            this._onStoppedCallback = null;
+        }
     }
 
     _onSessionClosed() {
         switch (this._pipelineState) {
-        case PipelineState.STOPPED:
+        case Gst.State.NULL:
             break;
         default:
             this._pipeline.set_state(Gst.State.NULL);
@@ -146,13 +140,10 @@ var Recorder = class {
             return;
 
         const bus = this._pipeline.get_bus();
-        bus.add_watch(bus, this._onBusMessage.bind(this));
+        bus.connect('sync-message', this._onBusMessage.bind(this));
+        bus.enable_sync_message_emission();
 
         this._pipeline.set_state(Gst.State.PLAYING);
-        this._pipelineState = PipelineState.PLAYING;
-
-        this._onStartedCallback(this, true);
-        this._onStartedCallback = null;
     }
 
     startRecording(onStartedCallback) {
@@ -180,9 +171,9 @@ var Recorder = class {
     }
 
     stopRecording(onStoppedCallback) {
-        this._pipelineState = PipelineState.FLUSHING;
         this._onStoppedCallback = onStoppedCallback;
         this._pipeline.send_event(Gst.Event.new_eos());
+        this._pipeline.set_state(Gst.State.NULL);
     }
 
     _stopSession() {
@@ -192,29 +183,34 @@ var Recorder = class {
 
     _onBusMessage(bus, message, _) {
         switch (message.type) {
-        case Gst.MessageType.EOS:
-            this._pipeline.set_state(Gst.State.NULL);
-            this._addRecentItem();
-
+        case Gst.MessageType.STATE_CHANGED:
+            this._pipelineState = message.parse_state_changed()[1];
             switch (this._pipelineState) {
-            case PipelineState.FLUSHING:
-                this._pipelineState = PipelineState.STOPPED;
+            case Gst.State.PLAYING:
+                if (this._onStartedCallback) {
+                    this._onStartedCallback(this, true);
+                    this._onStartedCallback = null;
+                }
+                break;
+            case Gst.State.NULL:
+                switch (this._sessionState) {
+                case SessionState.ACTIVE:
+                    this._addRecentItem();
+                    this._stopSession();
+                    break;
+                case SessionState.STOPPED:
+                    this._notifyStopped();
+                    break;
+                default:
+                    break;
+                }
                 break;
             default:
                 break;
             }
-
-            switch (this._sessionState) {
-            case SessionState.ACTIVE:
-                this._stopSession();
-                break;
-            case SessionState.STOPPED:
-                this._notifyStopped();
-                break;
-            default:
-                break;
-            }
-
+            break;
+        case Gst.MessageType.EOS:
+            this._addRecentItem();
             break;
         default:
             break;
