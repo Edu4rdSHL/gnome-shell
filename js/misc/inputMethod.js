@@ -3,7 +3,6 @@
 const { Clutter, GLib, Gio, GObject, IBus } = imports.gi;
 
 const Keyboard = imports.ui.status.keyboard;
-const Main = imports.ui.main;
 
 Gio._promisify(IBus.Bus.prototype,
     'create_input_context_async', 'create_input_context_async_finish');
@@ -28,6 +27,7 @@ var InputMethod = GObject.registerClass({
         this._hidePanelId = 0;
         this.terminalMode = false;
         this._ibus = IBus.Bus.new_async();
+        this._caps = IBus.Capabilite.PREEDIT_TEXT | IBus.Capabilite.FOCUS | IBus.Capabilite.SURROUNDING_TEXT;
         this._ibus.connect('connected', this._onConnected.bind(this));
         this._ibus.connect('disconnected', this._clear.bind(this));
         this.connect('notify::can-show-preedit', this._updateCapabilities.bind(this));
@@ -46,13 +46,8 @@ var InputMethod = GObject.registerClass({
     }
 
     _updateCapabilities() {
-        let caps = IBus.Capabilite.PREEDIT_TEXT | IBus.Capabilite.FOCUS | IBus.Capabilite.SURROUNDING_TEXT;
-
-        if (Main.keyboard.visible)
-            caps |= IBus.Capabilite.OSK;
-
         if (this._context)
-            this._context.set_capabilities(caps);
+            this._context.set_capabilities(this._caps);
     }
 
     _onSourceChanged() {
@@ -81,14 +76,10 @@ var InputMethod = GObject.registerClass({
         this._context.connect('forward-key-event', this._onForwardKeyEvent.bind(this));
         this._context.connect('destroy', this._clear.bind(this));
 
-        Main.keyboard.connectObject('visibility-changed', () => this._updateCapabilities());
-
         this._updateCapabilities();
     }
 
     _clear() {
-        Main.keyboard.disconnectObject(this);
-
         if (this._cancellable) {
             this._cancellable.cancel();
             this._cancellable = null;
@@ -298,6 +289,20 @@ var InputMethod = GObject.registerClass({
         let state = event.get_state();
         if (state & IBus.ModifierType.IGNORED_MASK)
             return false;
+
+        if (Clutter.EventFlags.FLAG_OSK && IBus.Capabilite.OSK) {
+            if (event.get_flags() & Clutter.EventFlags.FLAG_OSK) {
+                if (!(this._caps & IBus.Capabilite.OSK)) {
+                    this._caps |= IBus.Capabilite.OSK;
+                    this._updateCapabilities();
+                }
+            } else {
+                if (this._caps & IBus.Capabilite.OSK) {
+                    this._caps &= ~IBus.Capabilite.OSK;
+                    this._updateCapabilities();
+                }
+            }
+        }
 
         if (event.type() == Clutter.EventType.KEY_RELEASE)
             state |= IBus.ModifierType.RELEASE_MASK;
