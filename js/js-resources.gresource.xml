@@ -151,5 +151,6 @@
     <file>ui/status/remoteAccess.js</file>
     <file>ui/status/system.js</file>
     <file>ui/status/thunderbolt.js</file>
+    <file>ui/status/stayAwake.js</file>
   </gresource>
 </gresources>
