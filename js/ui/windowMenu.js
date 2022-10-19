@@ -82,7 +82,8 @@ var WindowMenu = class extends PopupMenu.PopupMenu {
         });
         if (window.is_above())
             item.setOrnament(PopupMenu.Ornament.CHECK);
-        if (window.get_maximized() == Meta.MaximizeFlags.BOTH ||
+        if ((!window.is_above() &&
+             window.get_maximized() === Meta.MaximizeFlags.BOTH) ||
             type == Meta.WindowType.DOCK ||
             type == Meta.WindowType.DESKTOP ||
             type == Meta.WindowType.SPLASHSCREEN)
