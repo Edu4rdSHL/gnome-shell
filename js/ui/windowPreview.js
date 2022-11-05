@@ -111,9 +111,11 @@ export const WindowPreview = GObject.registerClass({
             dragActorMaxSize: WINDOW_DND_SIZE,
             dragActorOpacity: DRAGGING_WINDOW_OPACITY,
         });
-        this._draggable.connect('drag-begin', this._onDragBegin.bind(this));
-        this._draggable.connect('drag-cancelled', this._onDragCancelled.bind(this));
-        this._draggable.connect('drag-end', this._onDragEnd.bind(this));
+        this._draggable.connectObject(
+            'drag-begin', this._onDragBegin.bind(this),
+            'drag-cancelled', this._onDragCancelled.bind(this),
+            'drag-end', this._onDragEnd.bind(this),
+            this);
         this.inDrag = false;
 
         const clickGesture = new Clutter.ClickGesture();
