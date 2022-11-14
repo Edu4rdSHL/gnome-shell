@@ -269,3 +269,18 @@ testCase('Emitter with empty tracker, disconnects on disconnectObject', () => {
     obj.emit('signal');
     JsUnit.assertFalse(callbackCalled);
 });
+
+testCase('Emitter with no tracker, disconnects on disconnectObject', () => {
+    const obj = new JSDestroyable();
+    let callbackCalled = false;
+    obj.connectObject('signal', () => (callbackCalled = true));
+
+    obj.emit('signal');
+    JsUnit.assertTrue(callbackCalled);
+
+    obj.disconnectObject();
+
+    callbackCalled = false;
+    obj.emit('signal');
+    JsUnit.assertFalse(callbackCalled);
+});

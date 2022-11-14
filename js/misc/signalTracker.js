@@ -259,7 +259,8 @@ function connectObject(thisObj, ...args) {
  * @returns {void}
  */
 function disconnectObject(thisObj, obj) {
-    SignalManager.getDefault().maybeGetSignalTracker(thisObj)?.untrack(obj);
+    SignalManager.getDefault().maybeGetSignalTracker(thisObj)?.untrack(
+        obj ?? globalThis);
 }
 
 /**
