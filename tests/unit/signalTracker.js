@@ -216,6 +216,11 @@ testCase('Signal emissions can be tracked', () => {
     JsUnit.assertEquals(count, 20);
 });
 
+testCase('Signal support default flags', () => {
+    const obj = new Signals.EventEmitter();
+    obj.connectObject('signal', () => {}, GObject.ConnectFlags.DEFAULT ?? 0, {});
+});
+
 testCase('Fails with unknown flags', () => {
     const obj = new Signals.EventEmitter();
     TestUtils.assertRaisesError(() => obj.connectObject('signal', () => {}, 256, {}),

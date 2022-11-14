@@ -216,7 +216,7 @@ function connectObject(thisObj, ...args) {
         const flags = arg;
         let flagsMask = 0;
         Object.values(GObject.ConnectFlags).forEach(v => (flagsMask |= v));
-        if (!(flags & flagsMask))
+        if (flags && !(flags & flagsMask))
             throw new Error(`Invalid flag value ${flags}`);
         if (flags & GObject.ConnectFlags.SWAPPED)
             throw new Error('Swapped signals are not supported');
