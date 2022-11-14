@@ -219,8 +219,6 @@ function connectObject(thisObj, ...args) {
         const flags = arg;
         if (flags && (flags & flagsMask) !== flags)
             throw new Error(`Invalid flag value ${flags}`);
-        if (flags & GObject.ConnectFlags.SWAPPED)
-            throw new Error('Swapped signals are not supported');
         return [signalName, handler, flags, ...rest];
     };
 
@@ -229,10 +227,13 @@ function connectObject(thisObj, ...args) {
         const func = (flags & GObject.ConnectFlags.AFTER) && isGObject
             ? 'connect_after'
             : 'connect';
+        const orderedHandler = flags & GObject.ConnectFlags.SWAPPED
+            ? (instance, ...handlerArgs) => handler(...handlerArgs, instance)
+            : handler;
         const emitterProto = isGObject
             ? GObject.Object.prototype
             : Object.getPrototypeOf(emitter);
-        return emitterProto[func].call(emitter, signalName, handler);
+        return emitterProto[func].call(emitter, signalName, orderedHandler);
     };
 
     const signalIds = [];

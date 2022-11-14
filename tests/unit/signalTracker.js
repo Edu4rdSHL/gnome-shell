@@ -332,6 +332,43 @@ testCase('Signal arguments are respected', () => {
     emitter.emit('signal');
 });
 
+testCase('JSObject signal arguments can be swapped', () => {
+    const emitter = new Signals.EventEmitter();
+    const tracked = new Destroyable();
+    let cbCalled = false;
+
+    emitter.connectObject('signal', (...args) => {
+        TestUtils.assertArrayEquals(['add', 4, 'arguments', null, emitter], args);
+        cbCalled = true;
+    }, GObject.ConnectFlags.SWAPPED, tracked);
+
+    emitter.emit('signal', 'add', 4, 'arguments', null);
+    tracked.emit('destroy');
+
+    JsUnit.assertTrue(cbCalled);
+    emitter.emit('signal');
+});
+
+testCase('GObject signal arguments can be swapped', () => {
+    const emitter = new GObjectEmitterInt();
+    const tracked = new Destroyable();
+    let cbCalled = false;
+
+    emitter.connectObject('signal-int', (...args) => {
+        TestUtils.assertArrayEquals([5, emitter], args);
+        cbCalled = true;
+    }, GObject.ConnectFlags.SWAPPED, tracked);
+
+    emitter.emit('signal-int', 5);
+    tracked.emit('destroy');
+
+    JsUnit.assertTrue(cbCalled);
+
+    cbCalled = false;
+    emitter.emit('signal-int', 10);
+    JsUnit.assertFalse(cbCalled);
+});
+
 testCase('Signal after connection is respected', () => {
     let callbackCalled = false;
     let callbackAfterCalled = false;
