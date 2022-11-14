@@ -208,15 +208,16 @@ class SignalTracker {
  * @returns {void}
  */
 function connectObject(thisObj, ...args) {
+    let flagsMask = 0;
+    Object.values(GObject.ConnectFlags).forEach(v => (flagsMask |= v));
+
     const getParams = argArray => {
         const [signalName, handler, arg, ...rest] = argArray;
         if (typeof arg !== 'number')
             return [signalName, handler, 0, arg, ...rest];
 
         const flags = arg;
-        let flagsMask = 0;
-        Object.values(GObject.ConnectFlags).forEach(v => (flagsMask |= v));
-        if (flags && !(flags & flagsMask))
+        if (flags && (flags & flagsMask) !== flags)
             throw new Error(`Invalid flag value ${flags}`);
         if (flags & GObject.ConnectFlags.SWAPPED)
             throw new Error('Swapped signals are not supported');

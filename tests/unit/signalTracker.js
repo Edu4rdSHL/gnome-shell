@@ -225,6 +225,8 @@ testCase('Fails with unknown flags', () => {
     const obj = new Signals.EventEmitter();
     TestUtils.assertRaisesError(() => obj.connectObject('signal', () => {}, 256, {}),
         'Invalid flag value 256');
+    TestUtils.assertRaisesError(() => obj.connectObject('signal', () => {}, 234, {}),
+        'Invalid flag value');
 });
 
 testCase('Emitter is same of tracker', () => {
