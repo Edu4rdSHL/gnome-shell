@@ -3,6 +3,9 @@ const { GObject } = imports.gi;
 
 const destroyableTypes = [];
 
+// Add custom shell connection flags, ensuring we don't override standard ones
+GObject.ConnectFlags.SHELL_ONCE = 1 << 25;
+
 /**
  * @private
  * @param {Object} obj - an object
@@ -179,6 +182,24 @@ class SignalTracker {
     }
 
     /**
+     * @param {object} obj - tracked object instance
+     * @param {...number} handlerIds - tracked handler IDs to untrack
+     * @returns {void}
+     */
+    untrackIds(obj, ...handlerIds) {
+        const {ownerSignals} = this._getSignalData(obj);
+        const ownerProto = this._getObjectProto(this._owner);
+
+        handlerIds.forEach(id => {
+            this._disconnectSignalForProto(ownerProto, this._owner, id);
+            ownerSignals.splice(ownerSignals.indexOf(id), 1);
+        });
+
+        if (!ownerSignals.length)
+            this.untrack(obj);
+    }
+
+    /**
      * @returns {void}
      */
     clear() {
@@ -222,7 +243,11 @@ function connectObject(thisObj, ...args) {
         return [signalName, handler, flags, ...rest];
     };
 
+    const signalManager = SignalManager.getDefault();
+    let obj;
+
     const connectSignal = (emitter, signalName, handler, flags) => {
+        let connectionId;
         const isGObject = emitter instanceof GObject.Object;
         const func = (flags & GObject.ConnectFlags.AFTER) && isGObject
             ? 'connect_after'
@@ -230,10 +255,19 @@ function connectObject(thisObj, ...args) {
         const orderedHandler = flags & GObject.ConnectFlags.SWAPPED
             ? (instance, ...handlerArgs) => handler(...handlerArgs, instance)
             : handler;
+        const realHandler = flags & GObject.ConnectFlags.SHELL_ONCE
+            ? (...handlerArgs) => {
+                const tracker = signalManager.getSignalTracker(emitter);
+                tracker.untrackIds(obj, connectionId);
+                return orderedHandler(...handlerArgs);
+            }
+            : orderedHandler;
+
         const emitterProto = isGObject
             ? GObject.Object.prototype
             : Object.getPrototypeOf(emitter);
-        return emitterProto[func].call(emitter, signalName, orderedHandler);
+        connectionId = emitterProto[func].call(emitter, signalName, realHandler);
+        return connectionId;
     };
 
     const signalIds = [];
@@ -243,8 +277,8 @@ function connectObject(thisObj, ...args) {
         args = rest;
     }
 
-    const obj = args.at(0) ?? globalThis;
-    const tracker = SignalManager.getDefault().getSignalTracker(thisObj);
+    obj = args.at(0) ?? globalThis;
+    const tracker = signalManager.getSignalTracker(thisObj);
     tracker.track(obj, ...signalIds);
 }
 

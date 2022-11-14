@@ -427,3 +427,154 @@ testCase('Signal after connection is respected in batch connections', () => {
     JsUnit.assertTrue(callbackCalled);
     JsUnit.assertTrue(callbackAfterCalled);
 });
+
+testCase('Signal connections once are automatically disconnected from GObject', () => {
+    let callback1Called = 0;
+    let callback2Called = 0;
+    const obj = new GObjectEmitter();
+
+    obj.connectObject(
+        'signal', () => {
+            callback1Called++;
+            JsUnit.assertTrue(hasSignalHandler(obj, 'signal'));
+        }, GObject.ConnectFlags.SHELL_ONCE,
+        'signal', () => {
+            callback2Called++;
+            JsUnit.assertFalse(hasSignalHandler(obj, 'signal'));
+        }, GObject.ConnectFlags.SHELL_ONCE);
+
+    JsUnit.assertTrue(hasSignalHandler(obj, 'signal'));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'destroy'));
+
+    obj.emit('signal');
+    JsUnit.assertFalse(hasSignalHandler(obj, 'signal'));
+    JsUnit.assertFalse(hasSignalHandler(obj, 'destroy'));
+
+    JsUnit.assertEquals(1, callback1Called);
+    JsUnit.assertEquals(1, callback2Called);
+});
+
+testCase('Signal connections once are automatically disconnected from GObject keeping destroy monitor', () => {
+    let callback1Called = 0;
+    let callback2Called = 0;
+
+    const obj = new GObjectEmitterInt();
+    obj.connectObject(
+        'signal-int', expectedCalls => {
+            JsUnit.assertEquals(callback1Called, expectedCalls);
+            callback1Called++;
+            JsUnit.assertFalse(hasSignalHandler(obj, 'signal-int'));
+            JsUnit.assertTrue(hasSignalHandler(obj, 'signal'));
+            obj.emit('signal-int', 10);
+        }, GObject.ConnectFlags.SHELL_ONCE | GObject.ConnectFlags.SWAPPED,
+        'signal', () => {
+            callback2Called++;
+            JsUnit.assertFalse(hasSignalHandler(obj, 'signal-int'));
+            JsUnit.assertTrue(hasSignalHandler(obj, 'signal'));
+        });
+
+    JsUnit.assertTrue(hasSignalHandler(obj, 'signal-int'));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'signal'));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'destroy'));
+
+    obj.emit('signal-int', 0);
+    JsUnit.assertFalse(hasSignalHandler(obj, 'signal-int'));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'signal'));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'destroy'));
+
+    JsUnit.assertEquals(1, callback1Called);
+    JsUnit.assertEquals(0, callback2Called);
+
+    obj.emit('signal');
+    JsUnit.assertFalse(hasSignalHandler(obj, 'signal-int'));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'signal'));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'destroy'));
+
+    JsUnit.assertEquals(1, callback1Called);
+    JsUnit.assertEquals(1, callback2Called);
+
+    obj.emit('signal');
+    JsUnit.assertEquals(2, callback2Called);
+
+    obj.disconnectObject();
+
+    JsUnit.assertFalse(hasSignalHandler(obj, 'signal-int'));
+    JsUnit.assertFalse(hasSignalHandler(obj, 'signal'));
+    JsUnit.assertFalse(hasSignalHandler(obj, 'destroy'));
+});
+
+testCase('Signal connections once are automatically disconnected from JSObject', () => {
+    let callback1Called = 0;
+    let callback2Called = 0;
+    const obj = new Signals.EventEmitter();
+
+    obj.connectObject(
+        'signal', (...args) => {
+            TestUtils.assertArrayEquals(args, ['arg1', 2, obj]);
+            callback1Called++;
+        }, GObject.ConnectFlags.SHELL_ONCE | GObject.ConnectFlags.SWAPPED,
+        'signal', (...args) => {
+            TestUtils.assertArrayEquals(args, [obj, 'arg1', 2]);
+            callback2Called++;
+        }, GObject.ConnectFlags.SHELL_ONCE);
+
+    obj.emit('destroy'); // It's ignored in such objects, must be no-op!
+    obj.emit('signal', 'arg1', 2);
+
+    JsUnit.assertEquals(1, callback1Called);
+    JsUnit.assertEquals(1, callback2Called);
+
+    obj.emit('signal');
+    JsUnit.assertEquals(1, callback1Called);
+    JsUnit.assertEquals(1, callback2Called);
+
+    obj.connectObject(
+        'signal1', () => {
+            callback1Called++;
+            obj.emit('signal1');
+        }, GObject.ConnectFlags.SHELL_ONCE,
+        'signal2', () => {
+            callback2Called++;
+        });
+
+    obj.emit('signal1');
+    JsUnit.assertEquals(2, callback1Called);
+    JsUnit.assertEquals(1, callback2Called);
+
+    obj.emit('signal2');
+    JsUnit.assertEquals(2, callback1Called);
+    JsUnit.assertEquals(2, callback2Called);
+
+    obj.disconnectObject();
+    obj.emit('signal1');
+    obj.emit('signal2');
+
+    JsUnit.assertEquals(2, callback1Called);
+    JsUnit.assertEquals(2, callback2Called);
+});
+
+testCase('Signal connections once are disconnected on tracker destruction', () => {
+    let callback1Called = 0;
+    let callback2Called = 0;
+    const obj = new Signals.EventEmitter();
+    const tracker = new Destroyable();
+
+    obj.connectObject(
+        'signal-once', () => {
+            callback1Called++;
+        }, GObject.ConnectFlags.SHELL_ONCE | GObject.ConnectFlags.SWAPPED,
+        'signal-once', () => {
+            callback2Called++;
+        }, GObject.ConnectFlags.SHELL_ONCE,
+        tracker);
+
+    JsUnit.assertTrue(hasSignalHandler(tracker, 'destroy'));
+
+    tracker.emit('destroy');
+
+    obj.emit('signal-once', 'arg1', 'arg2');
+    JsUnit.assertEquals(0, callback2Called);
+    JsUnit.assertEquals(0, callback1Called);
+
+    JsUnit.assertFalse(hasSignalHandler(tracker, 'destroy'));
+});
