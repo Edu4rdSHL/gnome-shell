@@ -315,6 +315,21 @@ testCase('Emitter with empty tracker, disconnects on disconnectObject', () => {
     JsUnit.assertFalse(hasSignalHandler(obj, 'destroy'));
 });
 
+testCase('Emitter with no tracker, disconnects on disconnectObject', () => {
+    const obj = new GObjectEmitter();
+    let callbackCalled = false;
+    obj.connectObject('signal', () => (callbackCalled = true));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'signal'));
+    JsUnit.assertTrue(hasSignalHandler(obj, 'destroy'));
+
+    obj.emit('signal');
+    JsUnit.assertTrue(callbackCalled);
+
+    obj.disconnectObject();
+    JsUnit.assertFalse(hasSignalHandler(obj, 'signal'));
+    JsUnit.assertFalse(hasSignalHandler(obj, 'destroy'));
+});
+
 testCase('Signal arguments are respected', () => {
     const emitter = new Signals.EventEmitter();
     const tracked = new Destroyable();
