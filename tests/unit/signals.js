@@ -71,3 +71,50 @@ testCase('EventEmitter connections', () => {
     JsUnit.assertFalse(emitter.signalHandlerIsConnected(idFoo));
     JsUnit.assertFalse(emitter.signalHandlerIsConnected(idBar));
 });
+
+testCase('DestroyableEventEmitter connections', () => {
+    let fooCalled = 0, barCalled = 0;
+    const emitter = new Signals.DestroyableEventEmitter();
+    emitter.disconnect(emitter.connect('foo', () => TestUtils.assertNotReached()));
+    const idFoo = emitter.connect('foo', (self, ...args) => {
+        JsUnit.assertEquals(self, emitter);
+        TestUtils.assertArrayEquals(args, ['args', 5, null, emitter]);
+        fooCalled++;
+    });
+    const idBar = emitter.connect('bar', () => ++barCalled);
+
+    JsUnit.assertTrue(emitter.signalHandlerIsConnected(idFoo));
+    JsUnit.assertTrue(emitter.signalHandlerIsConnected(idBar));
+
+    emitter.emit('foo', 'args', 5, null, emitter);
+    JsUnit.assertEquals(1, fooCalled);
+    JsUnit.assertEquals(0, barCalled);
+
+    emitter.disconnect(idBar);
+    JsUnit.assertTrue(emitter.signalHandlerIsConnected(idFoo));
+    JsUnit.assertFalse(emitter.signalHandlerIsConnected(idBar));
+
+    emitter.emit('bar');
+    JsUnit.assertEquals(0, barCalled);
+
+    emitter.disconnect(idFoo);
+    JsUnit.assertFalse(emitter.signalHandlerIsConnected(idFoo));
+    JsUnit.assertFalse(emitter.signalHandlerIsConnected(idBar));
+});
+
+testCase('DestroyableEventEmitter destroy', () => {
+    let destroyCalled = 0;
+
+    const emitter = new Signals.DestroyableEventEmitter();
+    const id = emitter.connect('destroy', () => destroyCalled++);
+
+    emitter.destroy();
+    JsUnit.assertEquals(1, destroyCalled);
+
+    emitter.destroy();
+    JsUnit.assertEquals(2, destroyCalled);
+
+    emitter.disconnect(id);
+    emitter.destroy();
+    JsUnit.assertEquals(2, destroyCalled);
+});

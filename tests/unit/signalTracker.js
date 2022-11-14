@@ -24,6 +24,15 @@ const GObjectEmitter = GObject.registerClass({
     Signals: { 'signal': {} },
 }, class GObjectEmitter extends Destroyable {});
 
+testCase('Signals.DestroyableEventEmitter can be registered as Destroyable types', () => {
+    class JSDestroyable extends Signals.DestroyableEventEmitter {}
+    registerDestroyableType(JSDestroyable);
+    registerDestroyableType(class OtherDestroyable extends JSDestroyable {});
+});
+
+class JSDestroyable extends Signals.DestroyableEventEmitter {}
+registerDestroyableType(JSDestroyable);
+
 testCase('Signal emissions can be tracked', () => {
     const emitter1 = new Signals.EventEmitter();
     const emitter2 = new GObjectEmitter();

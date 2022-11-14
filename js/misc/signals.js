@@ -1,3 +1,5 @@
+/* exported EventEmitter, DestroyableEventEmitter */
+
 const Signals = imports.signals;
 const SignalTracker = imports.misc.signalTracker;
 
@@ -20,3 +22,9 @@ var EventEmitter = class EventEmitter {
 };
 
 Signals.addSignalMethods(EventEmitter.prototype);
+
+var DestroyableEventEmitter = class DestroyableEventEmitter extends EventEmitter {
+    destroy() {
+        this.emit('destroy');
+    }
+};
