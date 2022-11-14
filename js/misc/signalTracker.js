@@ -119,11 +119,11 @@ class SignalTracker {
     /**
      * @private
      * @param {GObject.Object} obj - tracked widget
+     * @param {object} signalData - object signal data, got via _getSignalData()
      */
-    _trackDestroy(obj) {
-        const signalData = this._getSignalData(obj);
+    _trackDestroy(obj, signalData) {
         if (signalData.destroyId)
-            return;
+            throw new Error('Destroy already tracked');
         signalData.destroyId = obj.connect_after('destroy', () => this.untrack(obj));
     }
 
@@ -157,10 +157,11 @@ class SignalTracker {
      * @returns {void}
      */
     track(obj, ...handlerIds) {
-        if (_hasDestroySignal(obj))
-            this._trackDestroy(obj);
+        const signalData = this._getSignalData(obj);
+        if (!signalData.destroyId && _hasDestroySignal(obj))
+            this._trackDestroy(obj, signalData);
 
-        this._getSignalData(obj).ownerSignals.push(...handlerIds);
+        signalData.ownerSignals.push(...handlerIds);
     }
 
     /**
