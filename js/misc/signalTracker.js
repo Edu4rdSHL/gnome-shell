@@ -89,11 +89,11 @@ class SignalTracker {
      * @param {Object=} owner - object that owns the tracker
      */
     constructor(owner) {
-        if (_hasDestroySignal(owner))
-            this._ownerDestroyId = owner.connect_after('destroy', () => this.clear());
-
         this._owner = owner;
         this._map = new Map();
+
+        if (_hasDestroySignal(owner))
+            this._trackOwnerDestroy();
     }
 
     /**
@@ -114,6 +114,25 @@ class SignalTracker {
             this._map.set(obj, data);
         }
         return data;
+    }
+
+    /**
+     * Reconnects to owner 'destroy' if any
+     */
+    updateOwnerDestroyTracker() {
+        if (!this._ownerDestroyId)
+            return;
+
+        this._disconnectSignal(this._owner, this._ownerDestroyId);
+        this._trackOwnerDestroy();
+    }
+
+    /**
+     * @private
+     */
+    _trackOwnerDestroy() {
+        this._ownerDestroyId = this._owner.connect_after('destroy',
+            () => this.clear());
     }
 
     /**
@@ -158,6 +177,7 @@ class SignalTracker {
      */
     track(obj, ...handlerIds) {
         const signalData = this._getSignalData(obj);
+
         if (!signalData.destroyId && _hasDestroySignal(obj))
             this._trackDestroy(obj, signalData);
 
@@ -271,15 +291,22 @@ function connectObject(thisObj, ...args) {
         return connectionId;
     };
 
+    let trackingAfterDestroy = false;
     const signalIds = [];
     while (args.length > 1) {
         const [signalName, handler, flags, ...rest] = getParams(args);
         signalIds.push(connectSignal(thisObj, signalName, handler, flags));
+        if (signalName === 'destroy' && flags & GObject.ConnectFlags.AFTER)
+            trackingAfterDestroy = true;
         args = rest;
     }
 
     obj = args.at(0) ?? globalThis;
     const tracker = signalManager.getSignalTracker(thisObj);
+
+    if (trackingAfterDestroy)
+        tracker.updateOwnerDestroyTracker();
+
     tracker.track(obj, ...signalIds);
 }
 

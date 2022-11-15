@@ -121,6 +121,26 @@ testCase('TransientSignalHolder owner destruction keeps early monitored destruct
     JsUnit.assertFalse(hasSignalHandler(owned, 'destroy'));
 });
 
+testCase('TransientSignalHolder owner destruction always happens as last destruction event', () => {
+    let ownedDestroyCalled = false;
+    let ownerDestroyCalled = false;
+    const owner = new Destroyable();
+    const owned = new TransientSignalHolder(owner);
+
+    owned.connectObject('destroy', () => (ownedDestroyCalled = true), owner);
+    owner.connectObject('destroy', () => (ownerDestroyCalled = true),
+        GObject.ConnectFlags.AFTER);
+    JsUnit.assertTrue(hasSignalHandler(owner, 'destroy'));
+    JsUnit.assertTrue(hasSignalHandler(owned, 'destroy'));
+
+    owner.emit('destroy');
+    JsUnit.assertTrue(ownedDestroyCalled);
+    JsUnit.assertTrue(ownerDestroyCalled);
+
+    JsUnit.assertFalse(hasSignalHandler(owner, 'destroy'));
+    JsUnit.assertFalse(hasSignalHandler(owned, 'destroy'));
+});
+
 testCase('Signal emissions can be tracked', () => {
     const emitter1 = new Signals.EventEmitter();
     const emitter2 = new GObjectEmitter();
@@ -257,6 +277,20 @@ testCase('Emitter is same of tracker after', () => {
 
     obj.emit('destroy');
     JsUnit.assertTrue(callbackCalled);
+    JsUnit.assertFalse(hasSignalHandler(obj, 'destroy'));
+});
+
+testCase('Emitter is same of tracker does not block after-destroy signals', () => {
+    let destroyCalled = false;
+    const obj = new Destroyable();
+
+    obj.connectObject('destroy', () => (destroyCalled = true),
+        GObject.ConnectFlags.AFTER, obj);
+    JsUnit.assertTrue(hasSignalHandler(obj, 'destroy'));
+
+    obj.emit('destroy');
+    JsUnit.assertTrue(destroyCalled);
+
     JsUnit.assertFalse(hasSignalHandler(obj, 'destroy'));
 });
 
