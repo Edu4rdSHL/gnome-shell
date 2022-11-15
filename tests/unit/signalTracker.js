@@ -44,6 +44,10 @@ testCase('Signal emissions can be tracked', () => {
 
     let count = 0;
     const handler = () => count++;
+    const handlerPreChecked = expected => {
+        JsUnit.assertEquals(expected, count);
+        handler();
+    };
 
     emitter1.connectObject('signal', handler, tracked1);
     emitter2.connectObject('signal', handler, tracked1);
@@ -85,16 +89,16 @@ testCase('Signal emissions can be tracked', () => {
     JsUnit.assertEquals(count, 15);
 
     emitter1.connectObject(
-        'signal', handler,
-        'signal', handler, GObject.ConnectFlags.AFTER,
+        'signal', () => handlerPreChecked(16), GObject.ConnectFlags.AFTER,
+        'signal', () => handlerPreChecked(15),
         tracked1);
     emitter2.connectObject(
-        'signal', handler,
-        'signal', handler, GObject.ConnectFlags.AFTER,
+        'signal', () => handlerPreChecked(18), GObject.ConnectFlags.AFTER,
+        'signal', () => handlerPreChecked(17),
         tracked1);
     emitter3.connectObject(
-        'signal', handler, GObject.ConnectFlags.AFTER,
-        'signal', handler,
+        'signal', () => handlerPreChecked(20), GObject.ConnectFlags.AFTER,
+        'signal', () => handlerPreChecked(19),
         tracked1);
 
     emitter1.emit('signal');

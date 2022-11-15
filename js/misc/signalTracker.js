@@ -229,7 +229,7 @@ function connectObject(thisObj, ...args) {
 
     const connectSignal = (emitter, signalName, handler, flags) => {
         const isGObject = emitter instanceof GObject.Object;
-        const func = (flags & GObject.ConnectFlags.AFTER) && isGObject
+        const func = flags & GObject.ConnectFlags.AFTER
             ? 'connect_after'
             : 'connect';
         const emitterProto = isGObject
