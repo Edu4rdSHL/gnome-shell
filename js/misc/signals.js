@@ -4,6 +4,10 @@ const Signals = imports.signals;
 const SignalTracker = imports.misc.signalTracker;
 
 var EventEmitter = class EventEmitter {
+    connect_after(...args) {
+        return this.connectAfter(...args);
+    }
+
     connectObject(...args) {
         return SignalTracker.connectObject(this, ...args);
     }
