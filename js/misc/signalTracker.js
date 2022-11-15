@@ -24,8 +24,10 @@ class TransientSignalHolder extends GObject.Object {
     constructor(owner) {
         super();
 
-        if (_hasDestroySignal(owner))
-            owner.connectObject('destroy', () => this.destroy(), this);
+        if (_hasDestroySignal(owner)) {
+            owner.connectObject('destroy', () => this.destroy(),
+                GObject.ConnectFlags.AFTER, this);
+        }
     }
 
     destroy() {
