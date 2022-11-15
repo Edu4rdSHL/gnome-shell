@@ -14,24 +14,26 @@ function _hasDestroySignal(obj) {
     return destroyableTypes.some(type => obj instanceof type);
 }
 
-var TransientSignalHolder = GObject.registerClass(
-class TransientSignalHolder extends GObject.Object {
-    static [GObject.signals] = {
-        'destroy': {},
-    };
+// eslint-disable-next-line func-style
+var TransientSignalHolder = function (ownerObject) {
+    // Signals.DestroyableEventEmitter is undefined at import time, so we need
+    // to do this dynamically, by defining a class that will replace the
+    // temporary function definition at the first invocation.
 
-    constructor(owner) {
-        super();
+    class TransientSignalHolderImpl extends Signals.DestroyableEventEmitter {
+        constructor(owner) {
+            super();
 
-        if (_hasDestroySignal(owner))
-            owner.connectObject('destroy', () => this.destroy(), this);
+            if (_hasDestroySignal(owner)) {
+                owner.connectObject('destroy', () => this.destroy(),
+                    GObject.ConnectFlags.AFTER, this);
+            }
+        }
     }
 
-    destroy() {
-        this.emit('destroy');
-    }
-});
-registerDestroyableType(TransientSignalHolder);
+    TransientSignalHolder = TransientSignalHolderImpl;
+    return new TransientSignalHolderImpl(ownerObject);
+};
 
 class SignalManager {
     /**

@@ -5,7 +5,7 @@ const { Clutter, Gio, GLib, GObject, Graphene, Meta, Shell, St } = imports.gi;
 
 const DND = imports.ui.dnd;
 const Main = imports.ui.main;
-const { TransientSignalHolder } = imports.misc.signalTracker;
+const {signalTracker: SignalTracker} = imports.misc;
 const Util = imports.misc.util;
 const Workspace = imports.ui.workspace;
 
@@ -921,7 +921,7 @@ var ThumbnailsBox = GObject.registerClass({
             return;
 
         const { workspaceManager } = global;
-        this._transientSignalHolder = new TransientSignalHolder(this);
+        this._transientSignalHolder = new SignalTracker.TransientSignalHolder(this);
         workspaceManager.connectObject(
             'notify::n-workspaces', this._workspacesChanged.bind(this),
             'active-workspace-changed', () => this._updateIndicator(),
