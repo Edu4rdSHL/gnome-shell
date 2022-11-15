@@ -145,6 +145,8 @@ class SignalTracker {
     _trackDestroy(obj, signalData) {
         if (signalData.destroyId)
             throw new Error('Destroy already tracked');
+        if (obj === this._owner)
+            return;
         signalData.destroyId = obj.connect_after('destroy', () => this.untrack(obj));
     }
 
