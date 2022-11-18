@@ -51,6 +51,7 @@ const PointerA11yTimeout = imports.ui.pointerA11yTimeout;
 const ParentalControlsManager = imports.misc.parentalControlsManager;
 const Config = imports.misc.config;
 const Util = imports.misc.util;
+const SecureBootCheck = imports.misc.secureBootChecker;
 
 const WELCOME_DIALOG_LAST_SHOWN_VERSION = 'welcome-dialog-last-shown-version';
 // Make sure to mention the point release, otherwise it will show every time
@@ -348,6 +349,13 @@ function _initializeUI() {
             let perfOutput = GLib.getenv("SHELL_PERF_OUTPUT");
             let module = eval(`imports.perf.${perfModuleName};`);
             Scripting.runPerfScript(module, perfOutput);
+        }
+
+        if (sessionMode.currentMode === 'user') {
+            this._secureBootCheck = new SecureBootCheck.secureBootChecker();
+            this._secureBootCheck.getSecureBootState().then(res => {
+                this._secureBootCheck.setSecureBootNotification(res);
+            });
         }
     });
 }

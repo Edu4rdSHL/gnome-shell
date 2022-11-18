@@ -199,3 +199,18 @@
     background-color: transparentize($fg_color, 0.9);
   }
 }
+
+.login-dialog-secure-boot-warning-box {
+  background-color: $error_color;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.login-dialog-secure-boot-warning-label {
+  padding-left: 4pt;
+  font-size: 12pt;
+}
+
+.log-dialog-secure-boot-warning-icon {
+  icon-size: 16px;
+}

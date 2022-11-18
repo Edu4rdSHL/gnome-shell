@@ -1,0 +1,7 @@
+<node>
+  <interface name="org.freedesktop.fwupd">
+    <method name="GetHostSecurityAttrs">
+      <arg type="aa{sv}" name="attrs" direction="out"/>
+    </method>
+  </interface>
+</node>

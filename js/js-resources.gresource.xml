@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
   <gresource prefix="/org/gnome/shell">
+
     <file>gdm/authList.js</file>
     <file>gdm/authPrompt.js</file>
     <file>gdm/batch.js</file>
@@ -28,6 +29,7 @@
     <file>misc/params.js</file>
     <file>misc/parentalControlsManager.js</file>
     <file>misc/permissionStore.js</file>
+    <file>misc/secureBootChecker.js</file>
     <file>misc/signalTracker.js</file>
     <file>misc/smartcardManager.js</file>
     <file>misc/signals.js</file>

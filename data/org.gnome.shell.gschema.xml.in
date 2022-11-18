@@ -361,4 +361,17 @@
       </description>
     </key>
   </schema>
+
+  <schema id="org.gnome.shell.check-secure-boot"
+          path="/org/gnome/shell/check-secure-boot/"
+          gettext-domain="@GETTEXT_PACKAGE@">
+    <key type="b" name="secure-boot-notification">
+      <default>true</default>
+      <summary>Present a notification when secure boot is disabled.</summary>
+      <description>
+	If true, a notification will be shown if secure boot is not correctly configured.
+	Otherwise, the notification will not be shown.
+      </description>
+    </key>
+  </schema>
 </schemalist>
