@@ -1863,8 +1863,7 @@ class AppViewItem extends St.Button {
         this._otherIconIsHovering = false;
         this._expandTitleOnHover = expandTitleOnHover;
 
-        if (expandTitleOnHover)
-            this.connect('notify::hover', this._onHover.bind(this));
+        this.connect('notify::hover', this._onHover.bind(this));
         this.connect('destroy', this._onDestroy.bind(this));
     }
 
@@ -1910,8 +1909,27 @@ class AppViewItem extends St.Button {
         });
     }
 
+    _updateHoverScale() {
+        const allocationHeight = this.allocation.get_height();
+        const scaleUpFactor = (allocationHeight + 10) / allocationHeight;
+
+        this.icon.icon.ease({
+            duration: 150,
+            scale_x: this.hover ? scaleUpFactor : 1,
+            scale_y: this.hover ? scaleUpFactor : 1,
+        });
+
+        this.icon.label?.ease({
+            duration: 150,
+            translation_y: this.hover ? 2 : 0,
+        });
+    }
+
     _onHover() {
-        this._updateMultiline();
+        if (this._expandTitleOnHover)
+            this._updateMultiline();
+
+        this._updateHoverScale();
     }
 
     _onDragBegin() {
