@@ -256,6 +256,7 @@
 // tile
 @mixin tile_button($color, $flat: true) {
   @extend %tile;
+  border-radius: $base_border_radius+3px;
   @if $flat {
     background-color: transparent;
   } @else {
