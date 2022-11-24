@@ -461,8 +461,26 @@ var WorkspaceAnimationController = class {
             };
 
             if (monitorGroup.index === Main.layoutManager.primaryIndex) {
+                const workspaceManager = global.workspace_manager;
+
+                let wsIndex = newWs.index();
+                let wsDefunct = false;
+                workspaceManager.connectObject(
+                    'workspace-removed', (_, index) => {
+                        if (index === wsIndex)
+                            wsDefunct = true;
+                        else
+                            wsIndex = newWs.index();
+                    },
+                    'workspaces-reordered', () => {
+                        wsIndex = newWs.index();
+                    }, this);
+
+                params.onStopped = () => {
+                    workspaceManager.disconnectObject(this);
+                };
                 params.onComplete = () => {
-                    if (!newWs.active)
+                    if (!wsDefunct && !newWs.active)
                         newWs.activate(endTime);
                     this._finishWorkspaceSwitch(switchData);
                 };
