@@ -354,6 +354,39 @@ switcheroo_vanished_cb (GDBusConnection *connection,
 }
 
 static void
+shell_global_profiler_init (ShellGlobal *global)
+{
+  GjsProfiler *profiler;
+  const char *enabled;
+  const char *fd_str;
+  int fd = -1;
+
+  /* Sysprof uses the "GJS_TRACE_FD=N" environment variable to connect GJS
+   * profiler data to the combined Sysprof capture. Since we are in control of
+   * the GjsContext, we need to proxy this FD across to the GJS profiler.
+   */
+
+  fd_str = g_getenv ("GJS_TRACE_FD");
+  enabled = g_getenv ("GJS_ENABLE_PROFILER");
+  if (fd_str == NULL || enabled == NULL)
+    return;
+
+  profiler = gjs_context_get_profiler (global->js_context);
+  g_return_if_fail (profiler);
+
+  if (fd_str)
+    {
+      fd = atoi (fd_str);
+
+      if (fd > 2)
+        {
+          gjs_profiler_set_fd (profiler, fd);
+          gjs_profiler_start (profiler);
+        }
+    }
+}
+
+static void
 shell_global_init (ShellGlobal *global)
 {
   const char *datadir = g_getenv ("GNOME_SHELL_DATADIR");
@@ -455,6 +488,25 @@ shell_global_init (ShellGlobal *global)
                     switcheroo_vanished_cb,
                     global,
                     NULL);
+
+  shell_global_profiler_init (global);
+}
+
+static void
+shell_global_dispose (GObject *object)
+{
+  ShellGlobal *global = SHELL_GLOBAL (object);
+
+  g_clear_object (&global->js_context);
+
+  g_cancellable_cancel (global->switcheroo_cancellable);
+  g_clear_object (&global->switcheroo_cancellable);
+
+  g_clear_object (&global->settings);
+  g_clear_object (&global->userdatadir_path);
+  g_clear_object (&global->runtime_state_path);
+
+  G_OBJECT_CLASS (shell_global_parent_class)->dispose (object);
 }
 
 static void
@@ -462,22 +514,13 @@ shell_global_finalize (GObject *object)
 {
   ShellGlobal *global = SHELL_GLOBAL (object);
 
-  g_clear_object (&global->js_context);
-  g_object_unref (global->settings);
-
   the_object = NULL;
-
-  g_cancellable_cancel (global->switcheroo_cancellable);
-  g_clear_object (&global->switcheroo_cancellable);
-
-  g_clear_object (&global->userdatadir_path);
-  g_clear_object (&global->runtime_state_path);
 
   g_free (global->session_mode);
   g_free (global->imagedir);
   g_free (global->userdatadir);
 
-  g_hash_table_unref (global->save_ops);
+  g_hash_table_destroy (global->save_ops);
 
   G_OBJECT_CLASS(shell_global_parent_class)->finalize (object);
 }
@@ -489,6 +532,7 @@ shell_global_class_init (ShellGlobalClass *klass)
 
   gobject_class->get_property = shell_global_get_property;
   gobject_class->set_property = shell_global_set_property;
+  gobject_class->dispose = shell_global_dispose;
   gobject_class->finalize = shell_global_finalize;
 
   shell_global_signals[NOTIFY_ERROR] =
@@ -645,34 +689,24 @@ shell_global_class_init (ShellGlobalClass *klass)
 }
 
 /*
- * _shell_global_init: (skip)
- * @first_property_name: the name of the first property
- * @...: the value of the first property, followed optionally by more
- *  name/value pairs, followed by %NULL
+ * _shell_global_set: (skip)
+ * @global: the object to be used as global singleton
  *
- * Initializes the shell global singleton with the construction-time
- * properties.
- *
- * There are currently no such properties, so @first_property_name should
- * always be %NULL.
+ * Set the shell global singleton.
  *
  * This call must be called before shell_global_get() and shouldn't be called
  * more than once.
+ *
+ * Return value: (transfer none): the singleton #ShellGlobal object
  */
-void
-_shell_global_init (const char *first_property_name,
-                    ...)
+ShellGlobal *
+_shell_global_set (ShellGlobal *global)
 {
-  va_list argument_list;
+  g_return_val_if_fail (the_object == NULL, the_object);
 
-  g_return_if_fail (the_object == NULL);
+  the_object = global;
 
-  va_start (argument_list, first_property_name);
-  the_object = SHELL_GLOBAL (g_object_new_valist (SHELL_TYPE_GLOBAL,
-                                                  first_property_name,
-                                                  argument_list));
-  va_end (argument_list);
-
+  return the_object;
 }
 
 /**
@@ -689,17 +723,19 @@ shell_global_get (void)
 }
 
 /**
- * _shell_global_destroy_gjs_context: (skip)
+ * _shell_global_destroy: (skip)
  * @self: global object
  *
- * Destroys the GjsContext held by ShellGlobal, in order to break reference
- * counting cycles. (The GjsContext holds a reference to ShellGlobal because
- * it's available as window.global inside JS.)
+ * Destroys the #ShellGlobal, disposing child objects (such as the #GjsContext)
+ * in order to break reference counting cycles.
+ * The GjsContext holds a reference to ShellGlobal because it's available as
+ * window.global inside JS.
  */
 void
-_shell_global_destroy_gjs_context (ShellGlobal *self)
+_shell_global_destroy (ShellGlobal *global)
 {
-  g_clear_object (&self->js_context);
+  g_object_run_dispose (G_OBJECT (global));
+  g_object_unref (global);
 }
 
 static guint32
@@ -1301,7 +1337,7 @@ shell_global_notify_error (ShellGlobal  *global,
                            const char   *msg,
                            const char   *details)
 {
-  g_signal_emit_by_name (global, "notify-error", msg, details);
+  g_signal_emit (global, shell_global_signals[NOTIFY_ERROR], 0, msg, details);
 }
 
 /**

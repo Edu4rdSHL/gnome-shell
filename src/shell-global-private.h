@@ -6,12 +6,12 @@
 
 #include <gjs/gjs.h>
 
-void _shell_global_init            (const char *first_property_name,
-                                    ...);
+ShellGlobal *_shell_global_set (ShellGlobal  *global);
+
 void _shell_global_set_plugin      (ShellGlobal  *global,
                                     MetaPlugin   *plugin);
 
-void        _shell_global_destroy_gjs_context (ShellGlobal  *global);
+void        _shell_global_destroy (ShellGlobal  *global);
 
 GjsContext *_shell_global_get_gjs_context (ShellGlobal  *global);
 
