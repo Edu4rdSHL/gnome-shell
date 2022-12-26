@@ -38,7 +38,6 @@ const WorkspacesViewBase = GObject.registerClass({
             y_expand: true,
         });
         this.connect('destroy', this._onDestroy.bind(this));
-        global.focus_manager.add_group(this);
 
         this._monitorIndex = monitorIndex;
 

@@ -1061,6 +1061,7 @@ class Workspace extends St.Widget {
         // Window previews
         this._container = new WorkspaceWindowContainer({layoutManager});
         this.add_child(this._container);
+        global.focus_manager.add_group(this._container);
 
         this.metaWorkspace = metaWorkspace;
 
