@@ -395,6 +395,10 @@ class WorkspacesView extends WorkspacesViewBase {
         return this._workspaces[active];
     }
 
+    vfunc_navigate_focus(from, direction) {
+        return this.getActiveWorkspace().navigate_focus(from, direction, false);
+    }
+
     prepareToLeaveOverview() {
         for (let w = 0; w < this._workspaces.length; w++)
             this._workspaces[w].prepareToLeaveOverview();
