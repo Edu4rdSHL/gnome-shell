@@ -6,6 +6,10 @@
   StIcon { icon-size: 32px;}
 }
 
+.screenshot-ui-size-indicator {
+  @extend %osd_panel;
+}
+
 $screenshot_ui_panel_padding: $base_padding*3;
 $screenshot_ui_shot_cast_margin: 21px;
 $screenshot_ui_panel_border_radius: $modal_radius + $screenshot_ui_shot_cast_margin;
