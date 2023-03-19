@@ -27,6 +27,7 @@ tests = [
     'jsParse',
     'markup',
     'params',
+    'promiseUtils',
     'signalTracker',
     'url',
     'versionCompare',
@@ -36,6 +37,7 @@ foreach test : tests
   test(test, run_test,
     args: 'unit/@0@.js'.format(test),
     env: testenv,
+    suite: ['unit', 'js'],
     workdir: meson.current_source_dir())
 endforeach
 

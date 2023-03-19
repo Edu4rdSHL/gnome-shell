@@ -46,6 +46,8 @@ try {
 const {Clutter, Gdk, Gio, GLib, GObject, Meta, Polkit, Shell, St} = imports.gi;
 const Gettext = imports.gettext;
 const System = imports.system;
+const PromiseUtils = imports.misc.promiseUtils;
+const Signals = imports.signals;
 const SignalTracker = imports.misc.signalTracker;
 
 Gio._promisify(Gio.DataInputStream.prototype, 'fill_async');
@@ -151,6 +153,11 @@ function _makeEaseCallback(params, cleanup) {
             onStopped(isFinished);
         if (onComplete && isFinished)
             onComplete();
+
+        if (!isFinished) {
+            throw new GLib.Error(Gio.IOErrorEnum,
+                Gio.IOErrorEnum.CANCELLED, 'Ease not finished');
+        }
     };
 }
 
@@ -175,7 +182,24 @@ function _getPropertyTarget(actor, propName) {
     throw new Error(`Invalid property name ${propName}`);
 }
 
-function _easeActor(actor, params) {
+// eslint-disable-next-line jsdoc/require-jsdoc
+async function _completeTransition(transition, cancellable) {
+    try {
+        return await transition.connect_once('stopped', cancellable);
+    } catch (e) {
+        /* We may still be cancelled if the promise has been rejected */
+        transition.stop();
+
+        if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+            throw e;
+    }
+
+    /* This implies throwing a Gio.IOErrorEnum.CANCELLED again via callback */
+    return false;
+}
+
+// eslint-disable-next-line jsdoc/require-jsdoc
+async function _easeActor(actor, params) {
     actor.save_easing_state();
 
     if (params.duration != undefined)
@@ -195,6 +219,15 @@ function _easeActor(actor, params) {
     if (params.autoReverse != undefined)
         autoReverse = params.autoReverse;
     delete params.autoReverse;
+
+    const cancellable = params.cancellable || null;
+    delete params.cancellable;
+
+    if (cancellable?.is_cancelled()) {
+        const callback = _makeEaseCallback(params, () => {});
+        callback(false);
+        return;
+    }
 
     // repeatCount doesn't include the initial iteration
     const numIterations = repeatCount + 1;
@@ -232,17 +265,18 @@ function _easeActor(actor, params) {
     const [transition] = transitions;
 
     if (transition && transition.delay)
-        transition.connect('started', () => prepare());
-    else
-        prepare();
+        await transition.connect_once('started', cancellable);
+
+    prepare();
 
     if (transition)
-        transition.connect('stopped', (t, finished) => callback(finished));
+        callback(await _completeTransition(transition, cancellable));
     else
         callback(true);
 }
 
-function _easeActorProperty(actor, propName, target, params) {
+// eslint-disable-next-line jsdoc/require-jsdoc
+async function _easeActorProperty(actor, propName, target, params) {
     // Avoid pointless difference with ease()
     if (params.mode)
         params.progress_mode = params.mode;
@@ -261,6 +295,15 @@ function _easeActorProperty(actor, propName, target, params) {
     if (params.autoReverse != undefined)
         autoReverse = params.autoReverse;
     delete params.autoReverse;
+
+    const cancellable = params.cancellable || null;
+    delete params.cancellable;
+
+    if (cancellable?.is_cancelled()) {
+        const callback = _makeEaseCallback(params, () => {});
+        callback(false);
+        return;
+    }
 
     // repeatCount doesn't include the initial iteration
     const numIterations = repeatCount + 1;
@@ -310,11 +353,10 @@ function _easeActorProperty(actor, propName, target, params) {
     transition.set_to(target);
 
     if (transition.delay)
-        transition.connect('started', () => prepare());
-    else
-        prepare();
+        await transition.connect_once('started', cancellable);
 
-    transition.connect('stopped', (t, finished) => callback(finished));
+    prepare();
+    callback(await _completeTransition(transition, cancellable));
 }
 
 function init() {
@@ -344,6 +386,25 @@ function init() {
     SignalTracker.registerDestroyableType(Clutter.Actor);
 
     // Miscellaneous monkeypatching
+    const addSignalMethods = Signals.addSignalMethods;
+    Signals.addSignalMethods = proto => {
+        addSignalMethods(proto);
+
+        proto.connect_once = function (signal, cancellable) {
+            return new PromiseUtils.SignalConnectionPromise(this, signal, cancellable);
+        };
+        proto.connect_with_promise = function (signal, handler, flags, cancellable) {
+            return new PromiseUtils.SignalConnectionPromiseFull(this, signal, handler, flags, cancellable);
+        };
+    };
+
+    GObject.Object.prototype.connect_once = function (signal, cancellable) {
+        return new PromiseUtils.SignalConnectionPromise(this, signal, cancellable);
+    };
+    GObject.Object.prototype.connect_with_promise = function (signal, handler, cancellable) {
+        return new PromiseUtils.SignalConnectionPromiseFull(this, signal, handler, cancellable);
+    };
+
     _patchContainerClass(St.BoxLayout);
 
     _patchLayoutClass(Clutter.GridLayout, {
@@ -361,16 +422,16 @@ function init() {
         origSetEasingDelay.call(this, adjustAnimationTime(msecs));
     };
 
-    Clutter.Actor.prototype.ease = function (props) {
-        _easeActor(this, props);
+    Clutter.Actor.prototype.ease = async function (props) {
+        await _easeActor(this, props);
     };
-    Clutter.Actor.prototype.ease_property = function (propName, target, params) {
-        _easeActorProperty(this, propName, target, params);
+    Clutter.Actor.prototype.ease_property = async function (propName, target, params) {
+        await _easeActorProperty(this, propName, target, params);
     };
-    St.Adjustment.prototype.ease = function (target, params) {
+    St.Adjustment.prototype.ease = async function (target, params) {
         // we're not an actor of course, but we implement the same
         // transition API as Clutter.Actor, so this works anyway
-        _easeActorProperty(this, 'value', target, params);
+        await _easeActorProperty(this, 'value', target, params);
     };
 
     Clutter.Actor.prototype[Symbol.iterator] = function* () {
