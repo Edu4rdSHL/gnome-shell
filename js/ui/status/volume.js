@@ -32,9 +32,10 @@ const StreamSlider = GObject.registerClass({
         'stream-updated': {},
     },
 }, class StreamSlider extends QuickSlider {
-    _init(control) {
+    _init(control, menu_button_accessible_name) {
         super._init({
             icon_reactive: true,
+            menu_button_accessible_name: menu_button_accessible_name,
         });
 
         this._control = control;
@@ -71,6 +72,7 @@ const StreamSlider = GObject.registerClass({
         });
 
         this._deviceItems = new Map();
+
 
         this._deviceSection = new PopupMenu.PopupMenuSection();
         this.menu.addMenuItem(this._deviceSection);
@@ -273,7 +275,7 @@ const StreamSlider = GObject.registerClass({
 const OutputStreamSlider = GObject.registerClass(
 class OutputStreamSlider extends StreamSlider {
     _init(control) {
-        super._init(control);
+        super._init(control, _("Select output device"));
 
         this.slider.accessible_name = _('Volume');
 
@@ -343,7 +345,7 @@ class OutputStreamSlider extends StreamSlider {
 const InputStreamSlider = GObject.registerClass(
 class InputStreamSlider extends StreamSlider {
     _init(control) {
-        super._init(control);
+        super._init(control, _("Select input device"));
 
         this.slider.accessible_name = _('Microphone');
 
