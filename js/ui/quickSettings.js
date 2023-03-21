@@ -244,10 +244,10 @@ var QuickSlider = GObject.registerClass({
             'menu-enabled', '', '',
             GObject.ParamFlags.READWRITE,
             false),
-            'menu-button-accessible-name': GObject.ParamSpec.string(
-                'menu-button-accessible-name', '', '',
-                GObject.ParamFlags.READWRITE,
-                ''),
+        'menu-button-accessible-name': GObject.ParamSpec.string(
+            'menu-button-accessible-name', '', '',
+            GObject.ParamFlags.READWRITE,
+            ''),
     },
     Signals: {
         'icon-clicked': {},
@@ -334,7 +334,7 @@ var QuickSlider = GObject.registerClass({
         this.bind_property('menu-enabled',
             this._menuButton, 'visible',
             GObject.BindingFlags.SYNC_CREATE);
-            this.bind_property('menu-button-accessible-name',
+        this.bind_property('menu-button-accessible-name',
             this._menuButton, 'accessible-name',
             GObject.BindingFlags.SYNC_CREATE);
         this._menuButton.connect('clicked', () => this.menu.open());
