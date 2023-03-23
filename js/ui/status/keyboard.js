@@ -82,8 +82,9 @@ export class InputSource extends Signals.EventEmitter {
 
 export const InputSourcePopup = GObject.registerClass(
 class InputSourcePopup extends SwitcherPopup.SwitcherPopup {
-    _init(items, action, actionBackward) {
-        super._init(items);
+    // Selected item is optional, so just put it last.
+    _init(items, action, actionBackward, selectedItem) {
+        super._init(items, selectedItem);
 
         this._action = action;
         this._actionBackward = actionBackward;
