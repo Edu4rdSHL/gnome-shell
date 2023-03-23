@@ -165,12 +165,20 @@ class InputSourceSettings extends Signals.EventEmitter {
         this.emit('per-window-changed');
     }
 
+    _emitUseMruSourcesChanged() {
+        this.emit('use-mru-sources-changed');
+    }
+
     get inputSources() {
         return [];
     }
 
     get mruSources() {
         return [];
+    }
+
+    get useMruSources() {
+        return false;
     }
 
     set mruSources(sourcesList) {
@@ -268,11 +276,13 @@ class InputSourceSessionSettings extends InputSourceSettings {
         this._DESKTOP_INPUT_SOURCES_SCHEMA = 'org.gnome.desktop.input-sources';
         this._KEY_INPUT_SOURCES = 'sources';
         this._KEY_MRU_SOURCES = 'mru-sources';
+        this._KEY_USE_MRU_SOURCES = 'use-mru-sources';
         this._KEY_KEYBOARD_OPTIONS = 'xkb-options';
         this._KEY_PER_WINDOW = 'per-window';
 
         this._settings = new Gio.Settings({schema_id: this._DESKTOP_INPUT_SOURCES_SCHEMA});
         this._settings.connect(`changed::${this._KEY_INPUT_SOURCES}`, this._emitInputSourcesChanged.bind(this));
+        this._settings.connect(`changed::${this._KEY_USE_MRU_SOURCES}`, this._emitUseMruSourcesChanged.bind(this));
         this._settings.connect(`changed::${this._KEY_KEYBOARD_OPTIONS}`, this._emitKeyboardOptionsChanged.bind(this));
         this._settings.connect(`changed::${this._KEY_PER_WINDOW}`, this._emitPerWindowChanged.bind(this));
     }
@@ -302,6 +312,10 @@ class InputSourceSessionSettings extends InputSourceSettings {
         this._settings.set_value(this._KEY_MRU_SOURCES, sources);
     }
 
+    get useMruSources() {
+        return this._settings.get_boolean(this._KEY_USE_MRU_SOURCES);
+    }
+
     get keyboardOptions() {
         return this._settings.get_strv(this._KEY_KEYBOARD_OPTIONS);
     }
@@ -325,6 +339,9 @@ export class InputSourceManager extends Signals.EventEmitter {
 
         this._currentSource = null;
 
+        this._useMruSources = false;
+        this._fixedSources = [];
+        this._previousFixedSource = null;
         // All valid input sources currently in the gsettings
         // KEY_INPUT_SOURCES list ordered by most recently used
         this._mruSources = [];
@@ -347,6 +364,7 @@ export class InputSourceManager extends Signals.EventEmitter {
             this._settings = new InputSourceSessionSettings();
         this._settings.connect('input-sources-changed', this._inputSourcesChanged.bind(this));
         this._settings.connect('keyboard-options-changed', this._keyboardOptionsChanged.bind(this));
+        this._settings.connect('use-mru-sources-changed', this._useMruSourcesChanged.bind(this));
 
         this._xkbInfo = KeyboardManager.getXkbInfo();
         this._keyboardManager = KeyboardManager.getKeyboardManager();
@@ -372,6 +390,7 @@ export class InputSourceManager extends Signals.EventEmitter {
         this._reloading = true;
         this._keyboardManager.setKeyboardOptions(this._settings.keyboardOptions);
         this._inputSourcesChanged();
+        this._useMruSourcesChanged();
         this._reloading = false;
     }
 
@@ -381,7 +400,9 @@ export class InputSourceManager extends Signals.EventEmitter {
 
         this._ibusReady = ready;
         this._mruSources = [];
+        this._fixedSources = [];
         this._inputSourcesChanged();
+        this._useMruSourcesChanged();
     }
 
     _modifiersSwitcher() {
@@ -407,8 +428,13 @@ export class InputSourceManager extends Signals.EventEmitter {
     }
 
     _switchInputSource(display, window, binding) {
-        if (this._mruSources.length < 2)
-            return;
+        if (this._useMruSources) {
+            if (this._mruSources.length < 2)
+                return;
+        } else {
+            if (this._fixedSources.length < 2)
+                return;
+        }
 
         // HACK: Fall back on simple input source switching since we
         // can't show a popup switcher while a GrabHelper grab is in
@@ -421,7 +447,10 @@ export class InputSourceManager extends Signals.EventEmitter {
         }
 
         this._switcherPopup = new InputSourcePopup(
-            this._mruSources, this._keybindingAction, this._keybindingActionBackward);
+            this._useMruSources ? this._mruSources : this._fixedSources,
+            this._keybindingAction,
+            this._keybindingActionBackward,
+            this._currentSource);
         this._switcherPopup.connect('destroy', () => {
             this._switcherPopup = null;
         });
@@ -460,13 +489,17 @@ export class InputSourceManager extends Signals.EventEmitter {
 
         this.emit('current-source-changed', oldSource);
 
-        for (let i = 1; i < this._mruSources.length; ++i) {
-            if (this._mruSources[i] === newSource) {
-                let currentSource = this._mruSources.splice(i, 1);
-                this._mruSources = currentSource.concat(this._mruSources);
-                break;
+        // Fixed sources list does not need to update, obviously.
+        if (this._useMruSources) {
+            for (let i = 1; i < this._mruSources.length; ++i) {
+                if (this._mruSources[i] === newSource) {
+                    let currentSource = this._mruSources.splice(i, 1);
+                    this._mruSources = currentSource.concat(this._mruSources);
+                    break;
+                }
             }
         }
+
         this._changePerWindowSource();
     }
 
@@ -500,8 +533,34 @@ export class InputSourceManager extends Signals.EventEmitter {
             this._ibusManager.setEngine(engine);
         this._currentInputSourceChanged(is);
 
-        if (interactive)
+        // Fixed sources list does not need update, obviously.
+        if (interactive && this._useMruSources)
             this._updateMruSettings();
+    }
+
+    _updateFixedSources() {
+        let sourcesList = [];
+        for (let i of Object.keys(this._inputSources).sort((a, b) => a - b))
+            sourcesList.push(this._inputSources[i]);
+        this._fixedSources = sourcesList;
+
+        this._keyboardManager.setUserLayouts(sourcesList.map(x => x.xkbId));
+
+        // If we are back from iBus' password mode to normal mode, we need to
+        // try restoring previous source.
+        if (!this._disableIBus && this._previousFixedSource) {
+            const previousSource = this._fixedSources.find((source) => {
+                return source.type === this._previousFixedSource.type &&
+                    source.id === this._previousFixedSource.id;
+            });
+            if (previousSource)
+                previousSource.activate(false);
+            this._previousFixedSource = null;
+        }
+        // Because reload will clear `_currentSource`, if we failed to restore
+        // previous source, we will use the first source here.
+        if (this._currentSource == null && this._fixedSources.length > 0)
+            this._fixedSources[0].activate(false);
     }
 
     _updateMruSources() {
@@ -551,6 +610,16 @@ export class InputSourceManager extends Signals.EventEmitter {
         }
 
         this._mruSources = mruSources.concat(sourcesList);
+
+        if (this._currentSource == null && this._mruSources.length > 0)
+            this._mruSources[0].activate(false);
+    }
+
+    _updateSources() {
+        if (this._useMruSources)
+            this._updateMruSources();
+        else
+            this._updateFixedSources();
     }
 
     _inputSourcesChanged() {
@@ -628,14 +697,19 @@ export class InputSourceManager extends Signals.EventEmitter {
 
         this.emit('sources-changed');
 
-        this._updateMruSources();
-
-        if (this._mruSources.length > 0)
-            this._mruSources[0].activate(false);
+        this._updateSources();
 
         // All ibus engines are preloaded here to reduce the launching time
         // when users switch the input sources.
         this._ibusManager.preloadEngines(Object.keys(this._ibusSources));
+    }
+
+    _useMruSourcesChanged() {
+        this._useMruSources = this._settings.useMruSources;
+        // We may changed input sources before update _useMruSources and the
+        // needed list is not updated, to prevent from using sources not
+        // enabled, we update the list here.
+        this._updateSources();
     }
 
     _makeEngineShortName(engineDesc) {
@@ -700,7 +774,18 @@ export class InputSourceManager extends Signals.EventEmitter {
             if (this._disableIBus)
                 return;
             this._disableIBus = true;
-            this._mruSourcesBackup = this._mruSources.slice();
+            // We don't backup fixed sources list, it always get re-constructed,
+            // and is always the same. But unlike MRU sources list, whose first
+            // element is always the current source, we need to back up current
+            // source for fixed sources list to restore it later.
+            if (this._useMruSources) {
+                this._mruSourcesBackup = this._mruSources.slice();
+            } else if (this._currentSource) {
+                this._previousFixedSource = {
+                    type: this._currentSource.type,
+                    id: this._currentSource.id
+                };
+            }
         } else {
             if (!this._disableIBus)
                 return;
