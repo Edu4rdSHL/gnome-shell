@@ -984,6 +984,16 @@ export class PopupMenu extends PopupMenuBase {
         this.emit('open-state-changed', true);
     }
 
+    openNoGrab(animate) {
+        this.noGrab = true;
+        this.open(animate);
+    }
+
+    openTakeGrab() {
+        delete this.noGrab;
+        this.emit('open-state-changed', true);
+    }
+
     close(animate) {
         if (this._activeMenuItem)
             this._activeMenuItem.active = false;
@@ -999,6 +1009,9 @@ export class PopupMenu extends PopupMenuBase {
 
         this.isOpen = false;
         this.emit('open-state-changed', false);
+
+        if (this.noGrab)
+            delete this.noGrab;
     }
 
     destroy() {
@@ -1366,7 +1379,7 @@ export class PopupMenuManager {
     }
 
     _onMenuOpenState(menu, open) {
-        if (open && this.activeMenu === menu)
+        if (menu.noGrab || (open && this.activeMenu === menu))
             return;
 
         if (open) {
