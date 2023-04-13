@@ -321,7 +321,6 @@ class WorldClocksSection extends St.Button {
         });
         this._clock = new GnomeDesktop.WallClock();
         this._clockNotifyId = 0;
-        this._tzNotifyId = 0;
 
         this._locations = [];
 
@@ -458,18 +457,6 @@ class WorldClocksSection extends St.Button {
             this._locations[i].tzLabel = tz;
         }
 
-        if (this._grid.get_n_children() > 1) {
-            if (!this._tzNotifyId) {
-                this._tzNotifyId =
-                    this._clock.connect('notify::timezone', this._updateTimezoneLabels.bind(this));
-            }
-            this._updateTimezoneLabels();
-        } else {
-            if (this._tzNotifyId)
-                this._clock.disconnect(this._tzNotifyId);
-            this._tzNotifyId = 0;
-        }
-
         this._startOrStopUpdates();
     }
 
@@ -497,12 +484,6 @@ class WorldClocksSection extends St.Button {
             let l = this._locations[i];
             const now = GLib.DateTime.new_now(l.location.get_timezone());
             l.timeLabel.text = Util.formatTime(now, { timeOnly: true });
-        }
-    }
-
-    _updateTimezoneLabels() {
-        for (let i = 0; i < this._locations.length; i++) {
-            let l = this._locations[i];
             l.tzLabel.text = this._getTimezoneOffsetAtLocation(l.location);
         }
     }
