@@ -350,6 +350,8 @@ class WorldClocksSection extends St.Button {
         this._settings.connect('changed', this._clocksChanged.bind(this));
         this._clocksChanged();
 
+        this.connect('notify::mapped', () => this._startOrStopUpdates());
+
         this._appSystem = Shell.AppSystem.get_default();
         this._appSystem.connect('installed-changed',
             this._sync.bind(this));
@@ -367,6 +369,20 @@ class WorldClocksSection extends St.Button {
     _sync() {
         this._clocksApp = this._appSystem.lookup_app('org.gnome.clocks.desktop');
         this.visible = this._clocksApp != null;
+    }
+
+    _startOrStopUpdates() {
+        if (this.mapped && this._grid.get_n_children() > 1) {
+            if (!this._clockNotifyId) {
+                this._clockNotifyId =
+                    this._clock.connect('notify::clock', this._updateTimeLabels.bind(this));
+            }
+            this._updateTimeLabels();
+        } else {
+            if (this._clockNotifyId)
+                this._clock.disconnect(this._clockNotifyId);
+            this._clockNotifyId = 0;
+        }
     }
 
     _clocksChanged() {
@@ -443,25 +459,18 @@ class WorldClocksSection extends St.Button {
         }
 
         if (this._grid.get_n_children() > 1) {
-            if (!this._clockNotifyId) {
-                this._clockNotifyId =
-                    this._clock.connect('notify::clock', this._updateTimeLabels.bind(this));
-            }
             if (!this._tzNotifyId) {
                 this._tzNotifyId =
                     this._clock.connect('notify::timezone', this._updateTimezoneLabels.bind(this));
             }
-            this._updateTimeLabels();
             this._updateTimezoneLabels();
         } else {
-            if (this._clockNotifyId)
-                this._clock.disconnect(this._clockNotifyId);
-            this._clockNotifyId = 0;
-
             if (this._tzNotifyId)
                 this._clock.disconnect(this._tzNotifyId);
             this._tzNotifyId = 0;
         }
+
+        this._startOrStopUpdates();
     }
 
     _getTimezoneOffsetAtLocation(location) {
