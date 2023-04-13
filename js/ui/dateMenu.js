@@ -381,7 +381,7 @@ class WorldClocksSection extends St.Button {
                 this._locations.push({ location: l });
         }
 
-        const unixtime = GLib.DateTime.new_now_local().to_unix();
+        const unixtime = GLib.DateTime.new_now(this._clock.timezone).to_unix();
         this._locations.sort((a, b) => {
             const tzA = a.location.get_timezone();
             const tzB = b.location.get_timezone();
@@ -466,7 +466,8 @@ class WorldClocksSection extends St.Button {
 
     _getTimezoneOffsetAtLocation(location) {
         const tz = location.get_timezone();
-        const localOffset = GLib.DateTime.new_now_local().get_utc_offset();
+        const localOffset =
+            GLib.DateTime.new_now(this._clock.timezone).get_utc_offset();
         const utcOffset = GLib.DateTime.new_now(tz).get_utc_offset();
         const offsetCurrentTz = utcOffset - localOffset;
         const offsetHours =
