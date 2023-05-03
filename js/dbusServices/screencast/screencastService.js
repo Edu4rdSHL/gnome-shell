@@ -35,6 +35,26 @@ const PIPELINES = [
             'capsfilter caps=video/x-raw(memory:DMABuf),max-framerate=%F/1 ! \
              glupload ! glcolorconvert ! gldownload ! \
              queue ! \
+             av1enc usage-profile=realtime ! \
+             queue ! \
+             webmmux',
+    },
+    {
+        fileExtension: 'webm',
+        pipelineString:
+            'capsfilter caps=video/x-raw,max-framerate=%F/1 ! \
+             videoconvert chroma-mode=none dither=none matrix-mode=output-only n-threads=%T ! \
+             queue ! \
+             av1enc usage-profile=realtime ! \
+             queue ! \
+             webmmux',
+    },
+    {
+        fileExtension: 'webm',
+        pipelineString:
+            'capsfilter caps=video/x-raw(memory:DMABuf),max-framerate=%F/1 ! \
+             glupload ! glcolorconvert ! gldownload ! \
+             queue ! \
              vp8enc cpu-used=16 max-quantizer=17 deadline=1 keyframe-mode=disabled threads=%T static-threshold=1000 buffer-size=20000 ! \
              queue ! \
              webmmux',
