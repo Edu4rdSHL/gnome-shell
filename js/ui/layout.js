@@ -738,20 +738,23 @@ var LayoutManager = GObject.registerClass({
         } else {
             this.keyboardBox.hide();
 
-            let monitor = this.primaryMonitor;
+            const prepareMonitor = monitor => {
+                if (!Main.sessionMode.hasOverview) {
+                    const x = monitor.x + monitor.width / 2.0;
+                    const y = monitor.y + monitor.height / 2.0;
 
-            if (!Main.sessionMode.hasOverview) {
-                const x = monitor.x + monitor.width / 2.0;
-                const y = monitor.y + monitor.height / 2.0;
+                    this.uiGroup.set_pivot_point(
+                        x / global.screen_width,
+                        y / global.screen_height);
+                    this.uiGroup.scale_x = this.uiGroup.scale_y = 0.75;
+                    this.uiGroup.opacity = 0;
+                }
 
-                this.uiGroup.set_pivot_point(
-                    x / global.screen_width,
-                    y / global.screen_height);
-                this.uiGroup.scale_x = this.uiGroup.scale_y = 0.75;
-                this.uiGroup.opacity = 0;
-            }
+                global.window_group.set_clip(monitor.x, monitor.y,
+                    monitor.width, monitor.height);
+            };
 
-            global.window_group.set_clip(monitor.x, monitor.y, monitor.width, monitor.height);
+            prepareMonitor(this.primaryMonitor);
 
             try {
                 await this._updateBackgrounds();
@@ -764,6 +767,14 @@ var LayoutManager = GObject.registerClass({
                 logError(e);
                 return;
             }
+
+            this._startupMonitorsChangedId = this.connect('monitors-changed', () => {
+                this._coverPane.set({
+                    width: global.screen_width,
+                    height: global.screen_height,
+                });
+                prepareMonitor(this.primaryMonitor);
+            });
         }
 
         // Hack: Work around grab issue when testing greeter UI in nested
@@ -819,6 +830,11 @@ var LayoutManager = GObject.registerClass({
         this._startingUp = false;
 
         this.keyboardBox.show();
+
+        if (this._startupMonitorsChangedId) {
+            this.disconnect(this._startupMonitorsChangedId);
+            this._startupMonitorsChangedId = 0;
+        }
 
         if (!Main.sessionMode.isGreeter) {
             this._showSecondaryBackgrounds();
