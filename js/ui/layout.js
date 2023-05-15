@@ -593,7 +593,7 @@ var LayoutManager = GObject.registerClass({
         this._updateMonitors();
         this._updateBoxes();
         this._updateHotCorners();
-        this._updateBackgrounds();
+        this._updateBackgrounds().catch(logError);
         this._updateFullscreen();
         this._updateVisibility();
         this._queueUpdateRegions();
@@ -678,7 +678,7 @@ var LayoutManager = GObject.registerClass({
                 if (this.primaryMonitor) {
                     this._systemBackground.show();
                     global.stage.show();
-                    this._prepareStartupAnimation();
+                    this._prepareStartupAnimation().catch(logError);
                     return GLib.SOURCE_REMOVE;
                 } else {
                     return GLib.SOURCE_CONTINUE;

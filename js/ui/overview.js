@@ -95,7 +95,7 @@ class OverviewActor extends St.BoxLayout {
     }
 
     runStartupAnimation(callback) {
-        this._controls.runStartupAnimation(callback);
+        this._controls.runStartupAnimation(callback).catch(logError);
     }
 
     get dash() {
