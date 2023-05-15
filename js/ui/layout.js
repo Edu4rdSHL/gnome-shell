@@ -539,7 +539,7 @@ var LayoutManager = GObject.registerClass({
         this._bgManagers = [];
 
         if (Main.sessionMode.isGreeter)
-            return Promise.resolve();
+            return;
 
         for (let i = 0; i < this.monitors.length; i++) {
             let bgManager = this._createBackgroundManager(i);
@@ -548,8 +548,14 @@ var LayoutManager = GObject.registerClass({
             if (i != this.primaryIndex && this._startingUp)
                 bgManager.backgroundActor.hide();
         }
+    }
 
-        return Promise.all(this._bgManagers.map(bgManager => this._waitLoaded(bgManager)));
+    _waitBackgroundsLoaded() {
+        if (this._bgManagers.every(bgManager => bgManager.isLoaded))
+            return Promise.resolve();
+
+        return Promise.all(this._bgManagers.map(bgManager =>
+            this._waitLoaded(bgManager)));
     }
 
     _updateKeyboardBox() {
@@ -603,7 +609,7 @@ var LayoutManager = GObject.registerClass({
         this._updateMonitors();
         this._updateBoxes();
         this._updateHotCorners();
-        this._updateBackgrounds().catch(logError);
+        this._updateBackgrounds();
         this._updateFullscreen();
         this._updateVisibility();
         this._queueUpdateRegions();
@@ -716,7 +722,6 @@ var LayoutManager = GObject.registerClass({
     async _prepareStartupAnimation() {
         // During the initial transition, add a simple actor to block all events,
         // so they don't get delivered to X11 windows that have been transformed.
-        this._coverPane?.destroy();
         this._coverPane = new Clutter.Actor({
             opacity: 0,
             width: global.screen_width,
@@ -756,18 +761,6 @@ var LayoutManager = GObject.registerClass({
 
             prepareMonitor(this.primaryMonitor);
 
-            try {
-                await this._updateBackgrounds();
-            } catch (e) {
-                if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
-                    this._prepareStartupAnimation().catch(logError);
-                    return;
-                }
-
-                logError(e);
-                return;
-            }
-
             this._startupMonitorsChangedId = this.connect('monitors-changed', () => {
                 this._coverPane.set({
                     width: global.screen_width,
@@ -775,6 +768,23 @@ var LayoutManager = GObject.registerClass({
                 });
                 prepareMonitor(this.primaryMonitor);
             });
+
+            this._updateBackgrounds();
+
+            while (true) {
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    await this._waitBackgroundsLoaded();
+                    break;
+                } catch (e) {
+                    if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
+                        logError(e);
+                        this.disconnect(this._startupMonitorsChangedId);
+                        this._startupMonitorsChangedId = 0;
+                        return;
+                    }
+                }
+            }
         }
 
         // Hack: Work around grab issue when testing greeter UI in nested
