@@ -514,10 +514,20 @@ var LayoutManager = GObject.registerClass({
     }
 
     _waitLoaded(bgManager) {
-        return new Promise(resolve => {
+        return new Promise((resolve, reject) => {
+            let monitorsChangedId;
             const id = bgManager.connect('loaded', () => {
+                this.disconnect(monitorsChangedId);
                 bgManager.disconnect(id);
                 resolve();
+            });
+
+            monitorsChangedId = this.connect('monitors-changed', () => {
+                bgManager.disconnect(id);
+                this.disconnect(monitorsChangedId);
+
+                reject(new GLib.Error(Gio.IOErrorEnum,
+                    Gio.IOErrorEnum.CANCELLED, 'Loading was cancelled'));
             });
         });
     }
@@ -539,7 +549,7 @@ var LayoutManager = GObject.registerClass({
                 bgManager.backgroundActor.hide();
         }
 
-        return Promise.all(this._bgManagers.map(this._waitLoaded));
+        return Promise.all(this._bgManagers.map(bgManager => this._waitLoaded(bgManager)));
     }
 
     _updateKeyboardBox() {
