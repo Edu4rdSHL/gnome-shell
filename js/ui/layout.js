@@ -716,6 +716,7 @@ var LayoutManager = GObject.registerClass({
     async _prepareStartupAnimation() {
         // During the initial transition, add a simple actor to block all events,
         // so they don't get delivered to X11 windows that have been transformed.
+        this._coverPane?.destroy();
         this._coverPane = new Clutter.Actor({
             opacity: 0,
             width: global.screen_width,
@@ -752,7 +753,17 @@ var LayoutManager = GObject.registerClass({
 
             global.window_group.set_clip(monitor.x, monitor.y, monitor.width, monitor.height);
 
-            await this._updateBackgrounds();
+            try {
+                await this._updateBackgrounds();
+            } catch (e) {
+                if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
+                    this._prepareStartupAnimation().catch(logError);
+                    return;
+                }
+
+                logError(e);
+                return;
+            }
         }
 
         // Hack: Work around grab issue when testing greeter UI in nested
