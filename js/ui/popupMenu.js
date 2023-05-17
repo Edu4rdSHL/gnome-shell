@@ -299,6 +299,8 @@ class PopupSeparatorMenuItem extends PopupBaseMenuItem {
             y_align: Clutter.ActorAlign.CENTER,
         });
         this.add_child(this._separator);
+
+        this.setOrnament(Ornament.HIDDEN);
     }
 
     _syncVisibility() {

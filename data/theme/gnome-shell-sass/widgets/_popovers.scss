@@ -121,10 +121,6 @@ $submenu_bg_color: lighten($menu_bg_color, 7%);
     background-color: $borders_color;
   }
 
-  .popup-menu-ornament {
-    width: 0 !important;
-  }
-
   // separators in submenus
   .popup-sub-menu & {
     background-color: transparent;
