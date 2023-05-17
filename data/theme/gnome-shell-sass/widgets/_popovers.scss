@@ -145,9 +145,6 @@ $submenu_bg_color: lighten($menu_bg_color, 7%);
 .app-menu {
   max-width: 27.25em;
 
-  // this is unneeded at the top-level in this menu, hide it
-  .popup-menu-ornament { width: 0 !important; }
-
   .popup-inactive-menu-item:first-child {
     // "Open Windows" label
     > StLabel {
