@@ -36,7 +36,7 @@ imports.gi.versions.UPowerGlib = '1.0';
 const {Clutter, Gdk, Gio, GLib, GObject, Meta, Polkit, Shell, St} = imports.gi;
 const Gettext = imports.gettext;
 const System = imports.system;
-const SignalTracker = imports.misc.signalTracker;
+const {signals: Signals, signalTracker: SignalTracker} = imports.misc;
 
 Gio._promisify(Gio.DataInputStream.prototype, 'fill_async');
 Gio._promisify(Gio.DataInputStream.prototype, 'read_line_async');
@@ -296,6 +296,7 @@ function init() {
     };
 
     SignalTracker.registerDestroyableType(Clutter.Actor);
+    SignalTracker.registerDestroyableType(Signals.DestroyableEventEmitter);
 
     // Miscellaneous monkeypatching
     _patchContainerClass(St.BoxLayout);

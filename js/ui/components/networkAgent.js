@@ -411,7 +411,7 @@ class NetworkSecretDialog extends ModalDialog.ModalDialog {
     }
 });
 
-var VPNRequestHandler = class extends Signals.EventEmitter {
+var VPNRequestHandler = class extends Signals.DestroyableEventEmitter {
     constructor(agent, requestId, authHelper, serviceType, connection, hints, flags) {
         super();
 
@@ -504,7 +504,6 @@ var VPNRequestHandler = class extends Signals.EventEmitter {
         if (this._destroyed)
             return;
 
-        this.emit('destroy');
         if (this._childWatch)
             GLib.source_remove(this._childWatch);
 
@@ -512,6 +511,8 @@ var VPNRequestHandler = class extends Signals.EventEmitter {
         // Stdout is closed when we finish reading from it
 
         this._destroyed = true;
+
+        super.destroy();
     }
 
     _vpnChildFinished(pid, status, _requestObj) {

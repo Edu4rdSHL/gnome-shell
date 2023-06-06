@@ -462,7 +462,7 @@ class PopupImageMenuItem extends PopupBaseMenuItem {
     }
 });
 
-var PopupMenuBase = class extends Signals.EventEmitter {
+var PopupMenuBase = class extends Signals.DestroyableEventEmitter {
     constructor(sourceActor, styleClass) {
         super();
 
@@ -785,9 +785,7 @@ var PopupMenuBase = class extends Signals.EventEmitter {
         this.removeAll();
         this.actor.destroy();
 
-        this.emit('destroy');
-
-        Main.sessionMode.disconnectObject(this);
+        super.destroy();
     }
 };
 
@@ -935,7 +933,7 @@ var PopupMenu = class extends PopupMenuBase {
     }
 };
 
-var PopupDummyMenu = class extends Signals.EventEmitter {
+var PopupDummyMenu = class extends Signals.DestroyableEventEmitter {
     constructor(sourceActor) {
         super();
 
@@ -967,10 +965,6 @@ var PopupDummyMenu = class extends Signals.EventEmitter {
     }
 
     toggle() {}
-
-    destroy() {
-        this.emit('destroy');
-    }
 };
 
 var PopupSubMenu = class extends PopupMenuBase {

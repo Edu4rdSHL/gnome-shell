@@ -25,6 +25,7 @@ tests = [
     'markup',
     'params',
     'signalTracker',
+    'signals',
     'url',
     'versionCompare',
 ]

@@ -1,5 +1,7 @@
-/* exported TransientSignalHolder, connectObject, disconnectObject */
+/* exported TransientSignalHolder, connectObject, disconnectObject,
+   registerDestroyableType */
 const { GObject } = imports.gi;
+const {signals: Signals} = imports.misc;
 
 const destroyableTypes = [];
 
@@ -12,24 +14,26 @@ function _hasDestroySignal(obj) {
     return destroyableTypes.some(type => obj instanceof type);
 }
 
-var TransientSignalHolder = GObject.registerClass(
-class TransientSignalHolder extends GObject.Object {
-    static [GObject.signals] = {
-        'destroy': {},
-    };
+// eslint-disable-next-line func-style
+var TransientSignalHolder = function (ownerObject) {
+    // Signals.DestroyableEventEmitter is undefined at import time, so we need
+    // to do this dynamically, by defining a class that will replace the
+    // temporary function definition at the first invocation.
 
-    constructor(owner) {
-        super();
+    class TransientSignalHolderImpl extends Signals.DestroyableEventEmitter {
+        constructor(owner) {
+            super();
 
-        if (_hasDestroySignal(owner))
-            owner.connectObject('destroy', () => this.destroy(), this);
+            if (_hasDestroySignal(owner)) {
+                owner.connectObject('destroy', () => this.destroy(),
+                    GObject.ConnectFlags.AFTER, this);
+            }
+        }
     }
 
-    destroy() {
-        this.emit('destroy');
-    }
-});
-registerDestroyableType(TransientSignalHolder);
+    TransientSignalHolder = TransientSignalHolderImpl;
+    return new TransientSignalHolderImpl(ownerObject);
+};
 
 class SignalManager {
     /**
@@ -199,8 +203,10 @@ class SignalTracker {
  * with a tracked object.
  *
  * All handlers for a particular object can be disconnected
- * by calling disconnectObject(). If object is a {Clutter.widget},
- * this is done automatically when the widget is destroyed.
+ * by calling disconnectObject(). If object is a {GObject.Object}
+ * that supports destruction (registered via registerDestroyableType()
+ * such as {Clutter.Actor}) or a {Signal.DestroyableEventEmitter},
+ * this is done automatically when the object is destroyed.
  *
  * @param {object} thisObj - the emitter object
  * @param {...any} args - a sequence of signal-name/handler pairs
@@ -225,7 +231,7 @@ function connectObject(thisObj, ...args) {
 
     const connectSignal = (emitter, signalName, handler, flags) => {
         const isGObject = emitter instanceof GObject.Object;
-        const func = (flags & GObject.ConnectFlags.AFTER) && isGObject
+        const func = flags & GObject.ConnectFlags.AFTER
             ? 'connect_after'
             : 'connect';
         const emitterProto = isGObject
@@ -255,19 +261,38 @@ function connectObject(thisObj, ...args) {
  * @returns {void}
  */
 function disconnectObject(thisObj, obj) {
-    SignalManager.getDefault().maybeGetSignalTracker(thisObj)?.untrack(obj);
+    SignalManager.getDefault().maybeGetSignalTracker(thisObj)?.untrack(
+        obj ?? globalThis);
 }
 
 /**
- * Register a GObject type as having a 'destroy' signal
- * that should disconnect all handlers
+ * Register a GObject type as having a 'destroy' signal or
+ * or a Signals.DestroyableEventEmitter that should disconnect all handlers
  *
- * @param {GObject.Type} gtype - a GObject type
+ * @param {(GObject.Type|Signals.DestroyableEventEmitter)} type - a GObject type
+ * or a class extending Signals.DestroyableEventEmitter
  */
-function registerDestroyableType(gtype) {
-    if (!GObject.type_is_a(gtype, GObject.Object))
-        throw new Error(`${gtype} is not a GObject subclass`);
+function registerDestroyableType(type) {
+    if (destroyableTypes.includes(type))
+        return;
 
+    if (destroyableTypes.some(t => type?.prototype instanceof t))
+        return;
+
+    if (type !== GObject.Object && !(type?.prototype instanceof GObject.Object)) {
+        if (!Signals.DestroyableEventEmitter)
+            throw new Error(`${type} is not a GObject subclass`);
+
+        if (type === Signals.DestroyableEventEmitter ||
+            type?.prototype instanceof Signals.DestroyableEventEmitter) {
+            destroyableTypes.push(type);
+            return;
+        }
+
+        throw new Error(`${type} is not a GObject or Signals.DestroyableEventEmitter subclass`);
+    }
+
+    const gtype = type;
     if (!GObject.signal_lookup('destroy', gtype))
         throw new Error(`${gtype} does not have a destroy signal`);
 
