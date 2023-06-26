@@ -312,6 +312,11 @@ var ExtensionManager = class extends Signals.EventEmitter {
         return true;
     }
 
+    extensionShouldBeEnabled(uuid) {
+        return this._enabledExtensions.includes(uuid) &&
+            this._extensionSupportsSessionMode(uuid);
+    }
+
     notifyExtensionUpdate(uuid) {
         let extension = this.lookup(uuid);
         if (!extension)
@@ -436,8 +441,7 @@ var ExtensionManager = class extends Signals.EventEmitter {
             this.logExtensionError(extension.uuid, new Error(
                 'A different version was loaded previously. You need to log out for changes to take effect.'));
         } else {
-            let enabled = this._enabledExtensions.includes(extension.uuid) &&
-                          this._extensionSupportsSessionMode(extension.uuid);
+            let enabled = this.extensionShouldBeEnabled(extension.uuid);
             if (enabled) {
                 if (!await this._callExtensionInit(extension.uuid))
                     return;
