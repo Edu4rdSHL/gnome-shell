@@ -326,7 +326,6 @@ class WorldClocksSection extends St.Button {
         });
         this._clock = new GnomeDesktop.WallClock();
         this._clockNotifyId = 0;
-        this._tzNotifyId = 0;
 
         this._locations = [];
 
@@ -355,6 +354,8 @@ class WorldClocksSection extends St.Button {
         this._settings.connect('changed', this._clocksChanged.bind(this));
         this._clocksChanged();
 
+        this.connect('notify::mapped', () => this._startOrStopUpdates());
+
         this._appSystem = Shell.AppSystem.get_default();
         this._appSystem.connect('installed-changed',
             this._sync.bind(this));
@@ -374,6 +375,20 @@ class WorldClocksSection extends St.Button {
         this.visible = this._clocksApp != null;
     }
 
+    _startOrStopUpdates() {
+        if (this.mapped && this._grid.get_n_children() > 1) {
+            if (!this._clockNotifyId) {
+                this._clockNotifyId =
+                    this._clock.connect('notify::clock', this._updateTimeLabels.bind(this));
+            }
+            this._updateTimeLabels();
+        } else {
+            if (this._clockNotifyId)
+                this._clock.disconnect(this._clockNotifyId);
+            this._clockNotifyId = 0;
+        }
+    }
+
     _clocksChanged() {
         this._grid.destroy_all_children();
         this._locations = [];
@@ -386,7 +401,7 @@ class WorldClocksSection extends St.Button {
                 this._locations.push({ location: l });
         }
 
-        const unixtime = GLib.DateTime.new_now_local().to_unix();
+        const unixtime = GLib.DateTime.new_now(this._clock.timezone).to_unix();
         this._locations.sort((a, b) => {
             const tzA = a.location.get_timezone();
             const tzB = b.location.get_timezone();
@@ -447,31 +462,13 @@ class WorldClocksSection extends St.Button {
             this._locations[i].tzLabel = tz;
         }
 
-        if (this._grid.get_n_children() > 1) {
-            if (!this._clockNotifyId) {
-                this._clockNotifyId =
-                    this._clock.connect('notify::clock', this._updateTimeLabels.bind(this));
-            }
-            if (!this._tzNotifyId) {
-                this._tzNotifyId =
-                    this._clock.connect('notify::timezone', this._updateTimezoneLabels.bind(this));
-            }
-            this._updateTimeLabels();
-            this._updateTimezoneLabels();
-        } else {
-            if (this._clockNotifyId)
-                this._clock.disconnect(this._clockNotifyId);
-            this._clockNotifyId = 0;
-
-            if (this._tzNotifyId)
-                this._clock.disconnect(this._tzNotifyId);
-            this._tzNotifyId = 0;
-        }
+        this._startOrStopUpdates();
     }
 
     _getTimezoneOffsetAtLocation(location) {
         const tz = location.get_timezone();
-        const localOffset = GLib.DateTime.new_now_local().get_utc_offset();
+        const localOffset =
+            GLib.DateTime.new_now(this._clock.timezone).get_utc_offset();
         const utcOffset = GLib.DateTime.new_now(tz).get_utc_offset();
         const offsetCurrentTz = utcOffset - localOffset;
         const offsetHours =
@@ -492,12 +489,6 @@ class WorldClocksSection extends St.Button {
             let l = this._locations[i];
             const now = GLib.DateTime.new_now(l.location.get_timezone());
             l.timeLabel.text = Util.formatTime(now, { timeOnly: true });
-        }
-    }
-
-    _updateTimezoneLabels() {
-        for (let i = 0; i < this._locations.length; i++) {
-            let l = this._locations[i];
             l.tzLabel.text = this._getTimezoneOffsetAtLocation(l.location);
         }
     }
