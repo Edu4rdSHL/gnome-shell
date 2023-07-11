@@ -25,6 +25,7 @@ tests = [
     'markup',
     'params',
     'signalTracker',
+    'signals',
     'url',
     'versionCompare',
 ]
@@ -32,6 +33,7 @@ tests = [
 foreach test : tests
   test(test, run_test,
     args: 'unit/@0@.js'.format(test),
+    suite: ['unit', 'js'],
     workdir: meson.current_source_dir())
 endforeach
 

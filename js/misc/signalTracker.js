@@ -3,6 +3,9 @@ const GObject = imports.gi.GObject;
 
 const destroyableTypes = [];
 
+// Add custom shell connection flags, ensuring we don't override standard ones
+GObject.ConnectFlags.SHELL_ONCE = 1 << 25;
+
 /**
  * @private
  * @param {Object} obj - an object
@@ -21,8 +24,10 @@ class TransientSignalHolder extends GObject.Object {
     constructor(owner) {
         super();
 
-        if (_hasDestroySignal(owner))
-            owner.connectObject('destroy', () => this.destroy(), this);
+        if (_hasDestroySignal(owner)) {
+            owner.connectObject('destroy', () => this.destroy(),
+                GObject.ConnectFlags.AFTER, this);
+        }
     }
 
     destroy() {
@@ -86,11 +91,11 @@ class SignalTracker {
      * @param {Object=} owner - object that owns the tracker
      */
     constructor(owner) {
-        if (_hasDestroySignal(owner))
-            this._ownerDestroyId = owner.connect_after('destroy', () => this.clear());
-
         this._owner = owner;
         this._map = new Map();
+
+        if (_hasDestroySignal(owner))
+            this._trackOwnerDestroy();
     }
 
     /**
@@ -114,12 +119,33 @@ class SignalTracker {
     }
 
     /**
+     * Reconnects to owner 'destroy' if any
+     */
+    updateOwnerDestroyTracker() {
+        if (!this._ownerDestroyId)
+            return;
+
+        this._disconnectSignal(this._owner, this._ownerDestroyId);
+        this._trackOwnerDestroy();
+    }
+
+    /**
+     * @private
+     */
+    _trackOwnerDestroy() {
+        this._ownerDestroyId = this._owner.connect_after('destroy',
+            () => this.clear());
+    }
+
+    /**
      * @private
      * @param {GObject.Object} obj - tracked widget
+     * @param {object} signalData - object signal data, got via _getSignalData()
      */
-    _trackDestroy(obj) {
-        const signalData = this._getSignalData(obj);
+    _trackDestroy(obj, signalData) {
         if (signalData.destroyId)
+            throw new Error('Destroy already tracked');
+        if (obj === this._owner)
             return;
         signalData.destroyId = obj.connect_after('destroy', () => this.untrack(obj));
     }
@@ -154,10 +180,12 @@ class SignalTracker {
      * @returns {void}
      */
     track(obj, ...handlerIds) {
-        if (_hasDestroySignal(obj))
-            this._trackDestroy(obj);
+        const signalData = this._getSignalData(obj);
 
-        this._getSignalData(obj).ownerSignals.push(...handlerIds);
+        if (!signalData.destroyId && _hasDestroySignal(obj))
+            this._trackDestroy(obj, signalData);
+
+        signalData.ownerSignals.push(...handlerIds);
     }
 
     /**
@@ -176,6 +204,24 @@ class SignalTracker {
 
         if (this._map.size === 0)
             this._removeTracker();
+    }
+
+    /**
+     * @param {object} obj - tracked object instance
+     * @param {...number} handlerIds - tracked handler IDs to untrack
+     * @returns {void}
+     */
+    untrackIds(obj, ...handlerIds) {
+        const {ownerSignals} = this._getSignalData(obj);
+        const ownerProto = this._getObjectProto(this._owner);
+
+        handlerIds.forEach(id => {
+            this._disconnectSignalForProto(ownerProto, this._owner, id);
+            ownerSignals.splice(ownerSignals.indexOf(id), 1);
+        });
+
+        if (!ownerSignals.length)
+            this.untrack(obj);
     }
 
     /**
@@ -208,41 +254,63 @@ class SignalTracker {
  * @returns {void}
  */
 function connectObject(thisObj, ...args) {
+    let flagsMask = 0;
+    Object.values(GObject.ConnectFlags).forEach(v => (flagsMask |= v));
+
     const getParams = argArray => {
         const [signalName, handler, arg, ...rest] = argArray;
         if (typeof arg !== 'number')
             return [signalName, handler, 0, arg, ...rest];
 
         const flags = arg;
-        let flagsMask = 0;
-        Object.values(GObject.ConnectFlags).forEach(v => (flagsMask |= v));
-        if (!(flags & flagsMask))
+        if (flags && (flags & flagsMask) !== flags)
             throw new Error(`Invalid flag value ${flags}`);
-        if (flags & GObject.ConnectFlags.SWAPPED)
-            throw new Error('Swapped signals are not supported');
         return [signalName, handler, flags, ...rest];
     };
 
+    const signalManager = SignalManager.getDefault();
+    let obj;
+
     const connectSignal = (emitter, signalName, handler, flags) => {
+        let connectionId;
         const isGObject = emitter instanceof GObject.Object;
         const func = (flags & GObject.ConnectFlags.AFTER) && isGObject
             ? 'connect_after'
             : 'connect';
+        const orderedHandler = flags & GObject.ConnectFlags.SWAPPED
+            ? (instance, ...handlerArgs) => handler(...handlerArgs, instance)
+            : handler;
+        const realHandler = flags & GObject.ConnectFlags.SHELL_ONCE
+            ? (...handlerArgs) => {
+                const tracker = signalManager.getSignalTracker(emitter);
+                tracker.untrackIds(obj, connectionId);
+                return orderedHandler(...handlerArgs);
+            }
+            : orderedHandler;
+
         const emitterProto = isGObject
             ? GObject.Object.prototype
             : Object.getPrototypeOf(emitter);
-        return emitterProto[func].call(emitter, signalName, handler);
+        connectionId = emitterProto[func].call(emitter, signalName, realHandler);
+        return connectionId;
     };
 
+    let trackingAfterDestroy = false;
     const signalIds = [];
     while (args.length > 1) {
         const [signalName, handler, flags, ...rest] = getParams(args);
         signalIds.push(connectSignal(thisObj, signalName, handler, flags));
+        if (signalName === 'destroy' && flags & GObject.ConnectFlags.AFTER)
+            trackingAfterDestroy = true;
         args = rest;
     }
 
-    const obj = args.at(0) ?? globalThis;
-    const tracker = SignalManager.getDefault().getSignalTracker(thisObj);
+    obj = args.at(0) ?? globalThis;
+    const tracker = signalManager.getSignalTracker(thisObj);
+
+    if (trackingAfterDestroy)
+        tracker.updateOwnerDestroyTracker();
+
     tracker.track(obj, ...signalIds);
 }
 
@@ -255,7 +323,8 @@ function connectObject(thisObj, ...args) {
  * @returns {void}
  */
 function disconnectObject(thisObj, obj) {
-    SignalManager.getDefault().maybeGetSignalTracker(thisObj)?.untrack(obj);
+    SignalManager.getDefault().maybeGetSignalTracker(thisObj)?.untrack(
+        obj ?? globalThis);
 }
 
 /**
