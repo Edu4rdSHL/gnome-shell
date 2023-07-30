@@ -1,24 +1,31 @@
-import {getCurrentExtension, setExtensionManager} from './sharedInternals.js';
-
-export {
-    getSettings,
-    initTranslations,
-    gettext,
-    ngettext,
-    pgettext
-} from './sharedInternals.js';
+import {ExtensionBase, GettextWrapper} from './sharedInternals.js';
 
 const {extensionManager} = imports.ui.main;
-setExtensionManager(extensionManager);
 
-/**
- * Open the preference dialog of the current extension
- */
-export function openPrefs() {
-    const extension = getCurrentExtension();
+export class Extension extends ExtensionBase {
+    static lookupByUUID(uuid) {
+        return extensionManager.lookup(uuid)?.stateObj ?? null;
+    }
 
-    if (!extension)
-        throw new Error('openPrefs() can only be called from extensions');
+    static defineTranslationFunctions(url) {
+        const wrapper = new GettextWrapper(this, url);
+        return wrapper.defineTranslationFunctions();
+    }
 
-    extensionManager.openExtensionPrefs(extension.uuid, '', {});
+    enable() {
+    }
+
+    disable() {
+    }
+
+    /**
+     * Open the extension's preferences window
+     */
+    openPreferences() {
+        extensionManager.openExtensionPrefs(this.uuid, '', {});
+    }
 }
+
+export const {
+    gettext, ngettext, pgettext,
+} = Extension.defineTranslationFunctions();
