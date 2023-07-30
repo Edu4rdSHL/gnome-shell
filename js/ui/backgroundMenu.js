@@ -12,10 +12,15 @@ var BackgroundMenu = class BackgroundMenu extends PopupMenu.PopupMenu {
     constructor(layoutManager) {
         super(layoutManager.dummyCursor, 0, St.Side.TOP);
 
-        this.addSettingsAction(_("Change Background…"), 'gnome-background-panel.desktop');
+        this.addSettingsAction(_('Change Background…'),
+            'gnome-background-panel.desktop')
+            .setOrnament(PopupMenu.Ornament.HIDDEN);
         this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        this.addSettingsAction(_("Display Settings"), 'gnome-display-panel.desktop');
-        this.addSettingsAction(_('Settings'), 'org.gnome.Settings.desktop');
+        this.addSettingsAction(_('Display Settings'),
+            'gnome-display-panel.desktop')
+            .setOrnament(PopupMenu.Ornament.HIDDEN);
+        this.addSettingsAction(_('Settings'), 'org.gnome.Settings.desktop')
+            .setOrnament(PopupMenu.Ornament.HIDDEN);
 
         this.actor.add_style_class_name('background-menu');
 

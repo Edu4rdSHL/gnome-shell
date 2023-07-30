@@ -94,9 +94,9 @@ var PopupBaseMenuItem = GObject.registerClass({
         });
         this._delegate = this;
 
-        this._ornament = Ornament.NONE;
         this._ornamentIcon = new St.Icon({style_class: 'popup-menu-ornament'});
         this.add(this._ornamentIcon);
+        this.setOrnament(Ornament.NONE);
 
         this._parent = null;
         this._active = false;
@@ -255,7 +255,13 @@ var PopupBaseMenuItem = GObject.registerClass({
             this.remove_accessible_state(Atk.StateType.CHECKED);
         }
 
-        this._ornamentIcon.visible = ornament !== Ornament.HIDDEN;
+        if (ornament !== Ornament.HIDDEN) {
+            this._ornamentIcon.visible = true;
+            this.add_style_class_name('popup-ornamented-menu-item');
+        } else {
+            this._ornamentIcon.visible = false;
+            this.remove_style_class_name('popup-ornamented-menu-item');
+        }
     }
 });
 
@@ -299,6 +305,8 @@ class PopupSeparatorMenuItem extends PopupBaseMenuItem {
             y_align: Clutter.ActorAlign.CENTER,
         });
         this.add_child(this._separator);
+
+        this.setOrnament(Ornament.HIDDEN);
     }
 
     _syncVisibility() {

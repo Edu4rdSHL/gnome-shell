@@ -61,6 +61,7 @@ var AppMenu = class AppMenu extends PopupMenu.PopupMenu {
             this._app.open_new_window(-1);
             Main.overview.hide();
         });
+        this._newWindowItem.setOrnament(PopupMenu.Ornament.HIDDEN);
 
         this._actionSection = new PopupMenu.PopupMenuSection();
         this.addMenuItem(this._actionSection);
@@ -70,6 +71,7 @@ var AppMenu = class AppMenu extends PopupMenu.PopupMenu {
             this._app.launch(0, -1, this._getNonDefaultLaunchGpu());
             Main.overview.hide();
         });
+        this._onGpuMenuItem.setOrnament(PopupMenu.Ornament.HIDDEN);
 
         this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
@@ -80,6 +82,7 @@ var AppMenu = class AppMenu extends PopupMenu.PopupMenu {
             else
                 this._appFavorites.addFavorite(appId);
         });
+        this._toggleFavoriteItem.setOrnament(PopupMenu.Ornament.HIDDEN);
 
         this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
@@ -95,11 +98,13 @@ var AppMenu = class AppMenu extends PopupMenu.PopupMenu {
                 null, 0, -1, null);
             Main.overview.hide();
         });
+        this._detailsItem.setOrnament(PopupMenu.Ornament.HIDDEN);
 
         this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         this._quitItem =
             this.addAction(_('Quit'), () => this._app.request_quit());
+        this._quitItem.setOrnament(PopupMenu.Ornament.HIDDEN);
 
         this._appSystem.connectObject(
             'installed-changed', () => this._updateDetailsVisibility(),
@@ -241,7 +246,7 @@ var AppMenu = class AppMenu extends PopupMenu.PopupMenu {
 
                 this._app.launch_action(action, event.get_time(), -1);
                 Main.overview.hide();
-            });
+            }).setOrnament(PopupMenu.Ornament.HIDDEN);
         });
 
         this._updateQuitItem();
@@ -287,6 +292,7 @@ var AppMenu = class AppMenu extends PopupMenu.PopupMenu {
             const item = this._windowSection.addAction(title, event => {
                 Main.activateWindow(window, event.get_time());
             });
+            item.setOrnament(PopupMenu.Ornament.HIDDEN);
             window.connectObject('notify::title', () => {
                 item.label.text = window.title || this._app.get_name();
             }, item);
