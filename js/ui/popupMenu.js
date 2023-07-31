@@ -397,11 +397,11 @@ var PopupSwitchMenuItem = GObject.registerClass({
     activate(event) {
         if (this._switch.mapped)
             this.toggle();
-
-        // we allow pressing space to toggle the switch
-        // without closing the menu
-        if (event.type() == Clutter.EventType.KEY_PRESS &&
-            event.get_key_symbol() == Clutter.KEY_space)
+        // The accessibility menu remains open if the event
+        // is triggered by a non-keyboard input or the space
+        // key.
+        if (event.type() !== Clutter.EventType.KEY_PRESS ||
+            event.get_key_symbol() === Clutter.KEY_Space)
             return;
 
         super.activate(event);
