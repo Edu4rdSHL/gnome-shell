@@ -94,9 +94,9 @@ var PopupBaseMenuItem = GObject.registerClass({
         });
         this._delegate = this;
 
-        this._ornament = Ornament.NONE;
         this._ornamentIcon = new St.Icon({style_class: 'popup-menu-ornament'});
         this.add(this._ornamentIcon);
+        this.setOrnament(Ornament.HIDDEN);
 
         this._parent = null;
         this._active = false;
@@ -256,6 +256,14 @@ var PopupBaseMenuItem = GObject.registerClass({
         }
 
         this._ornamentIcon.visible = ornament !== Ornament.HIDDEN;
+        this._updateOrnamentStyle();
+    }
+
+    _updateOrnamentStyle() {
+        if (this._ornament !== Ornament.HIDDEN)
+            this.add_style_class_name('popup-ornamented-menu-item');
+        else
+            this.remove_style_class_name('popup-ornamented-menu-item');
     }
 });
 
@@ -465,6 +473,11 @@ class PopupImageMenuItem extends PopupBaseMenuItem {
             this._icon.gicon = icon;
         else
             this._icon.icon_name = icon;
+    }
+
+    _updateOrnamentStyle() {
+        // we move the ornament after the label, so we don't need
+        // additional padding regardless of ornament visibility
     }
 });
 

@@ -244,7 +244,6 @@ const NMSectionItem = GObject.registerClass({
 
         // Turn into an empty container with no padding
         this.styleClass = '';
-        this.setOrnament(PopupMenu.Ornament.HIDDEN);
 
         // Add intermediate section; we need this for submenu support
         this._mainSection = new PopupMenu.PopupMenuSection();
@@ -359,11 +358,6 @@ class NMConnectionItem extends NMMenuItem {
         this._sync();
     }
 
-    _updateOrnament() {
-        this.setOrnament(this.radio_mode && this.is_active
-            ? PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
-    }
-
     _getAccessibleName() {
         return this.is_active
             // Translators: %s is a device name like "MyPhone"
@@ -383,12 +377,14 @@ class NMConnectionItem extends NMMenuItem {
             this._subtitle.text = null;
             this.accessible_name = this.name;
             this.accessible_role = Atk.Role.CHECK_MENU_ITEM;
+            this.setOrnament(this.is_active
+                ? PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
         } else {
             this.accessible_name = this._getAccessibleName();
             this._subtitle.text = this._getSubtitleLabel();
             this.accessible_role = Atk.Role.MENU_ITEM;
+            this.setOrnament(PopupMenu.Ornament.HIDDEN);
         }
-        this._updateOrnament();
     }
 
     activate() {
