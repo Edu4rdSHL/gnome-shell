@@ -488,6 +488,33 @@ class ActivitiesButton extends PanelMenu.Button {
     }
 });
 
+var LgButton = GObject.registerClass(
+class LgButton extends PanelMenu.Button {
+    _init() {
+        super._init(0.0, null, true);
+        this.accessible_role = Atk.Role.TOGGLE_BUTTON;
+
+        this.name = 'panelLg';
+
+        this._label = new St.Label({
+            text: 'Looking Glass',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this.add_actor(this._label);
+
+        this.label_actor = this._label;
+    }
+
+    vfunc_event(event) {
+        if (event.type() == Clutter.EventType.TOUCH_END ||
+            event.type() == Clutter.EventType.BUTTON_RELEASE) {
+            Main.createLookingGlass().open();
+        }
+
+        return Clutter.EVENT_PROPAGATE;
+    }
+});
+
 const UnsafeModeIndicator = GObject.registerClass(
 class UnsafeModeIndicator extends SystemIndicator {
     _init() {
@@ -634,6 +661,7 @@ class QuickSettings extends PanelMenu.Button {
 
 const PANEL_ITEM_IMPLEMENTATIONS = {
     'activities': ActivitiesButton,
+    'lg': LgButton,
     'appMenu': AppMenuButton,
     'quickSettings': QuickSettings,
     'dateMenu': DateMenuButton,
