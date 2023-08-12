@@ -587,6 +587,7 @@ class BackgroundSource {
 
     getBackground(monitorIndex) {
         let file = null;
+        let uris = [];
         let style;
 
         // We don't watch changes to settings here,
@@ -600,20 +601,27 @@ class BackgroundSource {
             style = this._settings.get_enum(BACKGROUND_STYLE_KEY);
             if (style !== GDesktopEnums.BackgroundStyle.NONE) {
                 const colorScheme = this._interfaceSettings.get_enum('color-scheme');
-                const uri = this._settings.get_string(
-                    colorScheme === GDesktopEnums.ColorScheme.PREFER_DARK
-                        ? PICTURE_URI_DARK_KEY
-                        : PICTURE_URI_KEY);
+                let checkColorSchemeArgs;
 
+                if (colorScheme === GDesktopEnums.ColorScheme.PREFER_DARK)
+                    checkColorSchemeArgs = PICTURE_URI_DARK_KEY;
+                else
+                    checkColorSchemeArgs = PICTURE_URI_KEY;
+
+                uris = this._settings.get_strv(checkColorSchemeArgs);
+                if (!uris)
+                    uris = [this._settings.get_string(checkColorSchemeArgs)];
+
+                let uri;
+                if (uris.length === 1 || (monitorIndex > uris.length - 1))
+                    uri = uris[0];
+                else
+                    uri = uris[monitorIndex];
                 file = Gio.File.new_for_commandline_arg(uri);
             }
         }
 
-        // Animated backgrounds are (potentially) per-monitor, since
-        // they can have variants that depend on the aspect ratio and
-        // size of the monitor; for other backgrounds we can use the
-        // same background object for all monitors.
-        if (file == null || !file.get_basename().endsWith('.xml'))
+        if (file === null || uris.length === 1)
             monitorIndex = 0;
 
         if (!(monitorIndex in this._backgrounds)) {
