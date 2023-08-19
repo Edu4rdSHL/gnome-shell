@@ -399,6 +399,7 @@ class QuickSettings extends PanelMenu.Button {
         this._rfkill = new RFKillStatus.Indicator();
         this._autoRotate = new AutoRotateStatus.Indicator();
         this._unsafeMode = new UnsafeModeIndicator();
+        this._stayAwake = new imports.ui.status.stayAwake.Indicator();
         this._backgroundApps = new BackgroundAppsStatus.Indicator();
 
         this._indicators.add_child(this._remoteAccess);
@@ -408,6 +409,7 @@ class QuickSettings extends PanelMenu.Button {
         this._indicators.add_child(this._brightness);
         this._indicators.add_child(this._thunderbolt);
         this._indicators.add_child(this._nightLight);
+        this._indicators.add_child(this._stayAwake);
         if (this._network)
             this._indicators.add_child(this._network);
         this._indicators.add_child(this._darkMode);
@@ -441,7 +443,7 @@ class QuickSettings extends PanelMenu.Button {
         this._addItems(this._rfkill.quickSettingsItems);
         this._addItems(this._autoRotate.quickSettingsItems);
         this._addItems(this._unsafeMode.quickSettingsItems);
-
+        this._addItems(this._stayAwake.quickSettingsItems);
         this._addItems(this._backgroundApps.quickSettingsItems, N_QUICK_SETTINGS_COLUMNS);
     }
 
