@@ -24,6 +24,8 @@
 
 G_BEGIN_DECLS
 
+#define INI_GROUP_NAME "GNOME Extension"
+
 typedef enum {
   TYPE_SYSTEM = 1,
   TYPE_USER

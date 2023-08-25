@@ -357,7 +357,54 @@ export class ExtensionManager extends Signals.EventEmitter {
         this.emit('extension-state-changed', extension);
     }
 
-    createExtensionObject(uuid, dir, type) {
+    _translateIniKey(key) {
+        // 'Description' is the canonical name, but allow 'Comment'
+        // as well, as xgettext/msgfmt recognize it as translatable
+        // field in .desktop files
+        if (key === 'Comment')
+            return 'description';
+        return key.replace(/(.)([A-Z][a-z])/g, '$1-$2').toLowerCase();
+    }
+
+    _loadMetadataIni(dir) {
+        const metadataFile = dir.get_child('metadata.ini');
+
+        const keyFile = new GLib.KeyFile();
+        keyFile.load_from_file(metadataFile.get_path(), GLib.KeyFileFlags.NONE);
+
+        const GROUP_NAME = 'GNOME Extension';
+        const [keys] = keyFile.get_keys(GROUP_NAME);
+        const descKey = keys.includes('Description')
+            ? 'Description' : 'Comment';
+        const meta = {
+            uuid: keyFile.get_string(GROUP_NAME, 'Uuid'),
+            name: keyFile.get_locale_string(GROUP_NAME, 'Name', null),
+            description: keyFile.get_locale_string(GROUP_NAME, descKey, null),
+            'shell-version': keyFile.get_string_list(GROUP_NAME, 'ShellVersion'),
+        };
+
+        try {
+            meta['session-modes'] = keyFile.get_string_list(GROUP_NAME, 'SessionModes');
+        } catch (e) {
+            meta['session-modes'] = ['user'];
+        }
+
+        try {
+            meta['version'] = keyFile.get_integer(GROUP_NAME, 'Version');
+        } catch (e) {
+        }
+
+        for (const key of keys) {
+            const translatedKey = this._translateIniKey(key);
+            if (translatedKey in meta)
+                continue;
+            meta[translatedKey] = keyFile.get_value(GROUP_NAME, key);
+        }
+
+        return meta;
+    }
+
+    _loadMetadataJson(dir) {
         let metadataFile = dir.get_child('metadata.json');
         if (!metadataFile.query_exists(null))
             throw new Error('Missing metadata.json');
@@ -399,6 +446,19 @@ export class ExtensionManager extends Signals.EventEmitter {
                 throw new Error(`missing "${prop}" property in metadata.json`);
             if (!typeCheck(meta[prop]))
                 throw new Error(`property "${prop}" is not of type ${typeName}`);
+        }
+
+        return meta;
+    }
+
+    createExtensionObject(uuid, dir, type) {
+        let meta;
+        try {
+            meta = this._loadMetadataIni(dir);
+        } catch (e) {
+            if (!e.matches(GLib.FileError, GLib.FileError.NOENT))
+                throw e;
+            meta = this._loadMetadataJson(dir);
         }
 
         if (uuid !== meta.uuid)

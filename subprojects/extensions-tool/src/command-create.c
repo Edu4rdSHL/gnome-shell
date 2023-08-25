@@ -113,23 +113,6 @@ get_templates (void)
   return templates;
 }
 
-static char *
-escape_json_string (const char *string)
-{
-  GString *escaped = g_string_new (string);
-
-  for (gsize i = 0; i < escaped->len; ++i)
-    {
-      if (escaped->str[i] == '"' || escaped->str[i] == '\\')
-        {
-          g_string_insert_c (escaped, i, '\\');
-          ++i;
-        }
-    }
-
-  return g_string_free (escaped, FALSE);
-}
-
 static gboolean
 create_metadata (GFile       *target_dir,
                  const char  *uuid,
@@ -137,40 +120,24 @@ create_metadata (GFile       *target_dir,
                  const char  *description,
                  GError     **error)
 {
-  g_autofree char *uuid_escaped = NULL;
-  g_autofree char *name_escaped = NULL;
-  g_autofree char *desc_escaped = NULL;
   g_autoptr (GFile) target = NULL;
-  g_autoptr (GString) json = NULL;
+  g_autoptr (GKeyFile) ini = NULL;
   g_autofree char *version = NULL;
+  const char * const *versions = (const char * const *)&version;
 
   version = get_shell_version (error);
   if (version == NULL)
     return FALSE;
 
-  uuid_escaped = escape_json_string (uuid);
-  name_escaped = escape_json_string (name);
-  desc_escaped = escape_json_string (description);
+  ini = g_key_file_new ();
 
-  json = g_string_new ("{\n");
+  g_key_file_set_string (ini, INI_GROUP_NAME, "Name", name);
+  g_key_file_set_string (ini, INI_GROUP_NAME, "Description", description);
+  g_key_file_set_string (ini, INI_GROUP_NAME, "Uuid", uuid);
+  g_key_file_set_string_list (ini, INI_GROUP_NAME, "ShellVersion", versions, 1);
 
-  g_string_append_printf (json, "  \"name\": \"%s\",\n", name_escaped);
-  g_string_append_printf (json, "  \"description\": \"%s\",\n", desc_escaped);
-  g_string_append_printf (json, "  \"uuid\": \"%s\",\n", uuid_escaped);
-  g_string_append_printf (json, "  \"shell-version\": [\n");
-  g_string_append_printf (json, "    \"%s\"\n", version);
-  g_string_append_printf (json, "  ]\n}\n");
-
-  target = g_file_get_child (target_dir, "metadata.json");
-  return g_file_replace_contents (target,
-                                  json->str,
-                                  json->len,
-                                  NULL,
-                                  FALSE,
-                                  0,
-                                  NULL,
-                                  NULL,
-                                  error);
+  target = g_file_get_child (target_dir, "metadata.ini");
+  return g_key_file_save_to_file (ini, g_file_peek_path (target), error);
 }
 
 

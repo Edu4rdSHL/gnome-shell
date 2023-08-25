@@ -28,15 +28,30 @@
 #include "common.h"
 #include "config.h"
 
-static JsonObject *
-load_metadata (GFile   *dir,
-               GError **error)
+static char *
+load_uuid_ini (GFile   *file,
+                   GError **error)
+{
+  g_autoptr (GKeyFile) key_file = NULL;
+  const char *path;
+
+  path = g_file_peek_path (file);
+  key_file = g_key_file_new ();
+
+  if (!g_key_file_load_from_file (key_file, path, G_KEY_FILE_NONE, error))
+    return NULL;
+
+  return g_key_file_get_string (key_file, INI_GROUP_NAME, "Uuid", error);
+}
+
+static char *
+load_uuid_json (GFile   *file,
+                GError **error)
 {
   g_autoptr (JsonParser) parser = NULL;
   g_autoptr (GInputStream) stream = NULL;
-  g_autoptr (GFile) file = NULL;
+  JsonObject *root;
 
-  file = g_file_get_child (dir, "metadata.json");
   stream = G_INPUT_STREAM (g_file_read (file, NULL, error));
   if (stream == NULL)
     return NULL;
@@ -45,7 +60,23 @@ load_metadata (GFile   *dir,
   if (!json_parser_load_from_stream (parser, stream, NULL, error))
     return NULL;
 
-  return json_node_dup_object (json_parser_get_root (parser));
+  root = json_node_get_object (json_parser_get_root (parser));
+  return g_strdup (json_object_get_string_member (root, "uuid"));
+}
+
+static char *
+load_uuid (GFile   *dir,
+           GError **error)
+{
+  g_autoptr (GFile) ini = NULL;
+  g_autoptr (GFile) json = NULL;
+
+  ini = g_file_get_child (dir, "metadata.ini");
+  if (g_file_query_exists (ini, NULL))
+    return load_uuid_ini (ini, error);
+
+  json = g_file_get_child (dir, "metadata.json");
+  return load_uuid_json (json, error);
 }
 
 static void
@@ -89,7 +120,6 @@ install_extension (const char *bundle,
                    gboolean    force)
 {
   g_autoptr (AutoarExtractor) extractor = NULL;
-  g_autoptr (JsonObject) metadata = NULL;
   g_autoptr (GFile) cachedir = NULL;
   g_autoptr (GFile) tmpdir = NULL;
   g_autoptr (GFile) src = NULL;
@@ -98,7 +128,7 @@ install_extension (const char *bundle,
   g_autoptr (GFile) schemadir = NULL;
   g_autoptr (GError) error = NULL;
   g_autofree char *cwd = NULL;
-  const char *uuid;
+  g_autofree char *uuid = NULL;
 
   cwd = g_get_current_dir ();
   src = g_file_new_for_commandline_arg_and_cwd (bundle, cwd);
@@ -114,8 +144,8 @@ install_extension (const char *bundle,
   if (error != NULL)
     goto err;
 
-  metadata = load_metadata (tmpdir, &error);
-  if (metadata == NULL)
+  uuid = load_uuid (tmpdir, &error);
+  if (uuid == NULL)
     goto err;
 
   dstdir = g_file_new_build_filename (g_get_user_data_dir (),
@@ -129,7 +159,6 @@ install_extension (const char *bundle,
         goto err;
     }
 
-  uuid = json_object_get_string_member (metadata, "uuid");
   dst = g_file_get_child (dstdir, uuid);
 
   if (g_file_query_exists (dst, NULL))
