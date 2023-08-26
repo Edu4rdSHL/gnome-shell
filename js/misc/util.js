@@ -364,7 +364,7 @@ export class DBusSenderChecker {
     /**
      * @async
      * @param {string} sender - the bus name that invoked the checked method
-     * @returns {bool}
+     * @returns {Promise<boolean>}
      */
     async _isSenderAllowed(sender) {
         await this._initializedPromise;
@@ -372,13 +372,13 @@ export class DBusSenderChecker {
     }
 
     /**
-     * Check whether the bus name that invoked @invocation maps
+     * Check whether the bus name that invoked {@link invocation} maps
      * to an entry in the allow list.
      *
      * @async
      * @throws
      * @param {Gio.DBusMethodInvocation} invocation - the invocation
-     * @returns {void}
+     * @returns {Promise<void>}
      */
     async checkInvocation(invocation) {
         if (global.context.unsafe_mode)

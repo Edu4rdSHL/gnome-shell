@@ -82,9 +82,9 @@ export class GnomeShell {
      * Focus the overview's search entry
      *
      * @async
-     * @param {...any} params - method parameters
+     * @param {any[]} params - method parameters
      * @param {Gio.DBusMethodInvocation} invocation - the invocation
-     * @returns {void}
+     * @returns {Promise<void>}
      */
     async FocusSearchAsync(params, invocation) {
         try {
@@ -102,9 +102,9 @@ export class GnomeShell {
      * Show OSD with the specified parameters
      *
      * @async
-     * @param {...any} params - method parameters
+     * @param {[any[]]} params - method parameters
      * @param {Gio.DBusMethodInvocation} invocation - the invocation
-     * @returns {void}
+     * @returns {Promise<void>}
      */
     async ShowOSDAsync([params], invocation) {
         try {
@@ -143,9 +143,9 @@ export class GnomeShell {
      * Focus specified app in the overview's app grid
      *
      * @async
-     * @param {string} id - an application ID
+     * @param {[string]} id - an application ID
      * @param {Gio.DBusMethodInvocation} invocation - the invocation
-     * @returns {void}
+     * @returns {Promise<void>}
      */
     async FocusAppAsync([id], invocation) {
         try {
@@ -172,9 +172,9 @@ export class GnomeShell {
      * Show the overview's app grid
      *
      * @async
-     * @param {...any} params - method parameters
+     * @param {any[]} params - method parameters
      * @param {Gio.DBusMethodInvocation} invocation - the invocation
-     * @returns {void}
+     * @returns {Promise<void>}
      */
     async ShowApplicationsAsync(params, invocation) {
         try {
