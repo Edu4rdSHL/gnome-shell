@@ -711,14 +711,14 @@ class Panel extends St.Widget {
 
         if (Main.screenShield) {
             Main.screenShield.connect('shield-visible', () => {
-                this._addStyleClassName('screen-shield');
+                this.add_style_class_name('screen-shield');
                 if (Main.layoutManager.primaryMonitor) {
                     let bgManager = Main.screenShield.getBgManagerForMonitor(Main.layoutManager.primaryMonitor);
                     this._onBackgroundChanged(bgManager);
                 }
             });
             Main.screenShield.connect('shield-hidden', () => {
-                this._removeStyleClassName('screen-shield');
+                this.remove_style_class_name('screen-shield');
                 if (Main.layoutManager.primaryMonitor) {
                     let bgManager = Main.layoutManager._bgManagers[Main.layoutManager.primaryIndex];
                     this._onBackgroundChanged(bgManager);
@@ -1004,9 +1004,9 @@ log("panel: reconnecting changes");
         });
 
         if (windowNearPanel)
-            this._addStyleClassName('window-near');
+            this.add_style_class_name('window-near');
         else
-            this._removeStyleClassName('window-near');
+            this.remove_style_class_name('window-near');
     }
 
     _onBackgroundChanged(bgManager) {
@@ -1086,9 +1086,9 @@ log("BOX: measured  : " + JSON.stringify(boxCharacteristics));
 
         allStyleClassNames.forEach(name => {
             if (styleClassNames.includes(name))
-                this._addStyleClassName(name);
+                this.add_style_class_name(name);
             else
-                this._removeStyleClassName(name);
+                this.remove_style_class_name(name);
         });
     }
 

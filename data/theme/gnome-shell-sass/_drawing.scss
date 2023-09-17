@@ -517,9 +517,10 @@
         color: $_highlight_color;
       }
     }
-  }
 
-  .panel-corner {
-    -panel-corner-opacity: $_opacity;
+    // TODO: here?
+    &#panelActivities .workspace-dot {
+    	background-color: $_color;
+    }
   }
 }
