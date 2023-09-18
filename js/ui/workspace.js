@@ -573,7 +573,8 @@ export const WorkspaceLayout = GObject.registerClass({
     }
 
     _getAdjustedWorkarea(container) {
-        const workarea = this._workarea.copy();
+        let {x, y, width, height} = this._workarea;
+        const workarea = {x, y, width, height};
 
         if (container instanceof St.Widget) {
             const themeNode = container.get_theme_node();
@@ -588,10 +589,12 @@ export const WorkspaceLayout = GObject.registerClass({
         if (this._container) {
             if (this._workAreaChangedId)
                 return;
-            this._workarea = Main.layoutManager.getWorkAreaForMonitor(this._monitorIndex);
+            // TODO this._workarea = Main.layoutManager.getWorkAreaForMonitor(this._monitorIndex);
+            this._workarea = Main.layoutManager.monitors[this._monitorIndex];
             this._workareasChangedId =
                 global.display.connect('workareas-changed', () => {
-                    this._workarea = Main.layoutManager.getWorkAreaForMonitor(this._monitorIndex);
+                    // TODO this._workarea = Main.layoutManager.getWorkAreaForMonitor(this._monitorIndex);
+                    this._workarea = Main.layoutManager.monitors[this._monitorIndex];
                     this.layout_changed();
                 });
         } else if (this._workareasChangedId) {
@@ -1013,10 +1016,14 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
         const monitor = Main.layoutManager.monitors[this._monitorIndex];
 
         const rect = new Graphene.Rect();
-        rect.origin.x = this._workarea.x - monitor.x;
-        rect.origin.y = this._workarea.y - monitor.y;
-        rect.size.width = this._workarea.width;
-        rect.size.height = this._workarea.height;
+        rect.origin.x = monitor.x;
+        rect.origin.y = monitor.y;
+        rect.size.width = monitor.width;
+        rect.size.height = monitor.height;
+        //rect.origin.x = this._workarea.x - monitor.x;
+        //rect.origin.y = this._workarea.y - monitor.y;
+        //rect.size.width = this._workarea.width;
+        //rect.size.height = this._workarea.height;
 
         this._bgManager.backgroundActor.content.set_rounded_clip_bounds(rect);
     }
