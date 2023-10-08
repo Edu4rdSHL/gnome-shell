@@ -522,6 +522,9 @@ export const UnlockDialog = GObject.registerClass({
         tapAction.connect('tap', this._showPrompt.bind(this));
         this.add_action(tapAction);
 
+        global.backend.connectObject('lid-is-closed-changed',
+            this._showPrompt.bind(this), this);
+
         // Background
         this._backgroundGroup = new Clutter.Actor();
         this.add_child(this._backgroundGroup);
