@@ -5,12 +5,15 @@
 
 $is_highcontrast:false;
 
-// base color for light theme
+// base colors
+$_light_base_color: $light_1;
 $_dark_base_color: desaturate($dark_4, 100%);
 
-$base_color: if($variant == 'light', $light_1, $_dark_base_color);
-$bg_color: if($variant == 'light', $light_2, lighten($base_color, 5%));
-$fg_color: if($variant == 'light', $_dark_base_color, white);
+$base_color: if($variant == 'light', $_light_base_color, $_dark_base_color);
+$bg_color: if($variant == 'light', $light2, lighten($_dark_base_color, 5%));
+$_light_fg_color: $_dark_base_color;
+$_dark_fg_color: $_light_base_color;
+$fg_color: if($variant == 'light', $_light_fg_color, $_dark_fg_color);
 
 $selected_fg_color: $light_1;
 $selected_bg_color: $blue_3;
@@ -23,9 +26,40 @@ $link_color: if($variant == 'light', darken($selected_bg_color, 10%), lighten($s
 $link_visited_color: if($variant == 'light', darken($selected_bg_color, 20%), lighten($selected_bg_color, 10%));
 
 $warning_color: if($variant == 'light', $yellow_4, $yellow_3);
-$error_color: if($variant == 'light', $red_4, $red_3);
+
+$_dark_error_color: $red_3; // note: libadwaita uses #ff7b63
+$error_color: if($variant == 'light', $red_4, $_dark_error_color);
+$_dark_error_fg_color: $_light_fg_color;
+$error_fg_color: if($variant == 'light', $_light_fg_color, $_dark_error_fg_color);
+$_dark_error_bg_color: $red_4;
+$error_bg_color: if($variant == 'light', $red_3, $_dark_error_bg_color);
+
 $success_color: if($variant == 'light', $green_4, $green_5);
+
+$_dark_destructive_color: $_dark_error_color;
 $destructive_color: $error_color;
+$_dark_destructive_fg_color: $_dark_error_fg_color;
+$destructive_fg_color: $error_fg_color;
+$_dark_destructive_bg_color: $dark_error_bg_color;
+$destructive_bg_color: $error_bg_color;
+
+$privacy_color: if($variant == 'light', $orange_4, $orange_3);
+$_dark_privacy_fg_color: $_dark_fg_color;
+$privacy_fg_color: if($variant == 'light', $_light_fg_color, $_dark_privacy_fg_color);
+$_dark_privacy_bg_color: $orange_4;
+$privacy_bg_color: if($variant == 'light', $orange_1, $_dark_privacy_bg_color);
+
+// panel colors
+$_dark_panel_fg_color: darken($_dark_fg_color, 5%);
+$panel_fg_color: if($variant == 'light', $_light_fg_color, $_dark_panel_fg_color);
+$panel_bg_color: if($variant == 'light', $light_3, $dark_5);
+$panel_border_color: if($variant == 'light', darken($panel_bg_color, 2%), $panel_bg_color);
+
+$screenshot_indicator_fg_color: $destructive_fg_color;
+$screenshot_indicator_bg_color: $destructive_bg_color;
+
+$privacy_indicator_fg_color: $privacy_fg_color;
+$privacy_indicator_bg_color: $privacy_bg_color;
 
 // color definitions for OSD elements
 $osd_fg_color: $light_1;
@@ -45,7 +79,10 @@ $button_mix_factor: if($variant == 'light', 12%, 9%);
 // notifications
 $bubble_buttons_color: if($variant == 'light', darken($bg_color, 7%), lighten($bg_color, 5%));
 
-// color definitions for system elements (e.g. the overview)
+// screenshot ui
+$screenshot_ui_button_color: $_dark_destructive_color; // always used over a dark background
+
+// color definitions for system elements (lockscreen, overview, and other transparent panels)
 $system_base_color: $_dark_base_color; // always dark
 $system_fg_color: $light_2;
 
@@ -54,6 +91,15 @@ $system_bg_color: lighten($system_base_color, 5%);
 $system_borders_color: transparentize($system_fg_color, .9);
 $system_insensitive_fg_color: mix($system_fg_color, $system_bg_color, 50%);
 $system_overlay_bg_color: mix($system_base_color, $system_fg_color, 90%); // for non-transparent items, e.g. dash
+
+// panel system colors
+$system_panel_fg_color: $_dark_panel_fg_color;
+
+$system_screenshot_indicator_fg_color: $_dark_destructive_fg_color;
+$system_screenshot_indicator_bg_color: $_dark_destructive_bg_color;
+
+$system_privacy_indicator_fg_color: $_dark_privacy_fg_color;
+$system_privacy_indicator_bg_color: $_dark_privacy_bg_color;
 
 // derived global colors
 // insensitive state
