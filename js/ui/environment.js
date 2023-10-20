@@ -111,8 +111,15 @@ function _getPropertyTarget(actor, propName) {
 function _easeActor(actor, params) {
     actor.save_easing_state();
 
-    if (params.duration !== undefined)
-        actor.set_easing_duration(params.duration);
+    let required = false;
+    if (params.required !== undefined)
+        required = params.required;
+    delete params.required;
+
+    if (params.duration !== undefined) {
+        params.duration = adjustAnimationTime(params.duration, required);
+        origSetEasingDuration.call(actor, params.duration);
+    }
     delete params.duration;
 
     if (params.delay !== undefined)
@@ -181,8 +188,13 @@ function _easeActorProperty(actor, propName, target, params) {
         params.progress_mode = params.mode;
     delete params.mode;
 
+    let required = false;
+    if (params.required !== undefined)
+        required = params.required;
+    delete params.required;
+
     if (params.duration)
-        params.duration = adjustAnimationTime(params.duration);
+        params.duration = adjustAnimationTime(params.duration, required);
     let duration = Math.floor(params.duration || 0);
 
     let repeatCount = 0;
