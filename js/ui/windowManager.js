@@ -1702,6 +1702,7 @@ export class WindowManager {
                 return;
         }
 
+        let relativeTarget = false;
         if (target === 'last') {
             if (vertical)
                 direction = Meta.MotionDirection.DOWN;
@@ -1711,6 +1712,7 @@ export class WindowManager {
                 direction = Meta.MotionDirection.RIGHT;
             newWs = workspaceManager.get_workspace_by_index(workspaceManager.n_workspaces - 1);
         } else if (isNaN(target)) {
+            relativeTarget = true;
             // Prepend a new workspace dynamically
             let prependTarget;
             if (vertical)
@@ -1759,10 +1761,14 @@ export class WindowManager {
             direction !== Meta.MotionDirection.RIGHT)
             return;
 
-        if (action === 'switch')
-            this.actionMoveWorkspace(newWs);
-        else
+        if (action === 'switch') {
+            if (newWs.active && relativeTarget && this._shouldAnimate())
+                this._workspaceAnimation.animateBump(direction);
+            else
+                this.actionMoveWorkspace(newWs);
+        } else {
             this.actionMoveWindow(window, newWs);
+        }
 
         if (!Main.overview.visible) {
             if (this._workspaceSwitcherPopup == null) {

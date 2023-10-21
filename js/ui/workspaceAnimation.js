@@ -15,6 +15,7 @@ import * as Main from './main.js';
 
 const WINDOW_ANIMATION_TIME = 250;
 const WORKSPACE_SPACING = 100;
+const WORKSPACE_BUMP_RANGE = 0.1;
 
 const WorkspaceGroup = GObject.registerClass(
 class WorkspaceGroup extends Clutter.Actor {
@@ -383,6 +384,33 @@ export class WorkspaceAnimationController {
         switchData.monitors.forEach(m => m.destroy());
 
         this.movingWindow = null;
+    }
+
+    animateBump(direction) {
+        if (this._switchData && this._switchData.inProgress)
+            return;
+
+        this._prepareWorkspaceSwitch();
+        this._swipeTracker.enabled = false;
+        this._switchData.inProgress = true;
+
+        let diffProgress = WORKSPACE_BUMP_RANGE;
+        if (direction === Meta.MotionDirection.LEFT || direction === Meta.MotionDirection.UP)
+            diffProgress *= -1;
+
+        for (const monitorGroup of this._switchData.monitors) {
+            const endProgress = monitorGroup.progress + diffProgress;
+            monitorGroup.ease_property('progress', endProgress, {
+                autoReverse: true,
+                duration: WINDOW_ANIMATION_TIME,
+                mode: Clutter.AnimationMode.EASE_IN_QUAD,
+                repeatCount: 1,
+                onComplete: () => {
+                    this._finishWorkspaceSwitch(this._switchData);
+                    this._swipeTracker.enabled = true;
+                },
+            });
+        }
     }
 
     animateSwitch(from, to, direction, onComplete) {
