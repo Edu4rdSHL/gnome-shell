@@ -43,13 +43,16 @@ on_workareas_changed (ShellWorkspaceBackground *self)
   MetaWorkspace *workspace =
     meta_workspace_manager_get_workspace_by_index (workspace_manager, 0);
 
-  meta_workspace_get_work_area_for_monitor (workspace,
+  /* TODO: meta_workspace_get_work_area_for_monitor (workspace,
                                             self->monitor_index,
-                                            &self->work_area);
+                                            &self->work_area);*/
 
   meta_display_get_monitor_geometry (display,
                                      self->monitor_index,
                                      &self->monitor_geometry);
+  meta_display_get_monitor_geometry (display,
+                                     self->monitor_index,
+                                     &self->work_area);
 }
 
 static void

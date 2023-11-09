@@ -260,7 +260,8 @@ export const WorkspaceThumbnail = GObject.registerClass({
 
         this.connect('destroy', this._onDestroy.bind(this));
 
-        let workArea = Main.layoutManager.getWorkAreaForMonitor(this.monitorIndex);
+        // TODO let workArea = Main.layoutManager.getWorkAreaForMonitor(this.monitorIndex);
+        let workarea = Main.layoutManager.monitors[this.monitorIndex];
         this.setPorthole(workArea.x, workArea.y, workArea.width, workArea.height);
 
         let windows = global.get_window_actors().filter(actor => {
@@ -652,7 +653,12 @@ export const ThumbnailsBox = GObject.registerClass({
         this._settings = new Gio.Settings({schema_id: MUTTER_SCHEMA});
         this._settings.connect('changed::dynamic-workspaces',
             () => this._updateShouldShow());
+
+//            let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
         this._updateShouldShow();
+  //              return GLib.SOURCE_REMOVE;
+
+//});
 
         Main.layoutManager.connectObject('monitors-changed', () => {
             this._destroyThumbnails();
@@ -698,6 +704,8 @@ export const ThumbnailsBox = GObject.registerClass({
         const shouldShow = this._settings.get_boolean('dynamic-workspaces')
             ? nWorkspaces > NUM_WORKSPACES_THRESHOLD
             : nWorkspaces > 1;
+
+log("box shoudShow: " + shouldShow);
 
         if (this._shouldShow === shouldShow)
             return;
@@ -1240,8 +1248,9 @@ export const ThumbnailsBox = GObject.registerClass({
             const {x, y, width, height} = global.stage;
             this._porthole = {x, y, width, height};
         } else {
-            this._porthole =
-                Main.layoutManager.getWorkAreaForMonitor(this._monitorIndex);
+            const {x, y, width, height} = Main.layoutManager.monitors[this._monitorIndex];
+            this._porthole = {x, y, width, height};
+                // TODO: Main.layoutManager.getWorkAreaForMonitor(this._monitorIndex);
         }
 
         this.queue_relayout();

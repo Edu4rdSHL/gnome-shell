@@ -120,6 +120,12 @@ const PICTURE_URI_DARK_KEY = 'picture-uri-dark';
 const INTERFACE_SCHEMA = 'org.gnome.desktop.interface';
 const COLOR_SCHEME_KEY = 'color-scheme';
 
+const LUMINANCE_DARK_THRESHOLD = 60;
+const LUMINANCE_BRIGHT_THRESHOLD = 140;
+const LUMINANCE_STD_NOISY_THRESHOLD = 28;
+const ACUTANCE_NOISY_THRESHOLD = 8;
+const ACUTANCE_STD_NOISY_THRESHOLD = 6;
+
 const FADE_ANIMATION_TIME = 1000;
 
 // These parameters affect how often we redraw.
@@ -715,6 +721,7 @@ export class BackgroundManager extends Signals.EventEmitter {
         this._controlPosition = params.controlPosition;
         this._useContentSize = params.useContentSize;
 
+        this.isLoaded = false;
         this.backgroundActor = this._createBackgroundActor();
         this._newBackgroundActor = null;
     }
@@ -732,6 +739,50 @@ export class BackgroundManager extends Signals.EventEmitter {
         if (this.backgroundActor) {
             this.backgroundActor.destroy();
             this.backgroundActor = null;
+        }
+    }
+
+    getCharacteristicsForArea(x, y, width, height) {
+        const background = this._backgroundSource.getBackground(this._monitorIndex);
+
+        let areaIsNoisy, areaIsDark, areaIsBright;
+        areaIsNoisy = areaIsDark = areaIsBright = false;
+
+        const [retval, meanLuminance, luminanceVariance, meanAcutance, acutanceVariance] =
+            background.get_color_info(this._monitorIndex, x, y, width, height);
+
+        if (!retval)
+            return { success: false }
+
+        const luminanceStd = Math.sqrt(luminanceVariance);
+        const acutanceStd = Math.sqrt(acutanceVariance);
+
+        if (meanLuminance < LUMINANCE_DARK_THRESHOLD)
+            areaIsDark = true;
+        else if (meanLuminance > LUMINANCE_BRIGHT_THRESHOLD)
+            areaIsBright = true;
+
+        if (meanAcutance > ACUTANCE_NOISY_THRESHOLD ||
+            (meanAcutance * 4 > ACUTANCE_NOISY_THRESHOLD &&
+             acutanceStd > ACUTANCE_STD_NOISY_THRESHOLD) ||
+            luminanceStd > LUMINANCE_STD_NOISY_THRESHOLD ||
+            (areaIsDark &&
+             meanLuminance + luminanceStd > LUMINANCE_BRIGHT_THRESHOLD) ||
+            (areaIsBright &&
+             meanLuminance - luminanceStd < LUMINANCE_DARK_THRESHOLD))
+            areaIsNoisy = true;
+
+        return {
+            success: true,
+            areaIsNoisy,
+            areaIsDark,
+            areaIsBright,
+            measured: {
+                meanLuminance,
+                luminanceStd,
+                meanAcutance,
+                acutanceStd
+            },
         }
     }
 
@@ -844,6 +895,21 @@ export class BackgroundManager extends Signals.EventEmitter {
             if (backgroundActor.loadedSignalId)
                 background.disconnect(backgroundActor.loadedSignalId);
         });
+
+        if (!this.backgroundActor) {
+            if (background.isLoaded) {
+                this.isLoaded = true;
+            } else {
+                let id = background.connect('loaded', () => {
+                    if (background) {
+                        background.disconnect(id);
+
+                        this.isLoaded = true;
+                        this.emit('changed');
+                    }
+                });
+            }
+        }
 
         return backgroundActor;
     }

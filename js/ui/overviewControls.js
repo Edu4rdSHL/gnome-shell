@@ -53,6 +53,7 @@ class ControlsManagerLayout extends Clutter.BoxLayout {
         stateAdjustment.connect('notify::value', () => this.layout_changed());
 
         this._workAreaBox = new Clutter.ActorBox();
+        this._monitorBox = new Clutter.ActorBox();
         global.display.connectObject(
             'workareas-changed', () => this._updateWorkAreaBox(),
             this);
@@ -66,6 +67,9 @@ class ControlsManagerLayout extends Clutter.BoxLayout {
         const monitor = Main.layoutManager.primaryMonitor;
         if (!monitor)
             return;
+
+        this._monitorBox.set_origin(monitor.x, monitor.y);
+        this._monitorBox.set_size(monitor.width, monitor.height);
 
         const workArea = Main.layoutManager.getWorkAreaForMonitor(monitor.index);
         const startX = workArea.x - monitor.x;
@@ -83,8 +87,8 @@ class ControlsManagerLayout extends Clutter.BoxLayout {
 
         switch (state) {
         case ControlsState.HIDDEN:
-            workspaceBox.set_origin(...this._workAreaBox.get_origin());
-            workspaceBox.set_size(...this._workAreaBox.get_size());
+            workspaceBox.set_origin(...this._monitorBox.get_origin());
+            workspaceBox.set_size(...this._monitorBox.get_size());
             break;
         case ControlsState.WINDOW_PICKER:
             workspaceBox.set_origin(0,

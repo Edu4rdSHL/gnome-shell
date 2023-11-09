@@ -95,7 +95,7 @@ const _modes = {
         unlockDialog: UnlockDialog,
         components: USER_SESSION_COMPONENTS,
         panel: {
-            left: ['activities'],
+            left: ['activities', 'lg'],
             center: ['dateMenu'],
             right: ['screenRecording', 'screenSharing', 'dwellClick', 'a11y', 'keyboard', 'quickSettings'],
         },

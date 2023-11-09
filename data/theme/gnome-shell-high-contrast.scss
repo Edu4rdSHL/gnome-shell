@@ -13,14 +13,23 @@ $variant: 'dark';
 
 //force opaque panel
 #panel {
-  &.login-screen,
-  &.unlock-screen,
-  &:overview {
-    background-color: #000;
+  &, &.background-bright, &.background-dark, &.background-noisy {
+    @include panel(high-contrast);
   }
 
-  .panel-button {
-    color: #fff !important;
+  &:overview, &:overview.background-noisy {
+    @include panel(high-contrast);
+  }
+
+  // TODO: screen-shield class may have gone away?
+  &.lock-screen, &.login-screen, &.unlock-screen {
+    @include panel(login-screen);
+
+    &.screen-shield {
+      &, &.background-bright, &.background-dark, &.background-noisy {
+        @include panel(high-contrast);
+      }
+    }
   }
 }
 
