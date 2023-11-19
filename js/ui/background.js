@@ -126,8 +126,28 @@ const FADE_ANIMATION_TIME = 1000;
 // The first is how different (percent crossfaded) the slide show
 // has to look before redrawing and the second is the minimum
 // frequency (in seconds) we're willing to wake up
-const ANIMATION_OPACITY_STEP_INCREMENT = 4.0;
-const ANIMATION_MIN_WAKEUP_INTERVAL = 1.0;
+export var ANIMATION_OPACITY_STEP_INCREMENT = 4.0;
+export var ANIMATION_MIN_WAKEUP_INTERVAL = 1.0;
+
+/**
+ * change the crossfade difference required to trigger a redraw
+ *
+ * @param {number} value the new minimum difference required to trigger a redraw (in percent)
+ */
+export function setAnimationOpacityStepIncrement(value) {
+    ANIMATION_OPACITY_STEP_INCREMENT = value;
+}
+
+/**
+ * change the redraw frequency for the background
+ *
+ * @param {number} value the new redraw frequency (in seconds)
+ */
+export function setAnimationMinWakeupInterval(value) {
+    ANIMATION_MIN_WAKEUP_INTERVAL = value;
+}
+
+
 
 let _backgroundCache = null;
 
