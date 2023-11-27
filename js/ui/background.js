@@ -126,28 +126,8 @@ const FADE_ANIMATION_TIME = 1000;
 // The first is how different (percent crossfaded) the slide show
 // has to look before redrawing and the second is the minimum
 // frequency (in seconds) we're willing to wake up
-export var ANIMATION_OPACITY_STEP_INCREMENT = 4.0;
-export var ANIMATION_MIN_WAKEUP_INTERVAL = 1.0;
-
-/**
- * change the crossfade difference required to trigger a redraw
- *
- * @param {number} value the new minimum difference required to trigger a redraw (in percent)
- */
-export function setAnimationOpacityStepIncrement(value) {
-    ANIMATION_OPACITY_STEP_INCREMENT = value;
-}
-
-/**
- * change the redraw frequency for the background
- *
- * @param {number} value the new redraw frequency (in seconds)
- */
-export function setAnimationMinWakeupInterval(value) {
-    ANIMATION_MIN_WAKEUP_INTERVAL = value;
-}
-
-
+const ANIMATION_OPACITY_STEP_INCREMENT = 4.0;
+const ANIMATION_MIN_WAKEUP_INTERVAL = 1.0;
 
 let _backgroundCache = null;
 
@@ -257,7 +237,7 @@ function getBackgroundCache() {
     return _backgroundCache;
 }
 
-const Background = GObject.registerClass({
+export const Background = GObject.registerClass({
     Signals: {'loaded': {}, 'bg-changed': {}},
 }, class Background extends Meta.Background {
     _init(params) {
@@ -279,6 +259,8 @@ const Background = GObject.registerClass({
         this._fileWatches = {};
         this._cancellable = new Gio.Cancellable();
         this.isLoaded = false;
+        this._animationOpacityStepIncrement = ANIMATION_OPACITY_STEP_INCREMENT;
+        this._animationMinWakeupInterval = ANIMATION_MIN_WAKEUP_INTERVAL;
 
         this._interfaceSettings = new Gio.Settings({schema_id: INTERFACE_SCHEMA});
 
@@ -304,6 +286,22 @@ const Background = GObject.registerClass({
             this._emitChangedSignal.bind(this), this);
 
         this._load();
+    }
+
+    get animationOpacityStepIncrement() {
+        return this._animationOpacityStepIncrement;
+    }
+
+    set animationOpacityStepIncrement(value) {
+        this._animationOpacityStepIncrement = value;
+    }
+
+    get animationMinWakeupInterval() {
+        return this._animationMinWakeupInterval;
+    }
+
+    set animationMinWakeupInterval(value) {
+        this._animationMinWakeupInterval = value;
     }
 
     destroy() {
@@ -462,11 +460,11 @@ const Background = GObject.registerClass({
         if (!this._animation.transitionDuration)
             return;
 
-        let nSteps = 255 / ANIMATION_OPACITY_STEP_INCREMENT;
+        let nSteps = 255 / this._animationOpacityStepIncrement;
         let timePerStep = (this._animation.transitionDuration * 1000) / nSteps;
 
         let interval = Math.max(
-            ANIMATION_MIN_WAKEUP_INTERVAL * 1000,
+            this._animationMinWakeupInterval * 1000,
             timePerStep);
 
         if (interval > GLib.MAXUINT32)
