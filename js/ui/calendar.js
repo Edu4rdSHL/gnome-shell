@@ -760,6 +760,125 @@ export const Calendar = GObject.registerClass({
     }
 });
 
+const FadeEffect = GObject.registerClass({
+    Properties: {
+        'top-fade': GObject.ParamSpec.float(
+            'top-fade', 'top-fade', 'top-fade',
+            GObject.ParamFlags.READWRITE,
+            0, GLib.MAXINT32, 0),
+        'bottom-fade': GObject.ParamSpec.float(
+            'bottom-fade', 'bottom-fade', 'bottom-fade',
+            GObject.ParamFlags.READWRITE,
+            0, GLib.MAXINT32, 0),
+        'opacity': GObject.ParamSpec.float(
+            'opacity', 'opacity', 'opacity',
+            GObject.ParamFlags.READWRITE,
+            0, 1, 0),
+    },
+}, class FadeEffect extends Shell.GLSLEffect {
+    _init(params) {
+        super._init(params);
+
+        this._heightLocation = this.get_uniform_location('height');
+        this._widthLocation = this.get_uniform_location('width');
+        this._topFadeHeightLocation = this.get_uniform_location('top_fade_height');
+        this._bottomFadeHeightLocation = this.get_uniform_location('bottom_fade_height');
+        this._opacityLocation = this.get_uniform_location('opacity');
+
+        this._topFade = 0;
+        this._bottomFade = 0;
+        this._opacity = 0;
+    }
+
+    get opacity() {
+        return this._opacity;
+    }
+
+    set opacity(opacity) {
+        if (this._opacity === opacity)
+            return;
+
+        this._opacity = opacity;
+        this.set_uniform_float(this._opacityLocation, 1, [opacity]);
+        this.actor.queue_redraw();
+
+        this.notify('opacity');
+    }
+
+    get topFade() {
+        return this._topFade;
+    }
+
+    set topFade(height) {
+        if (this._topFade === height)
+            return;
+
+        this._topFade = height;
+        this.set_uniform_float(this._topFadeHeightLocation, 1, [height]);
+        this.actor.queue_redraw();
+
+        this.notify('top-fade');
+    }
+
+    get bottomFade() {
+        return this._bottomFade;
+    }
+
+    set bottomFade(height) {
+        if (this._bottomFade === height)
+            return;
+
+        this._bottomFade = height;
+        this.set_uniform_float(this._bottomFadeHeightLocation, 1, [height]);
+        this.actor.queue_redraw();
+
+        this.notify('bottom-fade');
+    }
+
+    vfunc_set_actor(actor) {
+        if (this.actor)
+            this.actor.disconnectObject(this);
+
+        if (actor) {
+            actor.connectObject('notify::allocation', () => {
+                this.set_uniform_float(this._heightLocation, 1, [this.get_actor().height]);
+                this.set_uniform_float(this._widthLocation, 1, [this.get_actor().width]);
+            }, this);
+        }
+
+        super.vfunc_set_actor(actor);
+    }
+
+    vfunc_build_pipeline() {
+        const dec = `uniform sampler2D tex;                       \n
+                     uniform float height;                        \n
+                     uniform float width;                         \n
+                     uniform float opacity;                       \n
+                     uniform float top_fade_height;               \n
+                     uniform float bottom_fade_height;            \n`;
+
+        const src = `cogl_color_out = cogl_color_in * texture2D (tex, vec2 (cogl_tex_coord_in[0].xy));  \n
+                     float base_fade = 200;                                                             \n
+                     float y = height * cogl_tex_coord_in[0].y;                                         \n
+                     float y_from_bottom = height - y;                                                  \n
+                     float ratio = 1.0;                                                                 \n
+
+                     if (y < top_fade_height) {                                                         \n
+                        ratio = y / (top_fade_height + base_fade);                                      \n
+                        ratio = 1 - ((1 - ratio) * opacity);                                            \n
+                     }                                                                                  \n
+
+                     if (y_from_bottom < bottom_fade_height) {                                          \n
+                        ratio = y_from_bottom / (bottom_fade_height + base_fade);                       \n
+                        ratio = 1 - ((1 - ratio) * opacity);                                            \n
+                     }                                                                                  \n
+
+                     cogl_color_out *= ratio;                                                           \n`;
+
+        this.add_glsl_snippet(Shell.SnippetHook.FRAGMENT, dec, src, true);
+    }
+});
+
 const Placeholder = GObject.registerClass(
 class Placeholder extends St.BoxLayout {
     _init() {
@@ -818,6 +937,7 @@ class CalendarMessageList extends St.Widget {
 
         this._scrollView = new St.ScrollView({
             style_class: 'vfade',
+            effect: new FadeEffect({name: 'highlight'}),
             overlay_scrollbars: true,
             x_expand: true, y_expand: true,
             child: this._messageView,

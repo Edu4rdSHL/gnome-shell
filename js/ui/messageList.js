@@ -1638,11 +1638,12 @@ export const MessageView = GObject.registerClass({
         // Collapse the previously expanded group
         if (prevGroup) {
             delete this._firstMove;
-            await prevGroup.collapse();
 
             scrollView.get_parent().layout_manager.frozen = false;
             this._showScrollbar();
             scrollView.style_class = 'vfade';
+            this._unhiglightGroup(prevGroup);
+            await prevGroup.collapse();
 
             const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
             this.vadjustment.ease(this._collapsedScrollPosition, {
@@ -1658,6 +1659,7 @@ export const MessageView = GObject.registerClass({
             this.set_child_below_sibling(this._overlay, group.get_parent());
             this._overlay.show();
             this._firstMove = true;
+            this._higlightGroup(group);
             await group.expand();
             scrollView.style_class = '';
         } else {
@@ -1788,6 +1790,56 @@ export const MessageView = GObject.registerClass({
                     duration,
                     mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                 });
+            },
+        });
+    }
+
+    _higlightGroup(group) {
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        const scrollView = this.get_parent();
+        const effect = scrollView.get_effect('highlight');
+
+        this._highlightHandlerId = group.connect('notify::allocation', this._updateHighlight.bind(this, group));
+        this._valueHandlerId = this.vadjustment.connect('notify::value', this._updateHighlight.bind(this, group));
+
+        scrollView.ease_property('@effects.highlight.opacity', 1.0, {
+            progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            duration,
+        });
+
+        effect.enabled = true;
+        this._updateHighlight(group);
+    }
+
+    _updateHighlight(group) {
+        const effect = this.get_parent().get_effect('highlight');
+        const {y1, y2} = group.getAllocationInParent(this);
+        const pageHeight = this.vadjustment.pageSize;
+        const value = this.vadjustment.value;
+
+        effect.topFade = Math.max(0, y1 - value);
+        effect.bottomFade = Math.max(0, pageHeight - ((y1 - value) + (y2 - y1)));
+    }
+
+    _unhiglightGroup(group) {
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        const scrollView = this.get_parent();
+        const effect = scrollView.get_effect('highlight');
+
+        scrollView.ease_property('@effects.highlight.opacity', 0.0, {
+            progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            duration,
+            onStopped: () => {
+                if (this._highlightHandlerId) {
+                    group.disconnect(this._highlightHandlerId);
+                    this._highlightHandlerId = undefined;
+                }
+
+                if (this._valueHandlerId) {
+                    this.vadjustment.disconnect(this._valueHandlerId);
+                    this._valueHandlerId = undefined;
+                }
+                effect.enabled = false;
             },
         });
     }
