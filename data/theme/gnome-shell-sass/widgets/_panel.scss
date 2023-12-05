@@ -1,13 +1,6 @@
 /* Top Bar */
 // a.k.a. the panel
 
-$privacy_indicator_color: $orange_3;
-
-$panel_bg_color: if($variant == 'light', $light_3, $dark_5);
-$panel_fg_color: if($variant == 'light', $fg_color, darken($fg_color, 5%));
-$panel_border_color: if($variant == 'light', darken($panel_bg_color, 2%), $panel_bg_color);
-
-$panel_system_fg_color: $system_fg_color; // always light for lockscreen, overview and other transparent panels
 $panel_height: 2.2em;
 $panel_transition_duration: 250ms; // same as the overview transition duration
 
@@ -71,11 +64,11 @@ $panel_transition_duration: 250ms; // same as the overview transition duration
     }
 
     &.screen-recording-indicator {
-      @include panel_button($screenshot_ui_button_red, $fg:$panel_system_fg_color, $flat: false);
+      @include panel_button($screenshot_indicator_bg_color, $fg: $screenshot_indicator_fg_color, $flat: false);
     }
 
     &.screen-sharing-indicator {
-      @include panel_button($privacy_indicator_color, $flat: false);
+      @include panel_button($privacy_indicator_bg_color, $fg: $privacy_indicator_fg_color, $flat: false);
     }
 
     // clock
@@ -99,24 +92,24 @@ $panel_transition_duration: 250ms; // same as the overview transition duration
     box-shadow: none;
 
     .panel-button {
-      @include panel_button($panel_system_fg_color, $fg:$panel_system_fg_color);
+      @include panel_button($system_panel_fg_color, $fg:$system_panel_fg_color);
 
       &#panelActivities .workspace-dot {
-        background-color: $panel_system_fg_color;
+        background-color: $system_panel_fg_color;
       }
 
       // clock
       &.clock-display {
-        @include panel_button($panel_system_fg_color, $fg:$panel_system_fg_color, $highlighted_child: true, $child_class:".clock");
+        @include panel_button($system_panel_fg_color, $fg:$system_panel_fg_color, $highlighted_child: true, $child_class:".clock");
       }
 
-      // unfortunate duplication so these indicators have styles
+      // screen activity indicators
       &.screen-recording-indicator {
-        @include panel_button($screenshot_ui_button_red, $fg:$panel_system_fg_color, $flat: false);
+        @include panel_button($system_screenshot_indicator_bg_color, $fg: $system_screenshot_indicator_fg_color, $flat: false);
       }
 
       &.screen-sharing-indicator {
-        @include panel_button($privacy_indicator_color, $flat: false);
+        @include panel_button($system_privacy_indicator_bg_color, $fg: $system_privacy_indicator_fg_color, $flat: false);
       }
     }
   }
