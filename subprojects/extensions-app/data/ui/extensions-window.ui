@@ -3,6 +3,11 @@
   <menu id="primary-menu">
     <section>
       <item>
+        <attribute name="label" translatable="yes">Automatic Updates</attribute>
+        <attribute name="action">win.automatic-updates</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+      <item>
         <attribute name="label" translatable="yes">Check for Updates</attribute>
         <attribute name="action">win.check-updates</attribute>
       </item>

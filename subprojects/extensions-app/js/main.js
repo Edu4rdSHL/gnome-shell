@@ -105,6 +105,12 @@ var ExtensionsWindow = GObject.registerClass({
 
         this.add_action_entries(
             [{
+                name: 'automatic-updates',
+                state: 'false',
+                change_state: (a, state) => {
+                    this._shellProxy.AutomaticUpdates = state.get_boolean();
+                },
+            }, {
                 name: 'check-updates',
                 activate: () => this._requestUpdatesCheck(),
             }, {
@@ -158,9 +164,20 @@ var ExtensionsWindow = GObject.registerClass({
         this._shellProxy.connectSignal('ExtensionStateChanged',
             this._onExtensionStateChanged.bind(this));
 
-        this._shellProxy.connect('g-properties-changed',
-            this._onUserExtensionsEnabledChanged.bind(this));
+        this._shellProxy.connect('g-properties-changed', (p, properties) => {
+            for (const prop in properties.deepUnpack()) {
+                switch (prop) {
+                case 'UserExtensionsEnabled':
+                    this._onUserExtensionsEnabledChanged();
+                    break;
+                case 'AutomaticUpdates':
+                    this._onAutomaticUpdatesChanged();
+                    break;
+                }
+            }
+        });
         this._onUserExtensionsEnabledChanged();
+        this._onAutomaticUpdatesChanged();
 
         this._scanExtensions();
     }
@@ -268,6 +285,13 @@ var ExtensionsWindow = GObject.registerClass({
         let action = this.lookup_action('user-extensions-enabled');
         action.set_state(
             new GLib.Variant('b', this._shellProxy.UserExtensionsEnabled));
+    }
+
+    _onAutomaticUpdatesChanged() {
+        const action = this.lookup_action('automatic-updates');
+        action.set_enabled(this._shellProxy.AutomaticUpdates !== null);
+        action.set_state(
+            new GLib.Variant('b', this._shellProxy.AutomaticUpdates));
     }
 
     _onExtensionStateChanged(proxy, senderName, [uuid, newState]) {
