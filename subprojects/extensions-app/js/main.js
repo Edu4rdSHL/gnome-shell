@@ -54,7 +54,8 @@ class Application extends Adw.Application {
     }
 
     vfunc_activate() {
-        this._shellProxy.CheckForUpdatesAsync().catch(logError);
+        if (this._shellProxy.AutomaticUpdates)
+            this._shellProxy.CheckForUpdatesAsync().catch(logError);
         this._window.present();
     }
 
