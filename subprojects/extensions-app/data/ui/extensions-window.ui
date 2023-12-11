@@ -3,6 +3,12 @@
   <menu id="primary-menu">
     <section>
       <item>
+        <attribute name="label" translatable="yes">Check for Updates</attribute>
+        <attribute name="action">win.check-updates</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
         <attribute name="label" translatable="yes">Keyboard Shortcuts</attribute>
         <attribute name="action">win.show-help-overlay</attribute>
       </item>

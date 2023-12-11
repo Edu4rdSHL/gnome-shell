@@ -105,6 +105,9 @@ var ExtensionsWindow = GObject.registerClass({
 
         this.add_action_entries(
             [{
+                name: 'check-updates',
+                activate: () => this._requestUpdatesCheck(),
+            }, {
                 name: 'show-about',
                 activate: () => this._showAbout(),
             }, {
@@ -200,6 +203,10 @@ var ExtensionsWindow = GObject.registerClass({
         this._shellProxy.OpenExtensionPrefsAsync(uuid,
             this._exportedHandle,
             {modal: new GLib.Variant('b', true)}).catch(logError);
+    }
+
+    _requestUpdatesCheck() {
+        this._shellProxy.CheckForUpdatesAsync().catch(logError);
     }
 
     _showAbout() {
