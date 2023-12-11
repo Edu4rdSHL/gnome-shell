@@ -1065,6 +1065,10 @@ const NotificationMessageGroup = GObject.registerClass({
         return [...this.get_children().filter(item => item !== this._headerBox && item !== this._cover).map(item => item.child).reverse()];
     }
 
+    vfunc_get_focus_chain() {
+        return this._messages;
+    }
+
     _addMessage(message, index) {
         const wasExpanded = this.expanded;
         const item = new St.Bin({
