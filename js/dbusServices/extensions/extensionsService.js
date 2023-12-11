@@ -51,6 +51,14 @@ export const ExtensionsService = class extends ServiceImplementation {
         return this._proxy.ShellVersion;
     }
 
+    get AutomaticUpdates() {
+        return this._proxy.AutomaticUpdates;
+    }
+
+    set AutomaticUpdates(enable) {
+        this._proxy.AutomaticUpdates = enable;
+    }
+
     get UserExtensionsEnabled() {
         return this._proxy.UserExtensionsEnabled;
     }

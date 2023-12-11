@@ -270,5 +270,11 @@
     -->
     <property name="UserExtensionsEnabled" type="b" access="readwrite"/>
 
+    <!--
+        AutomaticUpdates:
+        Whether extensions are updated automatically
+    -->
+    <property name="AutomaticUpdates" type="b" access="readwrite"/>
+
   </interface>
 </node>
