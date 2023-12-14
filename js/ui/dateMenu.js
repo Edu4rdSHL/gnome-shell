@@ -800,7 +800,7 @@ class MessagesIndicator extends St.Icon {
     }
 });
 
-const FreezableBinLayout = GObject.registerClass(
+export const FreezableBinLayout = GObject.registerClass(
 class FreezableBinLayout extends Clutter.BinLayout {
     _init() {
         super._init();

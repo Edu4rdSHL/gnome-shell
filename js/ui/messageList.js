@@ -19,6 +19,7 @@ import {formatTimeSpan} from '../misc/dateUtils.js';
 const MAX_NOTIFICATION_BUTTONS = 3;
 export const MESSAGE_ANIMATION_TIME = 200;
 
+const EXPANDED_GROUP_OVERSHOT_HEIGHT = 50;
 const DEFAULT_EXPAND_LINES = 6;
 const WIDTH_OFFSET_STACKED = 5;
 const HEIGHT_OFFSET_STACKED = 10;
@@ -946,6 +947,28 @@ const NotificationMessageGroup = GObject.registerClass({
         this.notify('expanded');
     }
 
+    get expandedHeight() {
+        return this.layoutManager.expandedHeight();
+    }
+
+    getAllocationInParent(actor) {
+        let box = this.get_allocation_box();
+        let y1 = box.y1, y2 = box.y2;
+
+        let parent = this.get_parent();
+        while (parent !== actor) {
+            if (!parent)
+                throw new Error(`The expanded group is not in ${actor}`);
+
+            box = parent.get_allocation_box();
+            y1 += box.y1;
+            y2 += box.y1;
+            parent = parent.get_parent();
+        }
+
+        return {y1, y2};
+    }
+
     _unfadeStackedMessages(duration) {
         this.messages.forEach(child => {
             child.save_easing_state();
@@ -1401,6 +1424,112 @@ export const MessageView = GObject.registerClass({
         this._setupNotifications();
     }
 
+    vfunc_set_adjustments(hadjustment, vadjustment) {
+        const internalAdjustment = new St.Adjustment({
+            actor: vadjustment.actor,
+            lower: vadjustment.lower,
+            upper: vadjustment.upper,
+            step_increment: vadjustment.step_increment,
+            page_increment: vadjustment.page_increment,
+            page_size: vadjustment.page_size,
+            value: vadjustment.value,
+        });
+
+        this._scrollViewAdjustment = vadjustment;
+
+        this._scrollViewAdjustment.connect('notify', (_, prop) => {
+            if (this._expandedGroup) {
+                if (this._scrollViewAdjustment.upper > this._scrollViewAdjustment.pageSize)
+                    this._showScrollbar();
+                else
+                    this._hideScrollbar();
+
+                if (prop.get_name() !== 'value')
+                    return;
+
+                if (this.vadjustment.get_transition('value'))
+                    return;
+
+                const {y1, y2_} = this._expandedGroup.getAllocationInParent(this);
+                internalAdjustment.value = this._scrollViewAdjustment.value +
+                    y1 -
+                    EXPANDED_GROUP_OVERSHOT_HEIGHT;
+            } else {
+                internalAdjustment.freeze_notify();
+                internalAdjustment.lower = this._scrollViewAdjustment.lower;
+                internalAdjustment.upper = this._scrollViewAdjustment.upper;
+                internalAdjustment.step_increment = this._scrollViewAdjustment.step_increment;
+                internalAdjustment.page_size = this._scrollViewAdjustment.page_size;
+                internalAdjustment.value = this._scrollViewAdjustment.value;
+                internalAdjustment.thaw_notify();
+            }
+        });
+
+        internalAdjustment.connectObject('notify', (_, prop) => {
+            if (this._expandedGroup) {
+                if (prop.get_name() !== 'value')
+                    return;
+
+                const {y1, y2_} = this._expandedGroup.getAllocationInParent(this);
+                this._scrollViewAdjustment.value = internalAdjustment.value -
+                    y1 +
+                    EXPANDED_GROUP_OVERSHOT_HEIGHT;
+            } else {
+                this._scrollViewAdjustment.freeze_notify();
+                this._scrollViewAdjustment.lower = internalAdjustment.lower;
+                this._scrollViewAdjustment.upper = internalAdjustment.upper;
+                this._scrollViewAdjustment.step_increment = internalAdjustment.step_increment;
+                this._scrollViewAdjustment.page_size = internalAdjustment.page_size;
+                this._scrollViewAdjustment.value = internalAdjustment.value;
+                this._scrollViewAdjustment.thaw_notify();
+            }
+        }, this);
+
+        super.vfunc_set_adjustments(hadjustment, internalAdjustment);
+    }
+
+    vfunc_allocate(box) {
+        const group = this.expandedGroup;
+
+        this.vadjustment.freeze_notify();
+
+        super.vfunc_allocate(box);
+
+        if (group && (this._firstMove || !this.vadjustment.get_transition('value'))) {
+            const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+            const [groupExpandedHeight, _] = group.expandedHeight;
+            const {y1, y2_} = group.getAllocationInParent(this);
+            const groupCenter = y1 + (groupExpandedHeight / 2);
+            const pageHeight = this.vadjustment.pageSize;
+            const pageCenter = pageHeight / 2;
+            const value = Math.min(y1, groupCenter - pageCenter);
+
+            if (this._firstMove) {
+                this._firstMove = false;
+                this._collapsedScrollPosition = this.vadjustment.value;
+                this.vadjustment.ease(value, {
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    duration,
+                });
+
+                this._hideScrollbar();
+            } else {
+                this.vadjustment.value = value;
+            }
+
+            this._scrollViewAdjustment.set_values(
+                this._scrollViewAdjustment.value, // value
+                0.0, // lower
+                Math.max(groupExpandedHeight + EXPANDED_GROUP_OVERSHOT_HEIGHT * 2, pageHeight), // upper
+                pageHeight / 6, // step_increment
+                pageHeight - pageHeight / 6, // page_increment
+                pageHeight // page_size
+            );
+        }
+
+        this.vadjustment.thaw_notify();
+    }
+
     _setupMpris() {
         this._players = new Map();
         this._mediaSource = new Mpris.MediaSource();
@@ -1499,6 +1628,7 @@ export const MessageView = GObject.registerClass({
 
     async _setExpandedGroup(group) {
         const prevGroup = this._expandedGroup;
+        const scrollView = this.get_parent();
 
         if (prevGroup === group)
             return;
@@ -1506,15 +1636,30 @@ export const MessageView = GObject.registerClass({
         this._expandedGroup = group;
 
         // Collapse the previously expanded group
-        if (prevGroup)
+        if (prevGroup) {
+            delete this._firstMove;
             await prevGroup.collapse();
 
+            scrollView.get_parent().layout_manager.frozen = false;
+            this._showScrollbar();
+            scrollView.style_class = 'vfade';
+
+            const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+            this.vadjustment.ease(this._collapsedScrollPosition, {
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                duration,
+            });
+        }
+
         if (group) {
+            scrollView.get_parent().layout_manager.frozen = true;
             // Make sure that the overlay is the child below the expanded group
             this.set_child_above_sibling(group.get_parent(), null);
             this.set_child_below_sibling(this._overlay, group.get_parent());
             this._overlay.show();
+            this._firstMove = true;
             await group.expand();
+            scrollView.style_class = '';
         } else {
             this._overlay.hide();
         }
@@ -1645,5 +1790,37 @@ export const MessageView = GObject.registerClass({
                 });
             },
         });
+    }
+
+    _hideScrollbar() {
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        const scrollView = this.get_parent();
+
+        scrollView.reactive = false;
+        scrollView.vscroll.reactive = false;
+        if (scrollView.vscrollbar_visible) {
+            scrollView.vscroll.ease_property('opacity', 0, {
+                progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                duration,
+            });
+        } else {
+            scrollView.vscroll.opacity = 0;
+        }
+    }
+
+    _showScrollbar() {
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        const scrollView = this.get_parent();
+
+        scrollView.reactive = true;
+        scrollView.vscroll.reactive = true;
+        if (scrollView.vscroll.visible) {
+            scrollView.vscroll.ease_property('opacity', 255, {
+                progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                duration,
+            });
+        } else {
+            scrollView.vscroll.opacity = 255;
+        }
     }
 });
