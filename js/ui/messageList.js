@@ -20,6 +20,8 @@ const MAX_NOTIFICATION_BUTTONS = 3;
 export const MESSAGE_ANIMATION_TIME = 200;
 
 const DEFAULT_EXPAND_LINES = 6;
+const WIDTH_OFFSET_STACKED = 5;
+const HEIGHT_OFFSET_STACKED = 10;
 
 export const URLHighlighter = GObject.registerClass(
 class URLHighlighter extends St.Label {
@@ -803,6 +805,563 @@ class MediaMessage extends Message {
     }
 });
 
+const NotificationMessageGroup = GObject.registerClass({
+    Properties: {
+        'expanded': GObject.ParamSpec.boolean(
+            'expanded', 'expanded', 'expanded',
+            GObject.ParamFlags.READABLE,
+            false),
+        'has-urgent': GObject.ParamSpec.boolean(
+            'has-urgent', 'has-urgent', 'has-urgent',
+            GObject.ParamFlags.READWRITE,
+            false),
+    },
+    Signals: {
+        'needs-attention': {},
+        'toggle-expand': {},
+    },
+}, class NotificationMessageGroup extends St.Widget {
+    _init(source) {
+        const action =  new Clutter.ClickAction();
+        super._init({
+            style_class: 'message-notification-group',
+            clip_to_allocation: true,
+            x_expand: true,
+            y_expand: false,
+            layout_manager: new MessageGroupExpanderLayout(),
+            pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
+            actions: action,
+            reactive: true,
+        });
+
+        // A widget that covers stacked messages so that the they don't get events
+        this._cover = new St.Widget({
+            reactive: true,
+        });
+
+        this.source = source;
+        this._expanded = false;
+        this._notifications = new Map();
+        this._nUrgent = 0;
+
+        this._headerBox = new St.BoxLayout({
+            style_class: 'message-group-header',
+            x_expand: true,
+            visible: false,
+        });
+
+        this.titleLabel = new St.Label({
+            style_class: 'message-group-title',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this.titleLabel.set_text(source.title);
+
+        this.source.connectObject('notify::title', () => {
+            this.titleLabel.set_text(this.source.title);
+        }, this);
+
+        this._headerBox.add_child(this.titleLabel);
+
+        this._unexpandButton = new St.Button({
+            style_class: 'message-collapse-button',
+            icon_name: 'group-collapse-symbolic',
+            x_align: Clutter.ActorAlign.END,
+            y_align: Clutter.ActorAlign.CENTER,
+            x_expand: true,
+            y_expand: true,
+        });
+
+        this._unexpandButton.connect('clicked', () => this.emit('toggle-expand'));
+        action.connect('clicked', () => this.emit('toggle-expand'));
+
+        this._headerBox.add_child(this._unexpandButton);
+        this.add_child(this._headerBox);
+        this.add_child(this._cover);
+        this.layout_manager.header = this._headerBox;
+        this.layout_manager.cover = this._cover;
+
+        source.connectObject(
+            'notification-added', (_, notification) => this._addNotification(notification),
+            'notification-removed', (_, notification) => this._removeNotification(notification),
+            this);
+
+        source.notifications.forEach(notification => {
+            this._addNotification(notification);
+        });
+    }
+
+    get expanded() {
+        // Consider this group to be expanded when it has only one message
+        return this._expanded || this.get_n_children() < 4;
+    }
+
+    get hasUrgent() {
+        return this._nUrgent > 0;
+    }
+
+    async expand() {
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+
+        const promise = new Promise((resolve, _) => {
+            this.ease_property('@layout.expansion', 1, {
+                progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                duration,
+                onComplete: () => resolve(),
+            });
+        });
+
+        this._headerBox.show();
+        this._expanded = true;
+        this._unfadeStackedMessages(duration);
+        this.notify('expanded');
+        this._cover.hide();
+
+        await promise;
+    }
+
+    async collapse() {
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+
+        this.messages.forEach(message => {
+            if (message.expanded)
+                message.toggleExpand();
+        });
+
+        const promise = new Promise((resolve, _) => {
+            this.ease_property('@layout.expansion', 0, {
+                progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                duration,
+                onComplete: () => resolve(),
+            });
+        });
+
+        this._fadeStackedMessages(duration);
+
+        await promise;
+
+        this._headerBox.hide();
+        this._expanded = false;
+        this._cover.show();
+
+        this.notify('expanded');
+    }
+
+    _unfadeStackedMessages(duration) {
+        this.messages.forEach(child => {
+            child.save_easing_state();
+            child.set_easing_mode(Clutter.AnimationMode.EASE_OUT_QUAD);
+            child.set_easing_duration(duration);
+
+            child.set_opacity(255);
+
+            child.restore_easing_state();
+        });
+    }
+
+    _fadeStackedMessages(duration) {
+        this.messages.forEach((child, i) => {
+            const opacity = 255 / (i + 1);
+
+            child.save_easing_state();
+            child.set_easing_mode(Clutter.AnimationMode.EASE_OUT_QUAD);
+            child.set_easing_duration(duration);
+
+            child.set_opacity(opacity);
+
+            child.restore_easing_state();
+        });
+    }
+
+    canClose() {
+        return true;
+    }
+
+    _addNotification(notification) {
+        const message = new NotificationMessage(notification);
+
+        this._notifications.set(notification, message);
+
+        notification.connectObject(
+            'notify::urgency', () => {
+                const isUrgent = notification.urgency === MessageTray.Urgency.CRITICAL;
+                const oldHasUrgent = this.hasUrgent;
+
+                if (isUrgent)
+                    this._nUrgent++;
+                else
+                    this._nUrgent--;
+
+                const index = isUrgent ? 0 : this._nUrgent;
+                this._moveMessage(message, index);
+                if (oldHasUrgent !== this.hasUrgent)
+                    this.notify('has-urgent');
+            }, message);
+
+        const isUrgent = notification.urgency === MessageTray.Urgency.CRITICAL;
+        const oldHasUrgent = this.hasUrgent;
+
+        if (isUrgent)
+            this._nUrgent++;
+
+        const index = isUrgent ? 0 : this._nUrgent;
+        this._addMessage(message, index);
+
+        if (oldHasUrgent !== this.hasUrgent)
+            this.notify('has-urgent');
+        this.emit('needs-attention');
+    }
+
+    _removeNotification(notification) {
+        const message = this._notifications.get(notification);
+
+        if (notification.urgency === MessageTray.Urgency.CRITICAL)
+            this._nUrgent--;
+
+        this._removeMessage(message);
+    }
+
+    vfunc_map() {
+        // Acknowledge all notifications once they are mapped
+        this.messages.forEach(message => {
+            message.notification.acknowledged = true;
+        });
+        super.vfunc_map();
+    }
+
+    _ensureChildOrder() {
+        // We need to make sure that the top most message is always the last child to be rendered.
+        // And the cover widget is placed below the top most message to cover all other messages.
+        const item = this.messages[0]?.get_parent();
+        if (item) {
+            this.set_child_above_sibling(item, null);
+            this.set_child_below_sibling(this._cover, item);
+        }
+    }
+
+    get messages() {
+        return [...this.get_children().filter(item => item !== this._headerBox && item !== this._cover).map(item => item.child).reverse()];
+    }
+
+    _addMessage(message, index) {
+        const wasExpanded = this.expanded;
+        const item = new St.Bin({
+            child: message,
+            canFocus: false,
+            layout_manager: new ScaleLayout(),
+            pivot_point: new Graphene.Point({x: .5, y: .5}),
+            scale_x: 0,
+            scale_y: 0,
+        });
+
+        message.connectObject(
+            'toggle-expand', () => {
+                if (!this.expanded)
+                    this.emit('toggle-expand');
+            },
+            'close', () => {
+                // If the group is collapsed and one notification is closed, close the entire group
+                if (!this.expanded) {
+                    GObject.signal_stop_emission_by_name(message, 'close');
+                    this.close();
+                }
+            },
+            'clicked', () => {
+                if (!this.expanded) {
+                    GObject.signal_stop_emission_by_name(message, 'clicked');
+                    this.emit('toggle-expand');
+                }
+            }, this);
+
+
+        // If we add a child below the top child we need to adjust index to skip the cover child
+        if (index !== 0)
+            index += 1;
+        this.insert_child_at_index(item, this.get_n_children() - index);
+        this._ensureChildOrder();
+
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        if (!this.expanded)
+            this._fadeStackedMessages(duration);
+
+        item.ease({
+            scale_x: 1,
+            scale_y: 1,
+            duration,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
+
+        if (wasExpanded !== this.expanded)
+            this.notify('expanded');
+    }
+
+    _removeMessage(message) {
+        const item = message.get_parent();
+
+        message.disconnectObject(this);
+
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        // Don't remove the last message the group will be removed
+        if (this.messages.length > 1) {
+            item.ease({
+                scale_x: 0,
+                scale_y: 0,
+                duration,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => {
+                    item.destroy();
+                    this._ensureChildOrder();
+
+                    if (!this.expanded)
+                        this._fadeStackedMessages(duration);
+                    else
+                        this._unfadeStackedMessages(duration);
+
+                    if (this.messages.length === 1)
+                        this.emit('toggle-expand');
+                },
+            });
+        }
+    }
+
+    _moveMessage(message, index) {
+        if (this.messages[index] === message)
+            return;
+
+        const item = message.get_parent();
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        item.ease({
+            scale_x: 0,
+            scale_y: 0,
+            duration,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            onComplete: () => {
+                // If we move a child below the top child we need to adjust index to skip the cover child
+                if (index !== 0)
+                    index += 1;
+                this.set_child_at_index(item, this.get_n_children() - index);
+                item.ease({
+                    scale_x: 1,
+                    scale_y: 1,
+                    duration,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                });
+            },
+        });
+    }
+
+    close() {
+        // If the group is closed, close all messages in this group
+        this.messages.forEach(message => {
+            message.disconnectObject(this);
+            message.close();
+        });
+    }
+});
+
+const MessageGroupExpanderLayout = GObject.registerClass({
+    Properties: {
+        'expansion': GObject.ParamSpec.double(
+            'expansion', 'Expansion', 'Expansion',
+            GObject.ParamFlags.READWRITE,
+            0, 1, 0),
+        'header': GObject.ParamSpec.object(
+            'header', 'header', 'header',
+            GObject.ParamFlags.READWRITE,
+            Clutter.Actor),
+        'cover': GObject.ParamSpec.object(
+            'cover', 'cover', 'cover',
+            GObject.ParamFlags.READWRITE,
+            Clutter.Actor),
+    },
+}, class MessageGroupExpanderLayout extends Clutter.LayoutManager {
+    constructor(params) {
+        super(params);
+
+        if (this._expansion === undefined)
+            this._expansion = 0;
+    }
+
+    get expansion() {
+        return this._expansion;
+    }
+
+    set expansion(v) {
+        if (v === this._expansion)
+            return;
+        this._expansion = v;
+        this.notify('expansion');
+
+        this.layout_changed();
+    }
+
+    expandedHeight(forWidth) {
+        let [minExpanded, natExpanded] = [0, 0];
+        const width = forWidth ?? this._container.width;
+
+        this._container.get_children().forEach(child => {
+            if (child === this.cover)
+                return;
+
+            const [minChild, natChild] = child.get_preferred_height(width);
+            minExpanded += minChild;
+            natExpanded += natChild;
+        });
+
+        return [minExpanded, natExpanded];
+    }
+
+    _offset(n) {
+        const x = n + 1;
+        const val = Math.max(HEIGHT_OFFSET_STACKED - x * x, 0);
+        return val;
+    }
+
+    vfunc_set_container(container) {
+        if (this._container === container)
+            return;
+
+        this._container?.disconnectObject(this);
+
+        this._container = container;
+        this._container?.connectObject(
+            'notify::scale-x', () => this.layout_changed(),
+            'notify::scale-y', () => this.layout_changed(),
+            this);
+    }
+
+    vfunc_get_preferred_width(_, forHeight) {
+        let [min, nat] = [0, 0];
+
+        this._container.get_children().forEach(child => {
+            const [childMin, childNat] = child.get_preferred_width(forHeight);
+            [min, nat] = [Math.max(min, childMin), Math.max(nat, childNat)];
+        });
+
+        return [
+            Math.floor(min * this._container.scale_y),
+            Math.floor(nat * this._container.scale_y),
+        ];
+    }
+
+    vfunc_get_preferred_height(_, forWidth) {
+        if (this._container.messages.length === 0)
+            return [0, 0];
+
+        let [min, nat] = this._container.messages[0].get_parent().get_preferred_height(forWidth);
+
+        let offset = HEIGHT_OFFSET_STACKED;
+        this._container.messages.forEach((message, index) => {
+            if (index === 0)
+                return;
+            min += offset;
+            nat += offset;
+            offset /= 2;
+        });
+
+        const [minExpanded, natExpanded] = this.expandedHeight(forWidth);
+
+        [min, nat] = [
+            min + this._expansion * (minExpanded - min),
+            nat + this._expansion * (natExpanded - nat),
+        ];
+
+        return [
+            Math.floor(min * this._container.scale_x),
+            Math.floor(nat * this._container.scale_x),
+        ];
+    }
+
+    vfunc_allocate(_, box) {
+        const messages = this._container.messages;
+        const childWidth = box.x2 - box.x1;
+
+        if (this.cover?.visible)
+            this.cover.allocate(box);
+
+        if (this.header?.visible) {
+            const [min, nat_] = this.header.get_preferred_height(childWidth);
+            box.y2 = box.y1 + min;
+            this.header.allocate(box);
+            box.y1 += this._expansion * (box.y2 - box.y1);
+        }
+
+        let heightOffset = HEIGHT_OFFSET_STACKED;
+        messages.forEach((message, i) => {
+            const child = message.get_parent();
+            const [min, nat_] = child.get_preferred_height(childWidth);
+
+            if (i === 0) {
+                box.y2 = box.y1 + min;
+            } else {
+                // Stack children with a small reveal when collapsed
+                box.y2 += heightOffset + this._expansion * (min - heightOffset);
+                box.y1 = box.y2 - min;
+                heightOffset /= 2;
+            }
+
+            // We need to make sure that allocation is always a valid size
+            // but we don't care about the actual size since it won't be visible anyways
+            if (box.get_width() < 0 || box.get_height() < 0) {
+                const zeroBox = new Clutter.ActorBox({x1: 0, x2: 0, y1: 0, y2: 0});
+                child.allocate(zeroBox);
+            } else {
+                child.allocate(box);
+            }
+
+            // Reduce width of children when collapsed
+            const widthOffset = (1.0 - this._expansion) * WIDTH_OFFSET_STACKED;
+            box.x1 += widthOffset;
+            box.x2 -= widthOffset;
+        });
+    }
+});
+
+const MessageViewLayout = GObject.registerClass({
+}, class MessageViewLayout extends Clutter.BoxLayout {
+    vfunc_get_preferred_width(container, forHeight) {
+        // Remove overlay from the width calculation if visible
+        const [minOverlay, natOverlay] = this.overlay?.visible
+            ? this.overlay.get_preferred_width(forHeight) : [0, 0];
+        const [min, nat] = super.vfunc_get_preferred_width(container, forHeight);
+
+        return [
+            min - minOverlay,
+            nat - natOverlay,
+        ];
+    }
+
+    vfunc_get_preferred_height(container, forWidth) {
+        // Remove overlay from the height calculation if visible
+        const [minOverlay, natOverlay] = this.overlay?.visbile
+            ? this.overlay.get_preferred_height(forWidth) : [0, 0];
+        const [min, nat] = super.vfunc_get_preferred_height(container, forWidth);
+        return [
+            min - minOverlay,
+            nat - natOverlay,
+        ];
+    }
+
+    vfunc_allocate(container, box) {
+        if (this.overlay?.visible)
+            this.overlay.allocate(box);
+
+        const width = box.x2 - box.x1;
+        // We need to use the order in messages since the children order is
+        // the render order and the expanded group needs to be the top most child
+        // and the overlay the child below it.
+        container.messages.forEach(message => {
+            const child = message.get_parent();
+            if (child === this.overlay)
+                return;
+
+            const [min, _] = child.get_preferred_height(width);
+            box.y2 = box.y1 + min;
+            child.allocate(box);
+            box.y1 = box.y2;
+        });
+    }
+});
+
 export const MessageView = GObject.registerClass({
     Implements: [St.Scrollable],
     Properties: {
@@ -814,25 +1373,32 @@ export const MessageView = GObject.registerClass({
             'empty', 'empty', 'empty',
             GObject.ParamFlags.READABLE,
             true),
+        'expanded-group': GObject.ParamSpec.object(
+            'expanded-group', 'expanded-group', 'expanded-group',
+            GObject.ParamFlags.READABLE,
+            Clutter.Actor),
     },
 }, class MessageView extends St.BoxLayout {
     constructor() {
         super({
             style_class: 'message-view',
+            layout_manager: new MessageViewLayout(),
             vertical: true,
             x_expand: true,
             y_expand: true,
         });
 
+        this.messages = [];
+        this._overlay = new Clutter.Actor({
+            reactive: true,
+            name: 'overlay',
+            visible: false,
+        });
+        this.add_child(this._overlay);
+        this.layout_manager.overlay = this._overlay;
+
         this._setupMpris();
         this._setupNotifications();
-    }
-
-    vfunc_map() {
-        this._messages.forEach(message => {
-            message.notification.acknowledged = true;
-        });
-        super.vfunc_map();
     }
 
     _setupMpris() {
@@ -862,82 +1428,104 @@ export const MessageView = GObject.registerClass({
     }
 
     _setupNotifications() {
-        this._notifications = new Map();
+        this._notificationSources = new Map();
         this._nUrgent = 0;
+
         Main.messageTray.connectObject(
             'source-added', (_, source) => this._addNotificationSource(source),
             'source-removed', (_, source) => this._removeNotificationSource(source),
             this);
 
         Main.messageTray.getSources().forEach(source => {
-            this._addSource(source);
+            this._addNotificationSource(source);
         });
     }
 
     _addNotificationSource(source) {
-        source.connectObject(
-            'notification-added', (_, notification) => this._addNotification(notification),
-            'notification-removed', (_, notification) => this._removeNotification(notification),
-            this);
+        const group = new NotificationMessageGroup(source);
 
-        source.notifications.forEach(this._addNotification);
-    }
+        this._notificationSources.set(source, group);
 
-    _removeNotificationSource(source) {
-        source.notifications.forEach(this._removeNotification);
-    }
-
-    _addNotification(notification) {
-        const message = new NotificationMessage(notification);
-        this._notifications.set(notification, message);
-
-        notification.connectObject(
-            'notify::urgency', () => {
-                const isUrgent = notification.urgency === MessageTray.Urgency.CRITICAL;
-
-                if (isUrgent)
+        group.connectObject(
+            'toggle-expand', () => {
+                if (group.expanded)
+                    this._setExpandedGroup(null);
+                else
+                    this._setExpandedGroup(group);
+            },
+            'notify::has-urgent', () => {
+                if (group.hasUrgent)
                     this._nUrgent++;
                 else
                     this._nUrgent--;
 
-                const index = this._players.size + isUrgent ? 0 : this._nUrgent;
-                this._moveMessage(message, index);
+                const index = this._players.size + group.hasUrgent ? 0 : this._nUrgent;
+                this._moveMessage(group, index);
+            },
+            'needs-attention', () => {
+                const index = this._players.size + group.hasUrgent ? 0 : this._nUrgent;
+                this._moveMessage(group, index);
             }, this);
 
-        const isUrgent = notification.urgency === MessageTray.Urgency.CRITICAL;
-
-        if (isUrgent)
+        if (group.hasUrgent)
             this._nUrgent++;
 
-        // Add notifications always after media messages
-        const index = this._players.size + isUrgent ? 0 : this._nUrgent;
-        this._addMessage(message, index);
+        const index = this._players.size + group.hasUrgent ? 0 : this._nUrgent;
+        this._addMessage(group, index);
     }
 
-    _removeNotification(notification) {
-        const message = this._notifications.get(notification);
-        this._removeMessage(message);
+    _removeNotificationSource(source) {
+        const group = this._notificationSources.get(source);
 
-        if (notification.urgency === MessageTray.Urgency.CRITICAL)
+        this._removeMessage(group);
+
+        if (group.hasUrgent)
             this._nUrgent--;
 
-        this._notifications.delete(notification);
+        this._notificationSources.delete(source);
     }
 
     get canClear() {
-        return this._messages.some(msg => msg.canClose());
+        return this.messages.some(msg => msg.canClose());
     }
 
     get empty() {
-        return this.get_first_child() === null;
+        return this.get_n_children() <= 1;
     }
 
-    get _messages() {
-        return this.get_children().map(item => item.child);
+    get expandedGroup() {
+        return this._expandedGroup;
     }
 
-    clear() {
-        const messages = this._messages.filter(msg => msg.canClose());
+    async _setExpandedGroup(group) {
+        const prevGroup = this._expandedGroup;
+
+        if (prevGroup === group)
+            return;
+
+        this._expandedGroup = group;
+
+        // Collapse the previously expanded group
+        if (prevGroup)
+            await prevGroup.collapse();
+
+        if (group) {
+            // Make sure that the overlay is the child below the expanded group
+            this.set_child_above_sibling(group.get_parent(), null);
+            this.set_child_below_sibling(this._overlay, group.get_parent());
+            this._overlay.show();
+            await group.expand();
+        } else {
+            this._overlay.hide();
+        }
+
+        this.notify('expanded-group');
+    }
+
+    async clear() {
+        const messages = this.messages.filter(msg => msg.canClose());
+
+        await this._setExpandedGroup(null);
 
         // If there are few messages, letting them all zoom out looks OK
         if (messages.length < 2) {
@@ -962,6 +1550,11 @@ export const MessageView = GObject.registerClass({
         }
     }
 
+    // Collapse expanded notification group
+    collapse() {
+        this._setExpandedGroup(null);
+    }
+
     _addMessage(message, index) {
         const wasEmpty = this.empty;
 
@@ -974,9 +1567,10 @@ export const MessageView = GObject.registerClass({
             scale_y: 0,
         });
 
-        message.connect('key-focus-in', () => ensureActorVisibleInScrollView(this.get_parent(), message));
+        message.connect('key-focus-in', () => ensureActorVisibleInScrollView(this.get_parent(), item));
 
-        this.insert_child_at_index(item, index);
+        this.add_child(item);
+        this.messages.splice(index, 0, message);
 
         if (wasEmpty) {
             this.notify('can-clear');
@@ -993,15 +1587,14 @@ export const MessageView = GObject.registerClass({
     }
 
     _removeMessage(message) {
-        const messages = this._messages;
         const item = message.get_parent();
         let nextMessage = null;
 
+        const index = this.messages.indexOf(message);
         if (message.has_key_focus()) {
-            const index = messages.indexOf(message);
             nextMessage =
-                messages[index + 1] ||
-                messages[index - 1] ||
+                this.messages[index + 1] ||
+                this.messages[index - 1] ||
                 this;
         }
 
@@ -1012,6 +1605,7 @@ export const MessageView = GObject.registerClass({
             duration,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
+                this.messages.splice(index, 1);
                 item.destroy();
 
                 if (this.empty) {
@@ -1025,7 +1619,7 @@ export const MessageView = GObject.registerClass({
     }
 
     _moveMessage(message, index) {
-        if (this.get_child_at_index(index)?.child === message)
+        if (this.messages[index] === message)
             return;
 
         const item = message.get_parent();
@@ -1037,7 +1631,12 @@ export const MessageView = GObject.registerClass({
             duration,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
-                this.set_child_at_index(item, index);
+                const oldIndex = this.messages.indexOf(message);
+                // We need to trigger a relayout
+                this.messages.splice(oldIndex, 1);
+                this.remove_child(item);
+                this.messages.splice(index, 0, message);
+                this.add_child(item);
                 item.ease({
                     scale_x: 1,
                     scale_y: 1,

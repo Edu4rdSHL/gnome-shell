@@ -62,6 +62,30 @@
   }
 }
 
+// message notification group
+.message-notification-group {
+  spacing: $base_padding * 2;
+
+  .message-group-header {
+    padding: $base_padding;
+    .message-group-title {
+      @extend %title_2;
+      margin: 0 $base_margin;
+    }
+  }
+
+  // close button
+  .message-collapse-button {
+    @extend .icon-button;
+    color: $fg_color;
+    background-color: transparentize($fg_color, 0.8);
+    padding: 4px !important;
+    border: 4px transparent solid;
+    &:hover {background-color: transparentize($fg_color, 0.7);}
+    &:active {background-color: transparentize($fg_color, 0.8);}
+  }
+}
+
 // message bubbles
 .message {
   @extend %card;
