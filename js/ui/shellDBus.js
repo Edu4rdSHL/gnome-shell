@@ -412,6 +412,16 @@ class GnomeShellExtensions {
                 new GLib.Variant('b', this._userExtensionsEnabled));
         });
 
+        this._automaticUpdates = this.AutomaticUpdates;
+        global.settings.connect('changed::automatic-extension-updates', () => {
+            if (this._automaticUpdates === this.AutomaticUpdates)
+                return;
+
+            this._automaticUpdates = this.AutomaticUpdates;
+            this._dbusImpl.emit_property_changed('AutomaticUpdates',
+                new GLib.Variant('b', this._automaticUpdates));
+        });
+
         Main.extensionManager.connect('extension-state-changed',
             this._extensionStateChanged.bind(this));
     }
@@ -478,6 +488,14 @@ class GnomeShellExtensions {
 
     get ShellVersion() {
         return Config.PACKAGE_VERSION;
+    }
+
+    get AutomaticUpdates() {
+        return global.settings.get_boolean('automatic-extension-updates');
+    }
+
+    set AutomaticUpdates(enable) {
+        global.settings.set_boolean('automatic-extension-updates', enable);
     }
 
     get UserExtensionsEnabled() {

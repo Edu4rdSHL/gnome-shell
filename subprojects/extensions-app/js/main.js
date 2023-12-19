@@ -54,7 +54,8 @@ class Application extends Adw.Application {
     }
 
     vfunc_activate() {
-        this._shellProxy.CheckForUpdatesAsync().catch(logError);
+        if (this._shellProxy.AutomaticUpdates)
+            this._shellProxy.CheckForUpdatesAsync().catch(logError);
         this._window.present();
     }
 
@@ -104,6 +105,15 @@ var ExtensionsWindow = GObject.registerClass({
 
         this.add_action_entries(
             [{
+                name: 'automatic-updates',
+                state: 'false',
+                change_state: (a, state) => {
+                    this._shellProxy.AutomaticUpdates = state.get_boolean();
+                },
+            }, {
+                name: 'check-updates',
+                activate: () => this._requestUpdatesCheck(),
+            }, {
                 name: 'show-about',
                 activate: () => this._showAbout(),
             }, {
@@ -154,9 +164,20 @@ var ExtensionsWindow = GObject.registerClass({
         this._shellProxy.connectSignal('ExtensionStateChanged',
             this._onExtensionStateChanged.bind(this));
 
-        this._shellProxy.connect('g-properties-changed',
-            this._onUserExtensionsEnabledChanged.bind(this));
+        this._shellProxy.connect('g-properties-changed', (p, properties) => {
+            for (const prop in properties.deepUnpack()) {
+                switch (prop) {
+                case 'UserExtensionsEnabled':
+                    this._onUserExtensionsEnabledChanged();
+                    break;
+                case 'AutomaticUpdates':
+                    this._onAutomaticUpdatesChanged();
+                    break;
+                }
+            }
+        });
         this._onUserExtensionsEnabledChanged();
+        this._onAutomaticUpdatesChanged();
 
         this._scanExtensions();
     }
@@ -199,6 +220,10 @@ var ExtensionsWindow = GObject.registerClass({
         this._shellProxy.OpenExtensionPrefsAsync(uuid,
             this._exportedHandle,
             {modal: new GLib.Variant('b', true)}).catch(logError);
+    }
+
+    _requestUpdatesCheck() {
+        this._shellProxy.CheckForUpdatesAsync().catch(logError);
     }
 
     _showAbout() {
@@ -260,6 +285,13 @@ var ExtensionsWindow = GObject.registerClass({
         let action = this.lookup_action('user-extensions-enabled');
         action.set_state(
             new GLib.Variant('b', this._shellProxy.UserExtensionsEnabled));
+    }
+
+    _onAutomaticUpdatesChanged() {
+        const action = this.lookup_action('automatic-updates');
+        action.set_enabled(this._shellProxy.AutomaticUpdates !== null);
+        action.set_state(
+            new GLib.Variant('b', this._shellProxy.AutomaticUpdates));
     }
 
     _onExtensionStateChanged(proxy, senderName, [uuid, newState]) {
@@ -357,16 +389,16 @@ var ExtensionRow = GObject.registerClass({
     GTypeName: 'ExtensionRow',
     Template: 'resource:///org/gnome/Extensions/ui/extension-row.ui',
     InternalChildren: [
-        'nameLabel',
+        'detailsPopover',
         'descriptionLabel',
         'versionLabel',
         'errorLabel',
-        'errorIcon',
-        'updatesIcon',
+        'errorButton',
+        'updatesButton',
         'switch',
         'actionsBox',
     ],
-}, class ExtensionRow extends Gtk.ListBoxRow {
+}, class ExtensionRow extends Adw.ActionRow {
     _init(extension) {
         super._init();
 
@@ -384,7 +416,10 @@ var ExtensionRow = GObject.registerClass({
             name: 'show-prefs',
             enabled: this.hasPrefs,
         });
-        action.connect('activate', () => this.get_root().openPrefs(this.uuid));
+        action.connect('activate', () => {
+            this._detailsPopover.popdown();
+            this.get_root().openPrefs(this.uuid);
+        });
         this._actionGroup.add_action(action);
 
         action = new Gio.SimpleAction({
@@ -392,6 +427,7 @@ var ExtensionRow = GObject.registerClass({
             enabled: this.url !== '',
         });
         action.connect('activate', () => {
+            this._detailsPopover.popdown();
             Gio.AppInfo.launch_default_for_uri(
                 this.url, this.get_display().get_app_launch_context());
         });
@@ -401,7 +437,10 @@ var ExtensionRow = GObject.registerClass({
             name: 'uninstall',
             enabled: this.type === ExtensionType.PER_USER,
         });
-        action.connect('activate', () => this.get_root().uninstall(this.uuid));
+        action.connect('activate', () => {
+            this._detailsPopover.popdown();
+            this.get_root().uninstall(this.uuid);
+        });
         this._actionGroup.add_action(action);
 
         action = new Gio.SimpleAction({
@@ -417,7 +456,7 @@ var ExtensionRow = GObject.registerClass({
         });
         this._actionGroup.add_action(action);
 
-        this._nameLabel.label = this.name;
+        this.title = this.name;
 
         const desc = this._extension.metadata.description.split('\n')[0];
         this._descriptionLabel.label = desc;
@@ -434,10 +473,6 @@ var ExtensionRow = GObject.registerClass({
                 this._updateState();
             });
         this._updateState();
-    }
-
-    vfunc_activate() {
-        this._switch.mnemonic_activate(false);
     }
 
     get uuid() {
@@ -482,11 +517,24 @@ var ExtensionRow = GObject.registerClass({
         if (!this.hasError)
             return '';
 
-        if (this._extension.state === ExtensionState.OUT_OF_DATE)
-            return _('The extension is incompatible with the current GNOME version');
+        if (this._extension.state === ExtensionState.OUT_OF_DATE) {
+            const {ShellVersion: shellVersion} = this._app.shellProxy;
+            return this.version !== ''
+                ? _('The installed version of this extension (%s) is incompatible with the current version of GNOME (%s). The extension has been disabled.').format(this.version, shellVersion)
+                : _('The installed version of this extension is incompatible with the current version of GNOME (%s). The extension has been disabled.').format(shellVersion);
+        }
 
-        return this._extension.error
-            ? this._extension.error : _('The extension had an error');
+        const message = [
+            _('An error has occurred in this extension. This could cause issues elsewhere in the system. It is recommended to turn the extension off until the error is resolved.'),
+        ];
+
+        if (this._extension.error) {
+            message.push(
+                // translators: Details for an extension error
+                _('Error details:'), this._extension.error);
+        }
+
+        return message.join('\n\n');
     }
 
     get keywords() {
@@ -503,15 +551,11 @@ var ExtensionRow = GObject.registerClass({
         if (!action.enabled)
             this._switch.active = state;
 
-        this._updatesIcon.visible = this.hasUpdate;
-        this._errorIcon.visible = this.hasError;
-
-        this._descriptionLabel.visible = !this.hasError;
-
+        this._updatesButton.visible = this.hasUpdate;
+        this._errorButton.visible = this.hasError;
         this._errorLabel.label = this.error;
-        this._errorLabel.visible = this.error !== '';
 
-        this._versionLabel.label = this.version.toString();
+        this._versionLabel.label = _('Version %s').format(this.version.toString());
         this._versionLabel.visible = this.version !== '';
     }
 

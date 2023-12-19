@@ -69,11 +69,11 @@ export class ExtensionManager extends Signals.EventEmitter {
 
         this._installExtensionUpdates();
         this._sessionUpdated().then(() => {
-            ExtensionDownloader.checkForUpdates();
+            this._checkForUpdates();
         });
 
         GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, UPDATE_CHECK_TIMEOUT, () => {
-            ExtensionDownloader.checkForUpdates();
+            this._checkForUpdates();
 
             return GLib.SOURCE_CONTINUE;
         });
@@ -669,7 +669,7 @@ export class ExtensionManager extends Signals.EventEmitter {
 
         this._updateInProgress = true;
 
-        await ExtensionDownloader.checkForUpdates();
+        await this._checkForUpdates();
         this._installExtensionUpdates();
 
         this._updatedUUIDS.map(uuid => this.lookup(uuid)).forEach(
@@ -677,6 +677,12 @@ export class ExtensionManager extends Signals.EventEmitter {
         this._updatedUUIDS = [];
 
         this._updateInProgress = false;
+    }
+
+    async _checkForUpdates() {
+        if (!global.settings.get_boolean('automatic-extension-updates'))
+            return;
+        await ExtensionDownloader.checkForUpdates();
     }
 
     _installExtensionUpdates() {

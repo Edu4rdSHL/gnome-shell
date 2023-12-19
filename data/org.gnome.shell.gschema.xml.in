@@ -49,6 +49,13 @@
         load all extensions regardless of the versions they claim to support.
       </description>
     </key>
+    <key name="automatic-extension-updates" type="b">
+      <default>true</default>
+      <summary>Automatic extension updates</summary>
+      <description>
+        Enable automatic extension updates.
+      </description>
+    </key>
     <key name="favorite-apps" type="as">
       <default>[ 'org.gnome.Epiphany.desktop', 'org.gnome.Calendar.desktop', 'org.gnome.Music.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop' ]</default>
       <summary>List of desktop file IDs for favorite applications</summary>
