@@ -317,6 +317,11 @@ export class ExtensionManager extends Signals.EventEmitter {
         return true;
     }
 
+    extensionShouldBeEnabled(uuid) {
+        return this._enabledExtensions.includes(uuid) &&
+            this._extensionSupportsSessionMode(uuid);
+    }
+
     notifyExtensionUpdate(uuid) {
         if (this._updateInProgress) {
             this._updatedUUIDS.push(uuid);
@@ -451,8 +456,7 @@ export class ExtensionManager extends Signals.EventEmitter {
             this.logExtensionError(extension.uuid, new Error(
                 'A different version was loaded previously. You need to log out for changes to take effect.'));
         } else {
-            let enabled = this._enabledExtensions.includes(extension.uuid) &&
-                          this._extensionSupportsSessionMode(extension.uuid);
+            let enabled = this.extensionShouldBeEnabled(extension.uuid);
             if (enabled) {
                 if (!await this._callExtensionInit(extension.uuid))
                     return;
@@ -596,12 +600,14 @@ export class ExtensionManager extends Signals.EventEmitter {
     }
 
     async _onEnabledExtensionsChanged() {
-        let newEnabledExtensions = this._getEnabledExtensions();
+        const newEnabledExtensions = this._getEnabledExtensions();
+        const oldEnabledExtensions = this._enabledExtensions.slice();
+        this._enabledExtensions = newEnabledExtensions;
 
         // Find and enable all the newly enabled extensions: UUIDs found in the
         // new setting, but not in the old one.
         const extensionsToEnable = newEnabledExtensions
-            .filter(uuid => !this._enabledExtensions.includes(uuid) &&
+            .filter(uuid => !oldEnabledExtensions.includes(uuid) &&
                              this._extensionSupportsSessionMode(uuid));
         for (const uuid of extensionsToEnable) {
             // eslint-disable-next-line no-await-in-loop
@@ -620,8 +626,6 @@ export class ExtensionManager extends Signals.EventEmitter {
             // eslint-disable-next-line no-await-in-loop
             await this._callExtensionDisable(uuid);
         }
-
-        this._enabledExtensions = newEnabledExtensions;
     }
 
     _onSettingsWritableChanged() {
