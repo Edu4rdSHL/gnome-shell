@@ -34,6 +34,8 @@ export const InputMethod = GObject.registerClass({
         this._preeditAnchor = 0;
         this._preeditVisible = false;
         this._hidePanelId = 0;
+        this._surroundingText = null;
+        this._surroundingTextCursor = null;
         this.terminalMode = false;
         this._ibus = IBus.Bus.new_async();
         this._ibus.connect('connected', this._onConnected.bind(this));
@@ -54,7 +56,10 @@ export const InputMethod = GObject.registerClass({
     }
 
     _updateCapabilities() {
-        let caps = IBus.Capabilite.PREEDIT_TEXT | IBus.Capabilite.FOCUS | IBus.Capabilite.SURROUNDING_TEXT;
+        let caps = IBus.Capabilite.PREEDIT_TEXT | IBus.Capabilite.FOCUS;
+
+        if (this._surroundingText)
+            caps |= IBus.Capabilite.SURROUNDING_TEXT;
 
         if (Main.keyboard.visible)
             caps |= IBus.Capabilite.OSK;
@@ -245,6 +250,10 @@ export const InputMethod = GObject.registerClass({
     }
 
     vfunc_set_surrounding(text, cursor, anchor) {
+        const updateCapabilities =
+            this._surroundingText === null !==
+            text === null;
+
         this._surroundingText = text;
         this._surroundingTextCursor = cursor;
         this.emit('surrounding-text-set');
@@ -254,6 +263,9 @@ export const InputMethod = GObject.registerClass({
 
         let ibusText = IBus.Text.new_from_string(text);
         this._context.set_surrounding_text(ibusText, cursor, anchor);
+
+        if (updateCapabilities)
+            this._updateCapabilities();
     }
 
     vfunc_update_content_hints(hints) {
