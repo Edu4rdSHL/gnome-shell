@@ -983,6 +983,35 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
             useContentSize: false,
         });
 
+        const desktopWindows = global.get_window_actors().filter(a =>
+            a.meta_window.get_window_type() === Meta.WindowType.DESKTOP);
+
+        if (desktopWindows.length) {
+            const desktopLayer = new Clutter.Actor({
+                layout_manager: new DesktopBackgroundLayout(),
+                clip_to_allocation: true,
+            });
+
+            for (let windowActor of desktopWindows) {
+                const clone = new Clutter.Clone({
+                    source: windowActor,
+                });
+
+                desktopLayer.add_child(clone);
+
+                windowActor.connectObject('destroy', () => {
+                    clone.destroy();
+                }, this);
+            }
+
+            const offset = 0;
+            const syncAll = Clutter.BindConstraint.new(this._bgManager.backgroundActor,
+                Clutter.BindCoordinate.ALL, offset);
+            desktopLayer.add_constraint(syncAll);
+            this._backgroundGroup.insert_child_above(desktopLayer,
+                this._bgManager.backgroundActor);
+        }
+
         this._bgManager.connect('changed', () => {
             this._updateRoundedClipBounds();
             this._updateBorderRadius();
@@ -1025,6 +1054,36 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
         if (this._bgManager) {
             this._bgManager.destroy();
             this._bgManager = null;
+        }
+    }
+});
+
+const DesktopBackgroundLayout = GObject.registerClass(
+class DesktopBackgroundLayout extends Clutter.LayoutManager {
+    vfunc_get_preferred_width() {
+        return [0, 0];
+    }
+
+    vfunc_get_preferred_height() {
+        return [0, 0];
+    }
+
+    vfunc_allocate(container, box) {
+        const monitorIndex = Main.layoutManager.findIndexForActor(container);
+        const monitor = Main.layoutManager.monitors[monitorIndex];
+        const monitorHscale = box.get_width() / monitor.width;
+        const monitorVscale = box.get_height() / monitor.height;
+
+        for (const child of container) {
+            const childBox = new Clutter.ActorBox();
+            const frameRect = child.get_source()?.metaWindow.get_frame_rect();
+            childBox.set_size(
+                Math.round(Math.min(frameRect.width, monitor.width) * monitorHscale),
+                Math.round(Math.min(frameRect.height, monitor.height) * monitorVscale));
+            childBox.set_origin(
+                Math.round((frameRect.x - monitor.x) * monitorHscale),
+                Math.round((frameRect.y - monitor.y) * monitorVscale));
+            child.allocate(childBox);
         }
     }
 });
