@@ -204,7 +204,7 @@ export const AppGrid = GObject.registerClass({
 const BaseAppViewGridLayout = GObject.registerClass(
 class BaseAppViewGridLayout extends Clutter.BinLayout {
     _init(grid, scrollView, nextPageIndicator, nextPageArrow,
-        previousPageIndicator, previousPageArrow) {
+        previousPageIndicator, previousPageArrow, pageIndicators) {
         if (!(grid instanceof AppGrid))
             throw new Error('Grid must be an AppGrid subclass');
 
@@ -216,6 +216,7 @@ class BaseAppViewGridLayout extends Clutter.BinLayout {
         this._previousPageArrow = previousPageArrow;
         this._nextPageIndicator = nextPageIndicator;
         this._nextPageArrow = nextPageArrow;
+        this._pageIndicators = pageIndicators;
 
         grid.connect('pages-changed', () => this._syncPageIndicatorsVisibility());
 
@@ -415,6 +416,13 @@ class BaseAppViewGridLayout extends Clutter.BinLayout {
         this._syncPageIndicators();
     }
 
+    vfunc_get_preferred_height(_container, forWidth) {
+        const [gridMinH, gridNatH] = this._grid.get_preferred_height(forWidth);
+        const [, pageIndicatorsH] = this._pageIndicators.get_preferred_height(-1);
+
+        return [gridNatH + pageIndicatorsH, gridNatH + pageIndicatorsH];
+    }
+
     vfunc_allocate(container, box) {
         const ltr = container.get_text_direction() !== Clutter.TextDirection.RTL;
         const indicatorsWidth = this._getIndicatorsWidth(box);
@@ -424,6 +432,10 @@ class BaseAppViewGridLayout extends Clutter.BinLayout {
             right: indicatorsWidth,
         });
 
+        this._pageWidth = box.get_width();
+
+        const [, pageIndicatorsHeight] = this._pageIndicators.get_preferred_height(-1);
+        box.y2 -= pageIndicatorsHeight;
         this._scrollView.allocate(box);
 
         const leftBox = box.copy();
@@ -439,7 +451,9 @@ class BaseAppViewGridLayout extends Clutter.BinLayout {
         this._nextPageArrow.allocate_align_fill(ltr ? rightBox : leftBox,
             0.5, 0.5, false, false);
 
-        this._pageWidth = box.get_width();
+        box.y1 = box.y2;
+        box.y2 = box.y1 + pageIndicatorsHeight;
+        this._pageIndicators.allocate(box);
     }
 
     goToPage(page, animate = true) {
@@ -601,13 +615,15 @@ var BaseAppView = GObject.registerClass({
         scrollContainer.add_child(this._nextPageIndicator);
         scrollContainer.add_child(this._nextPageArrow);
         scrollContainer.add_child(this._prevPageArrow);
+        scrollContainer.add_child(this._pageIndicators);
         scrollContainer.layoutManager = new BaseAppViewGridLayout(
             this._grid,
             this._scrollView,
             this._nextPageIndicator,
             this._nextPageArrow,
             this._prevPageIndicator,
-            this._prevPageArrow);
+            this._prevPageArrow,
+            this._pageIndicators);
         this._appGridLayout = scrollContainer.layoutManager;
         scrollContainer._delegate = this;
 
@@ -617,7 +633,6 @@ var BaseAppView = GObject.registerClass({
             y_expand: true,
         });
         this._box.add_child(scrollContainer);
-        this._box.add_child(this._pageIndicators);
 
         // Swipe
         this._swipeTracker = new SwipeTracker.SwipeTracker(this._scrollView,
