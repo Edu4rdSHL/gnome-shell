@@ -39,7 +39,7 @@ function primaryModifier(mask) {
 export const SwitcherPopup = GObject.registerClass({
     GTypeFlags: GObject.TypeFlags.ABSTRACT,
 }, class SwitcherPopup extends St.Widget {
-    _init(items) {
+    _init(items, selectedItem) {
         super._init({
             style_class: 'switcher-popup',
             reactive: true,
@@ -49,7 +49,10 @@ export const SwitcherPopup = GObject.registerClass({
         this._switcherList = null;
 
         this._items = items || [];
-        this._selectedIndex = 0;
+        // If no selected item, select the first one, because many widget does
+        // not set selected item explicitly.
+        this._selectedIndex = this._items.includes(selectedItem) ?
+            this._items.indexOf(selectedItem) : 0;
 
         this.connect('destroy', this._onDestroy.bind(this));
 
@@ -97,12 +100,14 @@ export const SwitcherPopup = GObject.registerClass({
     }
 
     _initialSelection(backward, _binding) {
+        // Because now we accept a initial selected item, we cannot hard code
+        // first or last item here, just use selected index.
         if (backward)
-            this._select(this._items.length - 1);
+            this._select(this._previous());
         else if (this._items.length === 1)
             this._select(0);
         else
-            this._select(1);
+            this._select(this._next());
     }
 
     show(backward, binding, mask) {
