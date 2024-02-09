@@ -820,6 +820,7 @@ class NotificationMessage extends MessageList.Message {
         if (!this._buttonBox) {
             this._buttonBox = new St.BoxLayout({
                 x_expand: true,
+                x_align: Clutter.ActorAlign.END,
                 style_class: 'notification-buttons-bin',
             });
             this.setActionArea(this._buttonBox);
@@ -831,7 +832,6 @@ class NotificationMessage extends MessageList.Message {
 
         const button = new St.Button({
             style_class: 'notification-button',
-            x_expand: true,
             label: action.label,
         });
 
