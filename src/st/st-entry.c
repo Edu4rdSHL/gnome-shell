@@ -1497,6 +1497,9 @@ st_entry_set_hint_actor (StEntry      *entry,
 
   if (priv->hint_actor != NULL)
     {
+      if (st_widget_get_label_actor (ST_WIDGET (entry)) == priv->hint_actor)
+        st_widget_set_label_actor (ST_WIDGET (entry), NULL);
+
       clutter_actor_remove_child (CLUTTER_ACTOR (entry), priv->hint_actor);
       priv->hint_actor = NULL;
     }
@@ -1505,6 +1508,9 @@ st_entry_set_hint_actor (StEntry      *entry,
     {
       priv->hint_actor = hint_actor;
       clutter_actor_add_child (CLUTTER_ACTOR (entry), priv->hint_actor);
+
+      if (st_widget_get_label_actor (ST_WIDGET (entry)) == NULL && ST_IS_LABEL (hint_actor))
+        st_widget_set_label_actor (ST_WIDGET (entry), hint_actor);
     }
 
   st_entry_update_hint_visibility (entry);
