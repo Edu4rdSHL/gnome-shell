@@ -983,39 +983,13 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
             useContentSize: false,
         });
 
-        const desktopWindows = global.get_window_actors().filter(a =>
-            a.meta_window.get_window_type() === Meta.WindowType.DESKTOP);
-
-        if (desktopWindows.length) {
-            const desktopLayer = new Clutter.Actor({
-                layout_manager: new DesktopBackgroundLayout(),
-                clip_to_allocation: true,
-            });
-
-            for (let windowActor of desktopWindows) {
-                const clone = new Clutter.Clone({
-                    source: windowActor,
-                });
-
-                desktopLayer.add_child(clone);
-
-                windowActor.connectObject('destroy', () => {
-                    clone.destroy();
-                }, this);
-            }
-
-            const offset = 0;
-            const syncAll = Clutter.BindConstraint.new(this._bgManager.backgroundActor,
-                Clutter.BindCoordinate.ALL, offset);
-            desktopLayer.add_constraint(syncAll);
-            this._backgroundGroup.insert_child_above(desktopLayer,
-                this._bgManager.backgroundActor);
-        }
-
         this._bgManager.connect('changed', () => {
             this._updateRoundedClipBounds();
             this._updateBorderRadius();
         });
+
+        this._desktopWindows = new Map();
+        this._desktopLayer = null;
 
         global.display.connectObject('workareas-changed', () => {
             this._workarea = Main.layoutManager.getWorkAreaForMonitor(monitorIndex);
@@ -1027,6 +1001,46 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
         this._updateBorderRadius();
 
         this.connect('destroy', this._onDestroy.bind(this));
+    }
+
+    addDesktopClone(desktopWindow) {
+        if (this._desktopWindows.has(desktopWindow))
+            return;
+        if (!this._desktopLayer)
+            this._makeDesktopLayer();
+
+        const clone = new Clutter.Clone({
+            source: desktopWindow.get_compositor_private(),
+        });
+
+        this._desktopLayer.add_child(clone);
+
+        clone.connectObject('destroy', () => {
+            clone.destroy();
+        }, this);
+
+        this._desktopWindows.set(desktopWindow, clone);
+    }
+
+    removeDesktopClone(desktopWindow) {
+        if (this._desktopWindows.has(desktopWindow)) {
+            this._desktopWindows.get(desktopWindow)?.destroy();
+            this._desktopWindows.delete(desktopWindow);
+        }
+    }
+
+    _makeDesktopLayer() {
+        this._desktopLayer = new Clutter.Actor({
+            layout_manager: new DesktopBackgroundLayout(),
+            clip_to_allocation: true,
+        });
+
+        const offset = 0;
+        const syncAll = Clutter.BindConstraint.new(this._bgManager.backgroundActor,
+            Clutter.BindCoordinate.ALL, offset);
+        this._desktopLayer.add_constraint(syncAll);
+        this._backgroundGroup.insert_child_above(this._desktopLayer,
+            this._bgManager.backgroundActor);
     }
 
     _updateBorderRadius() {
@@ -1126,6 +1140,14 @@ class Workspace extends St.Widget {
         this.monitorIndex = monitorIndex;
         this._monitor = Main.layoutManager.monitors[this.monitorIndex];
 
+        this._skipTaskbarSignals = new Map();
+        this._desktopWindowsSignals = new Map();
+        this._windows = [];
+        this._layoutFrozenId = 0;
+
+        // DND requires this to be set
+        this._delegate = this;
+
         if (monitorIndex !== Main.layoutManager.primaryIndex)
             this.add_style_class_name('external-monitor');
 
@@ -1146,13 +1168,6 @@ class Workspace extends St.Widget {
 
         this.connect('style-changed', this._onStyleChanged.bind(this));
         this.connect('destroy', this._onDestroy.bind(this));
-
-        this._skipTaskbarSignals = new Map();
-        this._windows = [];
-        this._layoutFrozenId = 0;
-
-        // DND requires this to be set
-        this._delegate = this;
 
         // Track window changes, but let the window tracker process them first
         this.metaWorkspace?.connectObject(
@@ -1195,6 +1210,31 @@ class Workspace extends St.Widget {
 
     syncStacking(stackIndices) {
         this._container.layout_manager.syncStacking(stackIndices);
+    }
+
+    _addDesktopClone(metaWin) {
+        this._background.addDesktopClone(metaWin);
+    }
+
+    _removeDesktopClone(metaWin) {
+        this._background.removeDesktopClone(metaWin);
+    }
+
+    _addPropertyMonitoringSignals(metaWin) {
+        this._skipTaskbarSignals.set(metaWin,
+            metaWin.connect('notify::skip-taskbar', () => {
+                if (metaWin.skip_taskbar)
+                    this._doRemoveWindow(metaWin);
+                else
+                    this._doAddWindow(metaWin);
+            }));
+        this._desktopWindowsSignals.set(metaWin,
+            metaWin.connect('notify::window_type', () => {
+                if (metaWin.window_type !== Meta.WindowType.DESKTOP)
+                    this._removeDesktopClone(metaWin);
+                else
+                    this._addDesktopClone(metaWin);
+            }));
     }
 
     _doRemoveWindow(metaWin) {
@@ -1244,36 +1284,10 @@ class Workspace extends St.Widget {
     }
 
     _doAddWindow(metaWin) {
-        let win = metaWin.get_compositor_private();
-
-        if (!win) {
-            // Newly-created windows are added to a workspace before
-            // the compositor finds out about them...
-            let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                if (metaWin.get_compositor_private() &&
-                    metaWin.get_workspace() === this.metaWorkspace)
-                    this._doAddWindow(metaWin);
-                return GLib.SOURCE_REMOVE;
-            });
-            GLib.Source.set_name_by_id(id, '[gnome-shell] this._doAddWindow');
-            return;
-        }
-
         // We might have the window in our list already if it was on all workspaces and
         // now was moved to this workspace
         if (this.containsMetaWindow(metaWin))
             return;
-
-        if (!this._isMyWindow(metaWin))
-            return;
-
-        this._skipTaskbarSignals.set(metaWin,
-            metaWin.connect('notify::skip-taskbar', () => {
-                if (metaWin.skip_taskbar)
-                    this._doRemoveWindow(metaWin);
-                else
-                    this._doAddWindow(metaWin);
-            }));
 
         if (!this._isOverviewWindow(metaWin)) {
             if (metaWin.get_transient_for() == null)
@@ -1314,22 +1328,48 @@ class Workspace extends St.Widget {
     }
 
     _windowAdded(metaWorkspace, metaWin) {
-        if (!Main.overview.closing)
-            this._doAddWindow(metaWin);
+        let win = metaWin.get_compositor_private();
+
+        if (!win) {
+            // Newly-created windows are added to a workspace before
+            // the compositor finds out about them...
+            let id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                if (metaWin.get_compositor_private() &&
+                    metaWin.get_workspace() === this.metaWorkspace)
+                    this._windowAdded(metaWin);
+                return GLib.SOURCE_REMOVE;
+            });
+            GLib.Source.set_name_by_id(id, '[gnome-shell] this._windowAdded');
+            return;
+        }
+
+        if (!this._isMyWindow(metaWin))
+            return;
+
+        if (!Main.overview.closing) {
+            if (metaWin.windowType === Meta.WindowType.DESKTOP)
+                this._addDesktopClone(metaWin);
+            else
+                this._doAddWindow(metaWin);
+            this._addPropertyMonitoringSignals(metaWin);
+        }
     }
 
     _windowRemoved(metaWorkspace, metaWin) {
-        this._doRemoveWindow(metaWin);
+        if (this._isOverviewWindow(metaWin))
+            this._doRemoveWindow(metaWin);
+        else if (metaWin.windowType === Meta.WindowType.DESKTOP)
+            this._removeDesktopClone(metaWin);
     }
 
     _windowEnteredMonitor(metaDisplay, monitorIndex, metaWin) {
         if (monitorIndex === this.monitorIndex && !Main.overview.closing)
-            this._doAddWindow(metaWin);
+            this._windowAdded(metaWin);
     }
 
     _windowLeftMonitor(metaDisplay, monitorIndex, metaWin) {
         if (monitorIndex === this.monitorIndex)
-            this._doRemoveWindow(metaWin);
+            this._windowRemoved(metaWin);
     }
 
     // check for maximized windows on the workspace
@@ -1344,10 +1384,13 @@ class Workspace extends St.Widget {
         return false;
     }
 
-    _clearSkipTaskbarSignals() {
+    _clearPropertyMonitoringSignals() {
         for (const [metaWin, id] of this._skipTaskbarSignals)
             metaWin.disconnect(id);
         this._skipTaskbarSignals.clear();
+        for (const [metaWin, id] of this._desktopWindowsSignals)
+            metaWin.disconnect(id);
+        this._desktopWindowsSignals.clear();
     }
 
     prepareToLeaveOverview() {
@@ -1367,7 +1410,7 @@ class Workspace extends St.Widget {
     }
 
     _onDestroy() {
-        this._clearSkipTaskbarSignals();
+        this._clearPropertyMonitoringSignals();
 
         if (this._layoutFrozenId > 0) {
             GLib.source_remove(this._layoutFrozenId);
