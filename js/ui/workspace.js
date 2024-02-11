@@ -1220,24 +1220,7 @@ class Workspace extends St.Widget {
         this._background.removeDesktopClone(metaWin);
     }
 
-    _addPropertyMonitoringSignals(metaWin) {
-        this._skipTaskbarSignals.set(metaWin,
-            metaWin.connect('notify::skip-taskbar', () => {
-                if (metaWin.skip_taskbar)
-                    this._doRemoveWindow(metaWin);
-                else
-                    this._doAddWindow(metaWin);
-            }));
-        this._desktopWindowsSignals.set(metaWin,
-            metaWin.connect('notify::window_type', () => {
-                if (metaWin.window_type !== Meta.WindowType.DESKTOP)
-                    this._removeDesktopClone(metaWin);
-                else
-                    this._addDesktopClone(metaWin);
-            }));
-    }
-
-    _doRemoveWindow(metaWin) {
+    _removeAnimatedWindowClone(metaWin) {
         let clone = this._removeWindowClone(metaWin);
 
         if (!clone)
@@ -1283,7 +1266,7 @@ class Workspace extends St.Widget {
             '[gnome-shell] this._layoutFrozenId');
     }
 
-    _doAddWindow(metaWin) {
+    _addAnimatedWindowClone(metaWin) {
         // We might have the window in our list already if it was on all workspaces and
         // now was moved to this workspace
         if (this.containsMetaWindow(metaWin))
@@ -1327,7 +1310,7 @@ class Workspace extends St.Widget {
         }
     }
 
-    _windowAdded(metaWorkspace, metaWin) {
+    _doAddWindow(metaWin) {
         let win = metaWin.get_compositor_private();
 
         if (!win) {
@@ -1346,30 +1329,82 @@ class Workspace extends St.Widget {
         if (!this._isMyWindow(metaWin))
             return;
 
-        if (!Main.overview.closing) {
-            if (metaWin.windowType === Meta.WindowType.DESKTOP)
-                this._addDesktopClone(metaWin);
-            else
-                this._doAddWindow(metaWin);
-            this._addPropertyMonitoringSignals(metaWin);
-        }
+        if (!Main.overview.closing)
+            return;
+
+        if (metaWin.windowType === Meta.WindowType.DESKTOP)
+            this._addDesktopClone(metaWin);
+        else
+            this._addAnimatedWindowClone(metaWin);
+
+        this._addPropertyMonitoringSignals(metaWin);
+    }
+
+    _doRemoveWindow(metaWin) {
+        if (this._isOverviewWindow(metaWin))
+            this._removeAnimatedWindowClone(metaWin);
+        else if (metaWin.windowType === Meta.WindowType.DESKTOP)
+            this._removeDesktopClone(metaWin);
+        this._removePropertyMonitoringSignal(metaWin);
+    }
+
+    _windowAdded(metaWorkspace, metaWin) {
+        this._doAddWindow(metaWin);
     }
 
     _windowRemoved(metaWorkspace, metaWin) {
-        if (this._isOverviewWindow(metaWin))
-            this._doRemoveWindow(metaWin);
-        else if (metaWin.windowType === Meta.WindowType.DESKTOP)
-            this._removeDesktopClone(metaWin);
+        this._doRemoveWindow(metaWin);
     }
 
     _windowEnteredMonitor(metaDisplay, monitorIndex, metaWin) {
-        if (monitorIndex === this.monitorIndex && !Main.overview.closing)
-            this._windowAdded(metaWin);
+        if (monitorIndex === this.monitorIndex)
+            this._doAddWindow(metaWin);
     }
 
     _windowLeftMonitor(metaDisplay, monitorIndex, metaWin) {
         if (monitorIndex === this.monitorIndex)
-            this._windowRemoved(metaWin);
+            this._doRemoveWindow(metaWin);
+    }
+
+    _addPropertyMonitoringSignals(metaWin) {
+        if (!this._skipTaskbarSignals.has(metaWin)) {
+            this._skipTaskbarSignals.set(metaWin,
+                metaWin.connect('notify::skip-taskbar', () => {
+                    if (metaWin.skip_taskbar)
+                        this._removeAnimatedWindowClone(metaWin);
+                    else
+                        this._addAnimatedWindowClone(metaWin);
+                }));
+        }
+        if (!this._desktopWindowsSignals.has(metaWin)) {
+            this._desktopWindowsSignals.set(metaWin,
+                metaWin.connect('notify::window_type', () => {
+                    if (metaWin.window_type !== Meta.WindowType.DESKTOP)
+                        this._removeDesktopClone(metaWin);
+                    else
+                        this._addDesktopClone(metaWin);
+                }));
+        }
+    }
+
+    _clearPropertyMonitoringSignals() {
+        for (const [metaWin, id] of this._skipTaskbarSignals)
+            metaWin.disconnect(id);
+        this._skipTaskbarSignals.clear();
+        for (const [metaWin, id] of this._desktopWindowsSignals)
+            metaWin.disconnect(id);
+        this._desktopWindowsSignals.clear();
+    }
+
+    _removePropertyMonitoringSignal(metaWin) {
+        if (this._skipTaskbarSignals.has(metaWin)) {
+            metaWin.disconnect(this._skipTaskbarSignals.get(metaWin));
+            this._skipTaskbarSignals.delete(metaWin);
+        }
+        if (this._desktopWindowsSignals.has(metaWin)) {
+            metaWin.disconnect(this._desktopWindowsSignals.get(metaWin));
+            this._desktopWindowsSignals.delete(metaWin);
+        }
     }
 
     // check for maximized windows on the workspace
@@ -1384,17 +1419,8 @@ class Workspace extends St.Widget {
         return false;
     }
 
-    _clearPropertyMonitoringSignals() {
-        for (const [metaWin, id] of this._skipTaskbarSignals)
-            metaWin.disconnect(id);
-        this._skipTaskbarSignals.clear();
-        for (const [metaWin, id] of this._desktopWindowsSignals)
-            metaWin.disconnect(id);
-        this._desktopWindowsSignals.clear();
-    }
-
     prepareToLeaveOverview() {
-        this._clearSkipTaskbarSignals();
+        this._clearPropertyMonitoringSignals();
 
         for (let i = 0; i < this._windows.length; i++)
             this._windows[i].remove_all_transitions();
