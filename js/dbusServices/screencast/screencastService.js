@@ -29,6 +29,27 @@ const DEFAULT_DRAW_CURSOR = true;
 
 const PIPELINES = [
     {
+        fileExtension: 'webm',
+        pipelineString:
+            'capsfilter caps=video/x-raw(memory:DMABuf),max-framerate=%F/1 ! \
+             glupload ! glcolorconvert ! gldownload ! \
+             queue ! \
+             av1enc usage-profile=realtime ! \
+             queue ! \
+             webmmux',
+    },
+    {
+        fileExtension: 'webm',
+        pipelineString:
+            'capsfilter caps=video/x-raw,max-framerate=%F/1 ! \
+             videoconvert chroma-mode=none dither=none matrix-mode=output-only n-threads=%T ! \
+             queue ! \
+             av1enc usage-profile=realtime ! \
+             queue ! \
+             webmmux',
+    },
+    {
+        fileExtension: 'webm',
         pipelineString:
             'capsfilter caps=video/x-raw(memory:DMABuf),max-framerate=%F/1 ! \
              glupload ! glcolorconvert ! gldownload ! \
@@ -38,6 +59,7 @@ const PIPELINES = [
              webmmux',
     },
     {
+        fileExtension: 'webm',
         pipelineString:
             'capsfilter caps=video/x-raw,max-framerate=%F/1 ! \
              videoconvert chroma-mode=none dither=none matrix-mode=output-only n-threads=%T ! \
@@ -76,7 +98,7 @@ class Recorder extends Signals.EventEmitter {
         this._y = y;
         this._width = width;
         this._height = height;
-        this._filePath = filePath;
+        this._filePathWithoutExtension = filePath;
 
         try {
             const dir = Gio.File.new_for_path(filePath).get_parent();
@@ -303,7 +325,7 @@ class Recorder extends Signals.EventEmitter {
                 newState === Gst.State.PLAYING) {
                 this._pipelineState = PipelineState.PLAYING;
 
-                this._startRequest.resolve();
+                this._startRequest.resolve(this._filePath);
                 delete this._startRequest;
             }
 
@@ -383,8 +405,9 @@ class Recorder extends Signals.EventEmitter {
     }
 
     _createPipeline(nodeId, pipelineConfig, framerate) {
-        const {pipelineString} = pipelineConfig;
+        const {fileExtension, pipelineString} = pipelineConfig;
         const finalPipelineString = this._substituteVariables(pipelineString, framerate);
+        this._filePath = `${this._filePathWithoutExtension}.${fileExtension}`;
 
         const fullPipeline = `
             pipewiresrc path=${nodeId}
@@ -565,8 +588,8 @@ export const ScreencastService = class extends ServiceImplementation {
         this._addRecorder(sender, recorder);
 
         try {
-            await recorder.startRecording();
-            returnValue = [true, filePath];
+            const pathWithExtension = await recorder.startRecording();
+            returnValue = [true, pathWithExtension];
         } catch (error) {
             log(`Failed to start recorder: ${error.message}`);
             this._removeRecorder(sender);
@@ -620,8 +643,8 @@ export const ScreencastService = class extends ServiceImplementation {
         this._addRecorder(sender, recorder);
 
         try {
-            await recorder.startRecording();
-            returnValue = [true, filePath];
+            const pathWithExtension = await recorder.startRecording();
+            returnValue = [true, pathWithExtension];
         } catch (error) {
             log(`Failed to start recorder: ${error.message}`);
             this._removeRecorder(sender);
