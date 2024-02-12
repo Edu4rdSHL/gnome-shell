@@ -584,27 +584,6 @@ export const Notification = GObject.registerClass({
 });
 SignalTracker.registerDestroyableType(Notification);
 
-export const NotificationBanner = GObject.registerClass({
-    Signals: {
-        'done-displaying': {},
-    },
-}, class NotificationBanner extends Calendar.NotificationMessage {
-    _init(notification) {
-        super._init(notification);
-
-        this.can_focus = false;
-        this.add_style_class_name('notification-banner');
-
-        this.notification.connectObject('activated', () => {
-            // We hide all types of notifications once the user clicks on
-            // them because the common outcome of clicking should be the
-            // relevant window being brought forward and the user's
-            // attention switching to the window.
-            this.emit('done-displaying');
-        }, this);
-    }
-});
-
 export const Source = GObject.registerClass({
     Properties: {
         'count': GObject.ParamSpec.int(
@@ -1072,12 +1051,6 @@ export const MessageTray = GObject.registerClass({
         return GLib.SOURCE_REMOVE;
     }
 
-    _escapeTray() {
-        this._pointerInNotification = false;
-        this._updateNotificationTimeout(0);
-        this._updateState();
-    }
-
     // All of the logic for what happens when occurs here; the various
     // event handlers merely update variables such as
     // 'this._pointerInNotification', 'this._traySummoned', etc, and
@@ -1160,8 +1133,9 @@ export const MessageTray = GObject.registerClass({
             this.idleMonitor.add_user_active_watch(this._onIdleMonitorBecameActive.bind(this));
         }
 
-        this._banner = this._notification.createBanner();
-        this._banner.connectObject('done-displaying', this._escapeTray.bind(this), this);
+        this._banner = new Calendar.NotificationMessage(this._notification.source, this._notification);
+        this._banner.can_focus = false;
+        this._banner.add_style_class_name('notification-banner');
 
         this._bannerBin.add_child(this._banner);
 
