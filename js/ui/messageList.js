@@ -372,6 +372,15 @@ class MessageHeader extends St.BoxLayout {
         });
         this.add_child(headerContent);
 
+        this.expandButton = new St.Button({
+            style_class: 'message-expand-button',
+            accessible_name: _('Expand notification'),
+            icon_name: 'notification-expand-symbolic',
+            y_align: Clutter.ActorAlign.CENTER,
+            pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
+        });
+        this.add_child(this.expandButton);
+
         this.closeButton = new St.Button({
             style_class: 'message-close-button',
             icon_name: 'window-close-symbolic',
@@ -438,7 +447,7 @@ export const Message = GObject.registerClass({
             accessible_role: Atk.Role.NOTIFICATION,
             can_focus: true,
             x_expand: true,
-            y_expand: true,
+            y_expand: false,
         });
 
         this.expanded = false;
@@ -501,6 +510,24 @@ export const Message = GObject.registerClass({
 
         this._header.closeButton.connect('clicked', this.close.bind(this));
         this._header.closeButton.visible = this.canClose();
+
+        this._header.expandButton.connect('clicked', () => {
+            if (this.expanded)
+                this.unexpand(true);
+            else
+                this.expand(true);
+        });
+        this._bodyLabel.connect('notify::allocation', this._updateExpandButton.bind(this));
+        this._updateExpandButton();
+    }
+
+    _updateExpandButton() {
+        if (!this._bodyLabel.has_allocation())
+            return;
+        const layout = this._bodyLabel.clutter_text.get_layout();
+        const canExpand = layout.is_ellipsized() || this.expanded || !!this._actionBin.child;
+        // Use opacity to not trigger a relayout
+        this._header.expandButton.opacity = canExpand ? 255 : 0;
     }
 
     close() {
@@ -569,6 +596,7 @@ export const Message = GObject.registerClass({
     setActionArea(actor) {
         this._actionBin.child = actor;
         this._actionBin.visible = actor && this.expanded;
+        this._updateExpandButton();
     }
 
     addMediaControl(iconName, callback) {
@@ -599,6 +627,11 @@ export const Message = GObject.registerClass({
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
 
+        this._header.expandButton.ease({
+            rotation_angle_z: 180,
+            duration,
+        });
+
         this.emit('expanded');
     }
 
@@ -617,6 +650,11 @@ export const Message = GObject.registerClass({
                 this._actionBin.hide();
                 this.expanded = false;
             },
+        });
+
+        this._header.expandButton.ease({
+            rotation_angle_z: 0,
+            duration,
         });
 
         this.emit('unexpanded');
