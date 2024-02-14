@@ -2092,8 +2092,8 @@ export const ScreenshotUI = GObject.registerClass({
             title,
             // Translators: notification body when a screencast was recorded.
             body: this._screencastPath ? _('Click here to view the video.') : '',
+            isTransient: true,
         });
-        notification.setTransient(true);
 
         if (this._screencastPath) {
             const file = Gio.file_new_for_path(this._screencastPath);
@@ -2328,6 +2328,7 @@ function _storeScreenshot(bytes, pixbuf) {
         // Translators: notification source name.
         title: _('Screenshot'),
         iconName: 'screenshot-recorded-symbolic',
+        isTransient: true,
     });
     const notification = new MessageTray.Notification({
         source,
@@ -2363,7 +2364,6 @@ function _storeScreenshot(bytes, pixbuf) {
         });
     }
 
-    notification.setTransient(true);
     Main.messageTray.add(source);
     source.addNotification(notification);
 
