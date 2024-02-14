@@ -351,30 +351,6 @@ class Action extends GObject.Object {
 });
 
 export class Notification extends GObject.Object {
-    _init(source, title, banner, params) {
-        super._init({source});
-
-        this.title = title;
-        this.urgency = Urgency.NORMAL;
-        // 'transient' is a reserved keyword in JS, so we have to use an alternate variable name
-        this.isTransient = false;
-        this.privacyScope = PrivacyScope.USER;
-        this.forFeedback = false;
-        this.body = null;
-        this.useMarkup = false;
-        this.sound = null;
-        this._soundPlayed = false;
-        this.actions = [];
-        this.setResident(false);
-
-        // If called with only one argument we assume the caller
-        // will call .update() later on. This is the case of
-        // NotificationDaemon, which wants to use the same code
-        // for new and updated notifications
-        if (arguments.length !== 1)
-            this.update(title, banner, params);
-    }
-
     // update:
     // @title: the new title
     // @banner: the new banner
@@ -413,6 +389,10 @@ export class Notification extends GObject.Object {
         }
 
         this.emit('updated', params.clear);
+    }
+
+    get actions() {
+        return this._actions ?? [];
     }
 
     get iconName() {
@@ -454,6 +434,9 @@ export class Notification extends GObject.Object {
     // @label: the label for the action's button
     // @callback: the callback for the action
     addAction(label, callback) {
+        if (!this._actions)
+            this._actions = [];
+
         const action = new Action(label, () => {
             callback();
 
@@ -466,18 +449,18 @@ export class Notification extends GObject.Object {
 
             this.destroy();
         });
-        this.actions.push(action);
+        this._actions.push(action);
         this.emit('action-added', action);
     }
 
     clearActions() {
-        if (this.actions.length === 0)
+        if (!this._actions || this._actions.length === 0)
             return;
 
-        this.actions.forEach(action => {
+        this._actions.forEach(action => {
             this.emit('action-removed', action);
         });
-        this.actions = [];
+        this._actions = [];
     }
 
     setUrgency(urgency) {
