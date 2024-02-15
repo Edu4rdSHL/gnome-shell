@@ -1300,6 +1300,66 @@ apply_discrete_gpu_env (GAppLaunchContext *context,
     }
 
   num_children = g_variant_n_children (variant);
+
+  // Check if the Default GPU is Discrete
+  for (i = 0; i < num_children; i++)
+    {
+      g_autoptr(GVariant) gpu = NULL;
+      g_autoptr(GVariant) env = NULL;
+      g_autoptr(GVariant) default_variant = NULL;
+      g_autoptr(GVariant) discrete_variant = NULL;
+      g_autofree const char **env_s = NULL;
+
+      gpu = g_variant_get_child_value (variant, i);
+      if (!gpu ||
+          !g_variant_is_of_type (gpu, G_VARIANT_TYPE ("a{s*}")))
+        continue;
+
+      /* Skip over non-default GPUs */
+      default_variant = g_variant_lookup_value (gpu, "Default", NULL);
+      if (!default_variant || !g_variant_get_boolean (default_variant))
+        continue;
+
+      /* break out if default GPU is not discrete */
+      discrete_variant = g_variant_lookup_value (gpu, "Discrete", NULL);
+      if (!discrete_variant || !g_variant_get_boolean (discrete_variant))
+        break;
+
+      // Default GPU is discrete, no need to do anything
+      return;
+    }
+
+    // Find the first Discrete GPU
+  for (i = 0; i < num_children; i++)
+    {
+      g_autoptr(GVariant) gpu = NULL;
+      g_autoptr(GVariant) env = NULL;
+      g_autoptr(GVariant) discrete_variant = NULL;
+      g_autofree const char **env_s = NULL;
+      guint j;
+
+      gpu = g_variant_get_child_value (variant, i);
+      if (!gpu ||
+          !g_variant_is_of_type (gpu, G_VARIANT_TYPE ("a{s*}")))
+        continue;
+
+      /* Skip over non-discrete GPUs */
+      discrete_variant = g_variant_lookup_value (gpu, "Discrete", NULL);
+      if (!discrete_variant || !g_variant_get_boolean (discrete_variant))
+        continue;
+
+      env = g_variant_lookup_value (gpu, "Environment", NULL);
+      if (!env)
+        continue;
+
+      env_s = g_variant_get_strv (env, NULL);
+      for (j = 0; env_s[j] != NULL; j = j + 2)
+        g_app_launch_context_setenv (context, env_s[j], env_s[j+1]);
+      return;
+    }
+
+  // fallback to old behavior
+  // find the first non-Default GPU
   for (i = 0; i < num_children; i++)
     {
       g_autoptr(GVariant) gpu = NULL;
