@@ -1041,6 +1041,10 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
         this._desktopLayer.add_constraint(syncAll);
         this._backgroundGroup.insert_child_above(this._desktopLayer,
             this._bgManager.backgroundActor);
+        this._desktopLayer.opacity = Util.lerp(255, 0, this._stateAdjustment.value);
+        this._stateAdjustment.connectObject('notify::value', () => {
+            this._desktopLayer.opacity = Util.lerp(255, 0, this._stateAdjustment.value);
+        }, this);
     }
 
     _updateBorderRadius() {
