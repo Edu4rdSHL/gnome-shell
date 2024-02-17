@@ -1329,7 +1329,7 @@ apply_discrete_gpu_env (GAppLaunchContext *context,
       return;
     }
 
-    // Find the first Discrete GPU
+  // Find the first Discrete GPU
   for (i = 0; i < num_children; i++)
     {
       g_autoptr(GVariant) gpu = NULL;
