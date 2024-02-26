@@ -34,6 +34,24 @@ const ScreenshotIface = loadInterfaceXML('org.gnome.Shell.Screenshot');
 const ScreencastIface = loadInterfaceXML('org.gnome.Shell.Screencast');
 const ScreencastProxy = Gio.DBusProxy.makeProxyWrapper(ScreencastIface);
 
+let screenshotNotificationSource = null;
+function getScreenshotNotificationSource() {
+    if (!screenshotNotificationSource) {
+        screenshotNotificationSource = new MessageTray.Source({
+            // Translators: notification source name.
+            title: _('Screenshot'),
+            iconName: 'screenshot-recorded-symbolic',
+        });
+
+        screenshotNotificationSource.connect('destroy', () => {
+            screenshotNotificationSource = null;
+        });
+        Main.messageTray.add(screenshotNotificationSource);
+    }
+
+    return screenshotNotificationSource;
+}
+
 const IconLabelButton = GObject.registerClass(
 class IconLabelButton extends St.Button {
     _init(iconName, label, params) {
@@ -2082,11 +2100,7 @@ export const ScreenshotUI = GObject.registerClass({
     }
 
     _showNotification(title) {
-        const source = new MessageTray.Source({
-            // Translators: notification source name.
-            title: _('Screenshot'),
-            iconName: 'screencast-recorded-symbolic',
-        });
+        const source = getScreenshotNotificationSource();
         const notification = new MessageTray.Notification(
             source,
             title,
@@ -2121,7 +2135,6 @@ export const ScreenshotUI = GObject.registerClass({
             });
         }
 
-        Main.messageTray.add(source);
         source.showNotification(notification);
     }
 
@@ -2324,11 +2337,7 @@ function _storeScreenshot(bytes, pixbuf) {
     );
 
     // Show a notification.
-    const source = new MessageTray.Source({
-        // Translators: notification source name.
-        title: _('Screenshot'),
-        iconName: 'screenshot-recorded-symbolic',
-    });
+    const source = getScreenshotNotificationSource();
     const notification = new MessageTray.Notification(
         source,
         // Translators: notification title.
@@ -2363,7 +2372,6 @@ function _storeScreenshot(bytes, pixbuf) {
     }
 
     notification.setTransient(true);
-    Main.messageTray.add(source);
     source.showNotification(notification);
 
     return file;
