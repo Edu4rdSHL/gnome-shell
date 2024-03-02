@@ -241,7 +241,10 @@ class AutorunDispatcher {
 const AutorunNotification = GObject.registerClass(
 class AutorunNotification extends MessageTray.Notification {
     constructor(source, mount, apps) {
-        super(source, mount.get_name());
+        /* Translators: %s is the name of a partition on a external drive */
+        const title = _('“%s” connected'.format(mount.get_name()));
+        const body = _('Disk can now be used');
+        super(source, title, body);
 
         this.gicon = mount.get_icon();
 
