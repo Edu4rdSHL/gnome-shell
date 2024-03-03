@@ -2087,13 +2087,13 @@ export const ScreenshotUI = GObject.registerClass({
             title: _('Screenshot'),
             iconName: 'screencast-recorded-symbolic',
         });
-        const notification = new MessageTray.Notification(
+        const notification = new MessageTray.Notification({
             source,
             title,
             // Translators: notification body when a screencast was recorded.
-            this._screencastPath ? _('Click here to view the video.') : ''
-        );
-        notification.setTransient(true);
+            body: this._screencastPath ? _('Click here to view the video.') : '',
+            isTransient: true,
+        });
 
         if (this._screencastPath) {
             const file = Gio.file_new_for_path(this._screencastPath);
@@ -2122,7 +2122,7 @@ export const ScreenshotUI = GObject.registerClass({
         }
 
         Main.messageTray.add(source);
-        source.showNotification(notification);
+        source.addNotification(notification);
     }
 
     get screencast_in_progress() {
@@ -2328,15 +2328,17 @@ function _storeScreenshot(bytes, pixbuf) {
         // Translators: notification source name.
         title: _('Screenshot'),
         iconName: 'screenshot-recorded-symbolic',
+        isTransient: true,
     });
-    const notification = new MessageTray.Notification(
+    const notification = new MessageTray.Notification({
         source,
         // Translators: notification title.
-        _('Screenshot captured'),
+        title: _('Screenshot captured'),
         // Translators: notification body when a screenshot was captured.
-        _('You can paste the image from the clipboard.'),
-        {datetime: time, gicon: content}
-    );
+        body: _('You can paste the image from the clipboard.'),
+        datetime: time,
+        gicon: content,
+    });
 
     if (!disableSaveToDisk) {
         // Translators: button on the screenshot notification.
@@ -2362,9 +2364,8 @@ function _storeScreenshot(bytes, pixbuf) {
         });
     }
 
-    notification.setTransient(true);
     Main.messageTray.add(source);
-    source.showNotification(notification);
+    source.addNotification(notification);
 
     return file;
 }

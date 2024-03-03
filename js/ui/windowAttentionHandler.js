@@ -37,19 +37,23 @@ export class WindowAttentionHandler {
         let source = new WindowAttentionSource(app, window);
         Main.messageTray.add(source);
 
-        let [title, banner] = this._getTitleAndBanner(app, window);
+        let [title, body] = this._getTitleAndBanner(app, window);
 
-        let notification = new MessageTray.Notification(source, title, banner);
+        let notification = new MessageTray.Notification({
+            source,
+            title,
+            body,
+            forFeedback: true,
+        });
         notification.connect('activated', () => {
             source.open();
         });
-        notification.setForFeedback(true);
 
-        source.showNotification(notification);
+        source.addNotification(notification);
 
         window.connectObject('notify::title', () => {
-            [title, banner] = this._getTitleAndBanner(app, window);
-            notification.update(title, banner);
+            [title, body] = this._getTitleAndBanner(app, window);
+            notification.set({title, body});
         }, source);
     }
 }

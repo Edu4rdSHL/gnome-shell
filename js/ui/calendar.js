@@ -18,6 +18,7 @@ import {formatDateWithCFormatString} from '../misc/dateUtils.js';
 import {loadInterfaceXML} from '../misc/fileUtils.js';
 
 const SHOW_WEEKDATE_KEY = 'show-weekdate';
+const MAX_NOTIFICATION_BUTTONS = 3;
 
 const NC_ = (context, str) => `${context}\u0004${str}`;
 
@@ -766,14 +767,10 @@ export const Calendar = GObject.registerClass({
 
 export const NotificationMessage = GObject.registerClass(
 class NotificationMessage extends MessageList.Message {
-    _init(notification) {
-        super._init(notification.source, notification.title, notification.bannerBodyText);
-        this.setUseBodyMarkup(notification.bannerBodyMarkup);
+    constructor(notification) {
+        super(notification.source);
 
         this.notification = notification;
-        this.datetime = notification.datetime;
-
-        this.setIcon(this._getIcon());
 
         this.connect('close', () => {
             this._closed = true;
@@ -781,31 +778,34 @@ class NotificationMessage extends MessageList.Message {
                 this.notification.destroy(MessageTray.NotificationDestroyedReason.DISMISSED);
         });
         notification.connectObject(
-            'updated', this._onUpdated.bind(this),
+            'action-added', (_, action) => this._addAction(action),
+            'action-removed', (_, action) => this._removeAction(action),
             'destroy', () => {
                 this.notification = null;
                 if (!this._closed)
                     this.close();
             }, this);
-    }
 
-    _getIcon() {
-        const {gicon} = this.notification;
-        if (gicon) {
-            const styleClass =
-                gicon instanceof Gio.ThemedIcon ? 'message-themed-icon' : '';
-            return new St.Icon({gicon, styleClass});
-        } else {
-            return null;
-        }
-    }
+        notification.bind_property('title',
+            this, 'title',
+            GObject.BindingFlags.SYNC_CREATE);
+        notification.bind_property('body',
+            this, 'body',
+            GObject.BindingFlags.SYNC_CREATE);
+        notification.bind_property('use-markup',
+            this, 'use-body-markup',
+            GObject.BindingFlags.SYNC_CREATE);
+        notification.bind_property('datetime',
+            this, 'datetime',
+            GObject.BindingFlags.SYNC_CREATE);
+        notification.bind_property('gicon',
+            this, 'icon',
+            GObject.BindingFlags.SYNC_CREATE);
 
-    _onUpdated(n, _clear) {
-        this.datetime = n.datetime;
-        this.setIcon(this._getIcon());
-        this.setTitle(n.title);
-        this.setBody(n.bannerBodyText);
-        this.setUseBodyMarkup(n.bannerBodyMarkup);
+        this._actions = new Map();
+        this.notification.actions.forEach(action => {
+            this._addAction(action);
+        });
     }
 
     vfunc_clicked() {
@@ -814,6 +814,36 @@ class NotificationMessage extends MessageList.Message {
 
     canClose() {
         return true;
+    }
+
+    _addAction(action) {
+        if (!this._buttonBox) {
+            this._buttonBox = new St.BoxLayout({
+                x_expand: true,
+                x_align: Clutter.ActorAlign.END,
+                style_class: 'notification-buttons-bin',
+            });
+            this.setActionArea(this._buttonBox);
+            global.focus_manager.add_group(this._buttonBox);
+        }
+
+        if (this._buttonBox.get_n_children() >= MAX_NOTIFICATION_BUTTONS)
+            return;
+
+        const button = new St.Button({
+            style_class: 'notification-button',
+            label: action.label,
+        });
+
+        button.connect('clicked', action.activate.bind(action));
+
+        this._actions.set(action, button);
+        this._buttonBox.add_child(button);
+    }
+
+    _removeAction(action) {
+        this._actions.get(action)?.destroy();
+        this._actions.delete(action);
     }
 });
 
@@ -850,7 +880,7 @@ class NotificationSection extends MessageList.MessageListSection {
                 if (isUrgent)
                     this._nUrgent--;
             },
-            'updated', () => {
+            'notify::urgency', () => {
                 this.moveMessage(message, isUrgent ? 0 : this._nUrgent, this.mapped);
             }, this);
 
@@ -983,7 +1013,6 @@ class CalendarMessageList extends St.Widget {
             vertical: true,
             x_expand: true,
             y_expand: true,
-            y_align: Clutter.ActorAlign.START,
         });
         this._sectionList.connectObject(
             'child-added', this._sync.bind(this),

@@ -274,13 +274,15 @@ async function _initializeUI() {
             return; // assume user action
 
         const source = MessageTray.getSystemSource();
-        const notification = new MessageTray.Notification(source,
-            _('System was put in unsafe mode'),
-            _('Apps now have unrestricted access'));
+        const notification = new MessageTray.Notification({
+            source,
+            title: _('System was put in unsafe mode'),
+            body: _('Apps now have unrestricted access'),
+            isTransient: true,
+        });
         notification.addAction(_('Undo'),
             () => (global.context.unsafe_mode = false));
-        notification.setTransient(true);
-        source.showNotification(notification);
+        source.addNotification(notification);
     });
 
     // Provide the bus object for gnome-session to
@@ -614,9 +616,13 @@ export function loadTheme() {
  */
 export function notify(msg, details) {
     const source = MessageTray.getSystemSource();
-    let notification = new MessageTray.Notification(source, msg, details);
-    notification.setTransient(true);
-    source.showNotification(notification);
+    const notification = new MessageTray.Notification({
+        source,
+        title: msg,
+        body: details,
+        isTransient: true,
+    });
+    source.addNotification(notification);
 }
 
 /**

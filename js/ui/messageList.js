@@ -222,12 +222,12 @@ const LabelExpanderLayout = GObject.registerClass({
             GObject.ParamFlags.READABLE | GObject.ParamFlags.WRITABLE,
             0, 1, 0),
     },
-}, class LabelExpanderLayout extends Clutter.LayoutManager {
-    _init(params) {
+}, class LabelExpanderLayout extends Clutter.BinLayout {
+    constructor(params) {
+        super(params);
+
         this._expansion = 0;
         this._expandLines = DEFAULT_EXPAND_LINES;
-
-        super._init(params);
     }
 
     get expansion() {
@@ -240,10 +240,6 @@ const LabelExpanderLayout = GObject.registerClass({
         this._expansion = v;
         this.notify('expansion');
 
-        let visibleIndex = this._expansion > 0 ? 1 : 0;
-        for (let i = 0; this._container && i < this._container.get_n_children(); i++)
-            this._container.get_child_at_index(i).visible = i === visibleIndex;
-
         this.layout_changed();
     }
 
@@ -255,54 +251,26 @@ const LabelExpanderLayout = GObject.registerClass({
             this.layout_changed();
     }
 
-    vfunc_set_container(container) {
-        this._container = container;
-    }
-
-    vfunc_get_preferred_width(container, forHeight) {
-        let [min, nat] = [0, 0];
-
-        for (let i = 0; i < container.get_n_children(); i++) {
-            if (i > 1)
-                break; // we support one unexpanded + one expanded child
-
-            let child = container.get_child_at_index(i);
-            let [childMin, childNat] = child.get_preferred_width(forHeight);
-            [min, nat] = [Math.max(min, childMin), Math.max(nat, childNat)];
-        }
-
-        return [min, nat];
-    }
-
     vfunc_get_preferred_height(container, forWidth) {
         let [min, nat] = [0, 0];
 
-        let children = container.get_children();
-        if (children[0])
-            [min, nat] = children[0].get_preferred_height(forWidth);
+        const [child] = container;
 
-        if (children[1]) {
-            let [min2, nat2] = children[1].get_preferred_height(forWidth);
-            const [expMin, expNat] = [
+        if (child) {
+            [min, nat] = child.get_preferred_height(-1);
+
+            let [min2, nat2] = child.get_preferred_height(forWidth);
+            const expHeight = Math.max(
                 Math.min(min2, min * this._expandLines),
-                Math.min(nat2, nat * this._expandLines),
-            ];
+                Math.min(nat2, nat * this._expandLines)
+            );
             [min, nat] = [
-                min + this._expansion * (expMin - min),
-                nat + this._expansion * (expNat - nat),
+                min + this._expansion * (expHeight - min),
+                nat + this._expansion * (expHeight - nat),
             ];
         }
 
         return [min, nat];
-    }
-
-    vfunc_allocate(container, box) {
-        for (let i = 0; i < container.get_n_children(); i++) {
-            let child = container.get_child_at_index(i);
-
-            if (child.visible)
-                child.allocate(box);
-        }
     }
 });
 
@@ -404,11 +372,19 @@ class MessageHeader extends St.BoxLayout {
         });
         this.add_child(headerContent);
 
+        this.expandButton = new St.Button({
+            style_class: 'message-expand-button',
+            accessible_name: _('Expand notification'),
+            icon_name: 'notification-expand-symbolic',
+            y_align: Clutter.ActorAlign.CENTER,
+            pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
+        });
+        this.add_child(this.expandButton);
+
         this.closeButton = new St.Button({
             style_class: 'message-close-button',
             icon_name: 'window-close-symbolic',
             y_align: Clutter.ActorAlign.CENTER,
-            opacity: 0,
         });
         this.add_child(this.closeButton);
 
@@ -437,19 +413,41 @@ class MessageHeader extends St.BoxLayout {
 });
 
 export const Message = GObject.registerClass({
+    Properties: {
+        'title': GObject.ParamSpec.string(
+            'title', 'title', 'title',
+            GObject.ParamFlags.READWRITE,
+            null),
+        'body': GObject.ParamSpec.string(
+            'body', 'body', 'body',
+            GObject.ParamFlags.READWRITE,
+            null),
+        'use-body-markup': GObject.ParamSpec.boolean(
+            'use-body-markup', 'use-body-markup', 'use-body-markup',
+            GObject.ParamFlags.READWRITE,
+            false),
+        'icon': GObject.ParamSpec.object(
+            'icon', 'icon', 'icon',
+            GObject.ParamFlags.READWRITE,
+            Gio.Icon),
+        'datetime': GObject.ParamSpec.boxed(
+            'datetime', 'datetime', 'datetime',
+            GObject.ParamFlags.READWRITE,
+            GLib.DateTime),
+    },
     Signals: {
         'close': {},
         'expanded': {},
         'unexpanded': {},
     },
 }, class Message extends St.Button {
-    _init(source, title, body) {
-        super._init({
+    constructor(source) {
+        super({
             style_class: 'message',
             accessible_role: Atk.Role.NOTIFICATION,
             can_focus: true,
             x_expand: true,
-            y_expand: true,
+            y_expand: false,
         });
 
         this.expanded = false;
@@ -469,19 +467,19 @@ export const Message = GObject.registerClass({
         });
         vbox.add_child(hbox);
 
-        this._actionBin = new St.Widget({
+        this._actionBin = new St.Bin({
             layout_manager: new ScaleLayout(),
             visible: false,
         });
         vbox.add_child(this._actionBin);
 
-        this._iconBin = new St.Bin({
-            style_class: 'message-icon-bin',
+        this._icon = new St.Icon({
+            style_class: 'message-icon',
             y_expand: true,
             y_align: Clutter.ActorAlign.START,
             visible: false,
         });
-        hbox.add_child(this._iconBin);
+        hbox.add_child(this._icon);
 
         const contentBox = new St.BoxLayout({
             style_class: 'message-content',
@@ -497,76 +495,108 @@ export const Message = GObject.registerClass({
             style_class: 'message-title',
             y_align: Clutter.ActorAlign.END,
         });
-        this.setTitle(title);
         contentBox.add_child(this.titleLabel);
 
-        this._bodyStack = new St.Widget({x_expand: true});
-        this._bodyStack.layout_manager = new LabelExpanderLayout();
-        contentBox.add_child(this._bodyStack);
-
-        this.bodyLabel = new URLHighlighter('', false, this._useBodyMarkup);
-        this.bodyLabel.add_style_class_name('message-body');
-        this._bodyStack.add_child(this.bodyLabel);
-        this.setBody(body);
+        this._bodyLabel = new URLHighlighter('', true, this._useBodyMarkup);
+        this._bodyLabel.add_style_class_name('message-body');
+        this._bodyBin = new St.Bin({
+            x_expand: true,
+            layout_manager: new LabelExpanderLayout(),
+            child: this._bodyLabel,
+        });
+        contentBox.add_child(this._bodyBin);
 
         this.connect('destroy', this._onDestroy.bind(this));
 
         this._header.closeButton.connect('clicked', this.close.bind(this));
-        let actorHoverId = this.connect('notify::hover', this._sync.bind(this));
-        this._header.closeButton.connect('destroy', this.disconnect.bind(this, actorHoverId));
-        this._sync();
+        this._header.closeButton.visible = this.canClose();
+
+        this._header.expandButton.connect('clicked', () => {
+            if (this.expanded)
+                this.unexpand(true);
+            else
+                this.expand(true);
+        });
+        this._bodyLabel.connect('notify::allocation', this._updateExpandButton.bind(this));
+        this._updateExpandButton();
+    }
+
+    _updateExpandButton() {
+        if (!this._bodyLabel.has_allocation())
+            return;
+        const layout = this._bodyLabel.clutter_text.get_layout();
+        const canExpand = layout.is_ellipsized() || this.expanded || !!this._actionBin.child;
+        // Use opacity to not trigger a relayout
+        this._header.expandButton.opacity = canExpand ? 255 : 0;
     }
 
     close() {
         this.emit('close');
     }
 
-    setIcon(actor) {
-        this._iconBin.child = actor;
-        this._iconBin.visible = actor != null;
+    set icon(icon) {
+        this._icon.gicon = icon;
+
+        if (icon instanceof Gio.ThemedIcon)
+            this._icon.add_style_class_name('message-themed-icon');
+        else
+            this._icon.remove_style_class_name('message-themed-icon');
+
+        this._icon.visible = !!icon;
+        this.notify('icon');
+    }
+
+    get icon() {
+        return this._icon.gicon;
+    }
+
+    set datetime(datetime) {
+        this._header.timeLabel.datetime = datetime;
+        this.notify('datetime');
     }
 
     get datetime() {
         return this._header.timeLabel.datetime;
     }
 
-    set datetime(datetime) {
-        this._header.timeLabel.datetime = datetime;
-    }
-
-    setTitle(text) {
-        let title = text ? _fixMarkup(text.replace(/\n/g, ' '), false) : '';
+    set title(text) {
+        this._titleText = text;
+        const title = text ? _fixMarkup(text.replace(/\n/g, ' '), false) : '';
         this.titleLabel.clutter_text.set_markup(title);
+        this.notify('title');
     }
 
-    setBody(text) {
+    get title() {
+        return this._titleText;
+    }
+
+    set body(text) {
         this._bodyText = text;
-        this.bodyLabel.setMarkup(text ? text.replace(/\n/g, ' ') : '',
+        this._bodyLabel.setMarkup(text ? text.replace(/\n/g, ' ') : '',
             this._useBodyMarkup);
-        if (this._expandedLabel)
-            this._expandedLabel.setMarkup(text, this._useBodyMarkup);
+        this.notify('body');
     }
 
-    setUseBodyMarkup(enable) {
+    get body() {
+        return this._bodyText;
+    }
+
+    set useBodyMarkup(enable) {
         if (this._useBodyMarkup === enable)
             return;
         this._useBodyMarkup = enable;
-        if (this.bodyLabel)
-            this.setBody(this._bodyText);
+        this.setBody(this._bodyText);
+        this.notify('use-body-markup');
+    }
+
+    get useBodyMarkup() {
+        return this._useBodyMarkup;
     }
 
     setActionArea(actor) {
-        if (actor == null) {
-            if (this._actionBin.get_n_children() > 0)
-                this._actionBin.get_child_at_index(0).destroy();
-            return;
-        }
-
-        if (this._actionBin.get_n_children() > 0)
-            throw new Error('Message already has an action area');
-
-        this._actionBin.add_child(actor);
-        this._actionBin.visible = this.expanded;
+        this._actionBin.child = actor;
+        this._actionBin.visible = actor && this.expanded;
+        this._updateExpandButton();
     }
 
     addMediaControl(iconName, callback) {
@@ -579,36 +609,13 @@ export const Message = GObject.registerClass({
         return button;
     }
 
-    setExpandedBody(actor) {
-        if (actor == null) {
-            if (this._bodyStack.get_n_children() > 1)
-                this._bodyStack.get_child_at_index(1).destroy();
-            return;
-        }
-
-        if (this._bodyStack.get_n_children() > 1)
-            throw new Error('Message already has an expanded body actor');
-
-        this._bodyStack.insert_child_at_index(actor, 1);
-    }
-
-    setExpandedLines(nLines) {
-        this._bodyStack.layout_manager.expandLines = nLines;
-    }
-
     expand(animate) {
         this.expanded = true;
 
-        this._actionBin.visible = this._actionBin.get_n_children() > 0;
-
-        if (this._bodyStack.get_n_children() < 2) {
-            this._expandedLabel = new URLHighlighter(this._bodyText,
-                true, this._useBodyMarkup);
-            this.setExpandedBody(this._expandedLabel);
-        }
+        this._actionBin.visible = !!this._actionBin.child;
 
         const duration = animate ? MessageTray.ANIMATION_TIME : 0;
-        this._bodyStack.ease_property('@layout.expansion', 1, {
+        this._bodyBin.ease_property('@layout.expansion', 1, {
             progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             duration,
         });
@@ -620,12 +627,17 @@ export const Message = GObject.registerClass({
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
 
+        this._header.expandButton.ease({
+            rotation_angle_z: 180,
+            duration,
+        });
+
         this.emit('expanded');
     }
 
     unexpand(animate) {
         const duration = animate ? MessageTray.ANIMATION_TIME : 0;
-        this._bodyStack.ease_property('@layout.expansion', 0, {
+        this._bodyBin.ease_property('@layout.expansion', 0, {
             progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             duration,
         });
@@ -640,17 +652,16 @@ export const Message = GObject.registerClass({
             },
         });
 
+        this._header.expandButton.ease({
+            rotation_angle_z: 0,
+            duration,
+        });
+
         this.emit('unexpanded');
     }
 
     canClose() {
         return false;
-    }
-
-    _sync() {
-        let visible = this.hover && this.canClose();
-        this._header.closeButton.opacity = visible ? 255 : 0;
-        this._header.closeButton.reactive = visible;
     }
 
     _onDestroy() {
