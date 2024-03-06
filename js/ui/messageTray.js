@@ -588,13 +588,6 @@ export const Source = GObject.registerClass({
     // To be overridden by subclasses
     open() {
     }
-
-    destroyNonResidentNotifications() {
-        for (let i = this.notifications.length - 1; i >= 0; i--) {
-            if (!this.notifications[i].resident)
-                this.notifications[i].destroy();
-        }
-    }
 });
 SignalTracker.registerDestroyableType(Source);
 
