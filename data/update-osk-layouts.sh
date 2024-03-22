@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 
 CLDR_LAYOUTS_TARBALL="http://www.unicode.org/Public/cldr/latest/keyboards.zip"
 
