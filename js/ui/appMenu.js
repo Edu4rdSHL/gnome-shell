@@ -177,8 +177,8 @@ export class AppMenu extends PopupMenu.PopupMenu {
 
         const launchGpu = this._getNonDefaultLaunchGpu();
         this._onGpuMenuItem.label.text = launchGpu === Shell.AppLaunchGpu.DEFAULT
-            ? _('Launch using Integrated Graphics Card')
-            : _('Launch using Discrete Graphics Card');
+            ? _('Launch With Integrated Graphics Card')
+            : _('Launch With Discrete Graphics Card');
     }
 
     _updateDetailsVisibility() {
