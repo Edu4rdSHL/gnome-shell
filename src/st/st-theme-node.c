@@ -75,6 +75,10 @@ maybe_free_properties (StThemeNode *node)
       cr_declaration_destroy (node->inline_properties);
       node->inline_properties = NULL;
     }
+
+  g_clear_signal_handler (&node->stylesheets_changed_id, node->theme);
+
+  node->properties_computed = FALSE;
 }
 
 static void
@@ -471,6 +475,16 @@ ensure_properties (StThemeNode *node)
         {
           node->n_properties = properties->len;
           node->properties = (CRDeclaration **)g_ptr_array_free (properties, FALSE);
+        }
+
+      if (!node->stylesheets_changed_id)
+        {
+          node->stylesheets_changed_id =
+            g_signal_connect_object (node->theme,
+                                     "custom-stylesheets-changed",
+                                     G_CALLBACK (maybe_free_properties),
+                                     G_OBJECT (node),
+                                     G_CONNECT_SWAPPED);
         }
     }
 }
