@@ -97,13 +97,12 @@ class LoginManagerSystemd extends Signals.EventEmitter {
         this._proxy = new SystemdLoginManager(Gio.DBus.system,
             'org.freedesktop.login1',
             '/org/freedesktop/login1');
-        this._userProxy = new SystemdLoginUser(Gio.DBus.system,
-            'org.freedesktop.login1',
-            '/org/freedesktop/login1/user/self');
         this._proxy.connectSignal('PrepareForSleep',
             this._prepareForSleep.bind(this));
         this._proxy.connectSignal('SessionRemoved',
             this._sessionRemoved.bind(this));
+
+        this._userProxy = this._initUserProxy();
     }
 
     async getCurrentSessionProxy() {
@@ -113,14 +112,15 @@ class LoginManagerSystemd extends Signals.EventEmitter {
         let sessionId = GLib.getenv('XDG_SESSION_ID');
         if (!sessionId) {
             log('Unset XDG_SESSION_ID, getCurrentSessionProxy() called outside a user session. Asking logind directly.');
-            let [session, objectPath] = this._userProxy.Display;
+            let userProxy = await this._userProxy;
+            let [session, objectPath] = userProxy.Display;
             if (session) {
                 log(`Will monitor session ${session}`);
                 sessionId = session;
             } else {
                 log('Failed to find "Display" session; are we the greeter?');
 
-                for ([session, objectPath] of this._userProxy.Sessions) {
+                for ([session, objectPath] of userProxy.Sessions) {
                     let sessionProxy = new SystemdLoginSession(Gio.DBus.system,
                         'org.freedesktop.login1',
                         objectPath);
@@ -217,6 +217,27 @@ class LoginManagerSystemd extends Signals.EventEmitter {
     _sessionRemoved(proxy, sender, [sessionId]) {
         this.emit('session-removed', sessionId);
     }
+
+    async _initUserProxy() {
+        let [objectPath] = await this._proxy.GetUserByPIDAsync(0)
+
+        let proxy = new SystemdLoginUser(Gio.DBus.system,
+            'org.freedesktop.login1',
+            objectPath);
+
+        return proxy;
+    }
+
+    async canSecureLock() {
+        const proxy = await this._userProxy;
+        return proxy.CanSecureLock;
+    }
+
+    async secureLock() {
+        const proxy = await this._userProxy;
+        if (proxy.CanSecureLock)
+                await proxy.SecureLockAsync(0);
+    }
 }
 
 class LoginManagerDummy extends Signals.EventEmitter  {
@@ -260,5 +281,12 @@ class LoginManagerDummy extends Signals.EventEmitter  {
     /* eslint-disable-next-line require-await */
     async inhibit() {
         return null;
+    }
+
+    async canSecureLock() {
+        return false;
+    }
+
+    async secureLock() {
     }
 }
