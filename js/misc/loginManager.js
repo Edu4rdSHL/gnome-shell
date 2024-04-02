@@ -125,7 +125,7 @@ class LoginManagerSystemd extends Signals.EventEmitter {
                         'org.freedesktop.login1',
                         objectPath);
                     log(`Considering ${session}, class=${sessionProxy.Class}`);
-                    if (sessionProxy.Class === 'greeter') {
+                    if (sessionProxy.Class === 'greeter' || sessionProxy.Class === "lock-screen") {
                         log(`Yes, will monitor session ${session}`);
                         sessionId = session;
                         break;

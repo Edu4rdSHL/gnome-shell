@@ -529,21 +529,38 @@ export const UnlockDialog = GObject.registerClass({
         this.add_action(tapAction);
 
         // Background
-        this._backgroundGroup = new Clutter.Actor();
-        this.add_child(this._backgroundGroup);
+        if (!Main.sessionMode.isGreeter) {
+            // We don't currently support storing a background picture for
+            // user accounts, so for now the secure lock screen will just have
+            // a blank background.
 
-        this._bgManagers = [];
+            this._backgroundGroup = new Clutter.Actor();
+            this.add_child(this._backgroundGroup);
 
-        const themeContext = St.ThemeContext.get_for_stage(global.stage);
-        themeContext.connectObject('notify::scale-factor',
-            () => this._updateBackgroundEffects(), this);
+            this._bgManagers = [];
 
-        this._updateBackgrounds();
-        Main.layoutManager.connectObject('monitors-changed',
-            this._updateBackgrounds.bind(this), this);
+            const themeContext = St.ThemeContext.get_for_stage(global.stage);
+            themeContext.connectObject('notify::scale-factor',
+                () => this._updateBackgroundEffects(), this);
+
+            this._updateBackgrounds();
+            Main.layoutManager.connectObject('monitors-changed',
+                this._updateBackgrounds.bind(this), this);
+        }
 
         this._userManager = AccountsService.UserManager.get_default();
-        this._userName = GLib.get_user_name();
+        if (!Main.sessionMode.isGreeter) {
+            this._userName = GLib.get_user_name();
+        } else {
+            this._userName = GLib.getenv('GDM_LOCK_SCREEN_USER');
+            if (!this._userName) {
+                // In the secure lock screen, this is a hard error. Fail-whale
+                const error = new GLib.Error(
+                    Gio.IOErrorEnum, Gio.IOErrorEnum.FAILED,
+                    'Could not get user for GDM lock screen');
+                global.context.terminate_with_error(error);
+            }
+        }
         this._user = this._userManager.get_user(this._userName);
 
         // Authentication & Clock stack
@@ -558,8 +575,6 @@ export const UnlockDialog = GObject.registerClass({
         this._clock.set_pivot_point(0.5, 0.5);
         this._stack.add_child(this._clock);
         this._showClock();
-
-        this.allowCancel = false;
 
         Main.ctrlAltTabManager.addGroup(this, _('Unlock Window'), 'dialog-password-symbolic');
 
@@ -797,7 +812,7 @@ export const UnlockDialog = GObject.registerClass({
     }
 
     _escape() {
-        if (this._authPrompt && this.allowCancel)
+        if (this._authPrompt && !Main.sessionMode.isGreeter)
             this._authPrompt.cancel();
     }
 
@@ -856,10 +871,11 @@ export const UnlockDialog = GObject.registerClass({
     }
 
     _updateUserSwitchVisibility() {
-        this._otherUserButton.visible = this._userManager.can_switch() &&
-            this._userManager.has_multiple_users &&
-            this._screenSaverSettings.get_boolean('user-switch-enabled') &&
-            !this._lockdownSettings.get_boolean('disable-user-switching');
+        let needed = this._userManager.can_switch() &&
+                     this._userManager.has_multiple_users;
+        let enabled = this._screenSaverSettings.get_boolean('user-switch-enabled') &&
+                      !this._lockdownSettings.get_boolean('disable-user-switching');
+        this._otherUserButton.visible = needed && (enabled || Main.sessionMode.isGreeter);
     }
 
     cancel() {
