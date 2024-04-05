@@ -408,6 +408,7 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
         const {
             title,
             body,
+            'markup-body': markupBody,
             icon: gicon,
             urgent,
             priority,
@@ -423,7 +424,8 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
         super({
             source,
             title: title.unpack(),
-            body: body?.unpack(),
+            body: markupBody?.unpack() ?? body?.unpack() ?? null,
+            useBodyMarkup: !!markupBody,
             gicon: gicon
                 ? Gio.icon_deserialize(gicon) : null,
             datetime: time
