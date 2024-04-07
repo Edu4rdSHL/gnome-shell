@@ -351,21 +351,12 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     constructor(sourceActor) {
         super(sourceActor, 'quick-toggle-menu');
 
-        const constraints = new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.Y,
-            source: sourceActor,
-        });
-        sourceActor.bind_property('height',
-            constraints, 'offset',
-            GObject.BindingFlags.DEFAULT);
-
         this.actor = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
             style_class: 'quick-toggle-menu-container',
             reactive: true,
             x_expand: true,
-            y_expand: false,
-            constraints,
+            y_expand: true,
         });
         this.actor._delegate = this;
         this.actor.add_child(this.box);
@@ -534,10 +525,8 @@ const QuickSettingsLayout = GObject.registerClass({
             1, GLib.MAXINT32, 1),
     },
 }, class QuickSettingsLayout extends Clutter.LayoutManager {
-    _init(overlay, params) {
+    _init(params) {
         super._init(params);
-
-        this._overlay = overlay;
     }
 
     _containerStyleChanged() {
@@ -568,9 +557,6 @@ const QuickSettingsLayout = GObject.registerClass({
         let [minWidth, natWidth] = [0, 0];
 
         for (const child of container) {
-            if (child === this._overlay)
-                continue;
-
             const [childMin, childNat] = child.get_preferred_width(-1);
             const colSpan = this._getColSpan(container, child);
             minWidth = Math.max(minWidth, childMin / colSpan);
@@ -594,9 +580,6 @@ const QuickSettingsLayout = GObject.registerClass({
 
         for (const child of container) {
             if (!child.visible)
-                continue;
-
-            if (child === this._overlay)
                 continue;
 
             if (lineIndex === 0)
@@ -649,7 +632,7 @@ const QuickSettingsLayout = GObject.registerClass({
     vfunc_get_preferred_height(container, _forWidth) {
         const rows = this._getRows(container);
 
-        let [minHeight, natHeight] = this._overlay.get_preferred_height(-1);
+        let [minHeight, natHeight] = [0, 0]
 
         const spacing = (rows.length - 1) * this.row_spacing;
         minHeight += spacing;
@@ -667,12 +650,8 @@ const QuickSettingsLayout = GObject.registerClass({
     vfunc_allocate(container, box) {
         const rows = this._getRows(container);
 
-        const [, overlayHeight] = this._overlay.get_preferred_height(-1);
-
         const availWidth = box.get_width() - (this.nColumns - 1) * this.column_spacing;
         const childWidth = Math.floor(availWidth / this.nColumns);
-
-        this._overlay.allocate_available_size(0, 0, box.get_width(), box.get_height());
 
         const isRtl = container.text_direction === Clutter.TextDirection.RTL;
 
@@ -698,9 +677,17 @@ const QuickSettingsLayout = GObject.registerClass({
             });
 
             y += rowNat + this.row_spacing;
+        });
+    }
+});
 
-            if (row.some(c => c.menu?.actor.visible))
-                y += overlayHeight;
+const BackButton = GObject.registerClass(
+class BackButton extends QuickSettingsItem {
+    _init() {
+        super._init({
+            style_class: 'icon-button',
+            can_focus: true,
+            icon_name: 'go-previous-symbolic',
         });
     }
 });
@@ -724,58 +711,46 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         this._boxPointer.add_effect_with_name('dim', this._dimEffect);
         this.box.add_style_class_name('quick-settings');
 
-        // Overlay layer for menus
-        this._overlay = new Clutter.Actor({
-            layout_manager: new Clutter.BinLayout(),
-        });
-
-        // "clone"
-        const placeholder = new Clutter.Actor({
-            constraints: new Clutter.BindConstraint({
-                coordinate: Clutter.BindCoordinate.HEIGHT,
-                source: this._overlay,
-            }),
-        });
-
         this._grid = new St.Widget({
             style_class: 'quick-settings-grid',
-            layout_manager: new QuickSettingsLayout(placeholder, {
+            layout_manager: new QuickSettingsLayout({
                 nColumns,
             }),
         });
-        this.box.add_child(this._grid);
-        this._grid.add_child(placeholder);
+        const dummy = new Clutter.Actor()
+        dummy.hide()
+        this._grid.add_child(dummy);
 
-        const yConstraint = new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.Y,
-            source: this._boxPointer,
+
+        this._menuWidget = new St.Bin();
+        this.menuBox = new Clutter.Actor({
+            layout_manager: new Clutter.BoxLayout({
+                orientation: Clutter.Orientation.VERTICAL,
+            }),
         });
+        this._menuWidget.set_child(this.menuBox)
 
-        // Pick up additional spacing from any intermediate actors
-        const updateOffset = () => {
-            const laters = global.compositor.get_laters();
-            laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
-                const offset = this._grid.apply_relative_transform_to_point(
-                    this._boxPointer, new Graphene.Point3D());
-                yConstraint.offset = offset.y;
-                return GLib.SOURCE_REMOVE;
-            });
-        };
-        this._grid.connect('notify::y', updateOffset);
-        this.box.connect('notify::y', updateOffset);
-        this._boxPointer.bin.connect('notify::y', updateOffset);
-
-        this._overlay.add_constraint(yConstraint);
-        this._overlay.add_constraint(new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.X,
-            source: this._boxPointer,
-        }));
-        this._overlay.add_constraint(new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.WIDTH,
-            source: this._boxPointer,
+        this.menuBox.add_constraint(new Clutter.BindConstraint({
+            coordinate: Clutter.BindCoordinate.SIZE,
+            source: this._grid,
         }));
 
-        this.actor.add_child(this._overlay);
+        const topRow = new St.BoxLayout()
+        this.backButton = new BackButton();
+        this.backButton.connect('clicked', () => {
+            this._grid.visible = true;
+            this.menuBox.visible = false;
+            this._activeMenu = null;
+        });
+        topRow.add_child(this.backButton);
+        topRow.add_child(new Clutter.Actor({x_expand: true}))
+
+        this.menuBox.add_child(topRow)
+
+        this.menuBox.hide();
+
+        this.box.add_child(this._grid);
+        this.box.add_child(this._menuWidget)
     }
 
     addItem(item, colSpan = 1) {
@@ -793,10 +768,11 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
             this._grid, item, 'column-span', colSpan);
 
         if (item.menu) {
-            this._overlay.add_child(item.menu.actor);
+            this.menuBox.add_child(item.menu.actor)
 
             item.menu.connect('open-state-changed', (m, isOpen) => {
-                this._setDimmed(isOpen);
+                this._grid.visible = !isOpen;
+                this.menuBox.visible = isOpen;
                 this._activeMenu = isOpen ? item.menu : null;
             });
         }
