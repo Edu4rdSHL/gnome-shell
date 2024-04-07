@@ -4,7 +4,6 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Graphene from 'gi://Graphene';
-import Meta from 'gi://Meta';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
@@ -525,10 +524,6 @@ const QuickSettingsLayout = GObject.registerClass({
             1, GLib.MAXINT32, 1),
     },
 }, class QuickSettingsLayout extends Clutter.LayoutManager {
-    _init(params) {
-        super._init(params);
-    }
-
     _containerStyleChanged() {
         const node = this._container.get_theme_node();
 
