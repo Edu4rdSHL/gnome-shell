@@ -14,7 +14,6 @@ import {Slider} from './slider.js';
 
 import {PopupAnimation} from './boxpointer.js';
 
-const DIM_BRIGHTNESS = -0.4;
 const POPUP_ANIMATION_TIME = 400;
 const MENU_BUTTON_BRIGHTNESS = 0.1;
 
@@ -704,7 +703,6 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         this._dimEffect = new Clutter.BrightnessContrastEffect({
             enabled: false,
         });
-        this._boxPointer.add_effect_with_name('dim', this._dimEffect);
         this.box.add_style_class_name('quick-settings');
 
         this._grid = new St.Widget({
@@ -713,6 +711,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
                 nColumns,
             }),
         });
+        this._grid.add_effect_with_name('dim', this._dimEffect);
         const dummy = new Clutter.Actor()
         dummy.hide()
         this._grid.add_child(dummy);
@@ -786,6 +785,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
             item.menu.connect('open-state-changed', (m, isOpen) => {
                 this._slide(isOpen);
+                this._setDimmed(isOpen);
                 this._activeMenu = isOpen ? item.menu : null;
             });
         }
@@ -815,8 +815,8 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
         this._grid.ease({
             x: target,
-            duration: 1000,
-            mode: Clutter.AnimationMode.EASE_OUT_EXPO, //  : Clutter.AnimationMode.EASE_IN_EXPO,
+            duration: POPUP_ANIMATION_TIME,
+            mode: Clutter.AnimationMode.EASE_OUT_EXPO,
             onComplete: () => {
                 this._grid.visible = !out;
                 this.menuBox.visible = out;
@@ -825,15 +825,12 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
     }
 
     _setDimmed(dim) {
-        const val = 127 * (1 + (dim ? 1 : 0) * DIM_BRIGHTNESS);
-        const color = Clutter.Color.new(val, val, val, 255);
+        const val = dim ? 0 : 255;
 
-        this._boxPointer.ease_property('@effects.dim.brightness', color, {
+        this._grid.ease_property('opacity', val, {
             mode: Clutter.AnimationMode.LINEAR,
             duration: POPUP_ANIMATION_TIME,
-            onStopped: () => (this._dimEffect.enabled = dim),
         });
-        this._dimEffect.enabled = true;
     }
 };
 
