@@ -497,6 +497,7 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     }
 
     _needsScrollbar() {
+        return true
         let parent = this.actor.get_parent();
         let [, maxHeight] = parent.get_preferred_height(-1);
 
