@@ -4,6 +4,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Graphene from 'gi://Graphene';
+import Meta from 'gi://Meta';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
@@ -729,13 +730,29 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
             coordinate: Clutter.BindCoordinate.SIZE,
             source: this._grid,
         }));
+        const xConstraint = new Clutter.BindConstraint({
+            coordinate: Clutter.BindCoordinate.X,
+            source: this._grid
+        });
+        this.menuBox.add_constraint(xConstraint);
+
+        const updateOffset = () => {
+            const laters = global.compositor.get_laters();
+            laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
+                [, xConstraint.offset] = this._boxPointer.get_preferred_width(-1);
+                return GLib.SOURCE_REMOVE;
+            });
+        };
+        this._grid.connect('notify::x', updateOffset);
+        this.box.connect('notify::x', updateOffset);
+        this._boxPointer.bin.connect('notify::x', updateOffset);
+
+
 
         const topRow = new St.BoxLayout()
         this.backButton = new BackButton();
         this.backButton.connect('clicked', () => {
-            this._grid.visible = true;
-            this.menuBox.visible = false;
-            this._activeMenu = null;
+            this._activeMenu.close()
         });
         topRow.add_child(this.backButton);
         topRow.add_child(new Clutter.Actor({x_expand: true}))
@@ -743,9 +760,11 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         this.menuBox.add_child(topRow)
 
         this.menuBox.hide();
+        this.bin = new St.Bin()
+        this.box.add_child(this.bin)
 
-        this.box.add_child(this._grid);
-        this.box.add_child(this._menuWidget)
+        this.bin.add_child(this._grid);
+        this.bin.add_child(this._menuWidget)
     }
 
     addItem(item, colSpan = 1) {
@@ -766,8 +785,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
             this.menuBox.add_child(item.menu.actor)
 
             item.menu.connect('open-state-changed', (m, isOpen) => {
-                this._grid.visible = !isOpen;
-                this.menuBox.visible = isOpen;
+                this._slide(isOpen);
                 this._activeMenu = isOpen ? item.menu : null;
             });
         }
@@ -785,6 +803,25 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
     close(animate) {
         this._activeMenu?.close(animate);
         super.close(animate);
+    }
+
+    _slide(out) {
+        this._grid.show();
+        this.menuBox.show();
+        const [, width] = this._boxPointer.get_preferred_width(-1);
+        const x = this._grid.get_x();
+
+        const target = out ? x - width : x + width
+
+        this._grid.ease({
+            x: target,
+            duration: 1000,
+            mode: Clutter.AnimationMode.EASE_OUT_EXPO, //  : Clutter.AnimationMode.EASE_IN_EXPO,
+            onComplete: () => {
+                this._grid.visible = !out;
+                this.menuBox.visible = out;
+            },
+        });
     }
 
     _setDimmed(dim) {
