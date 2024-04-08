@@ -411,7 +411,6 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
         this._syncChecked();
 
         this.connectObject('active-changed', () => {
-            console.log("active-changed")
             this._onSizeChanged()
         });
     }
@@ -502,8 +501,6 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
         let [, maxHeight] = parent.get_preferred_height(-1);
 
         let [, preferredHeight] = this.actor.get_preferred_height(-1);
-        console.log(maxHeight)
-        console.log(preferredHeight)
         return preferredHeight >= maxHeight;
     }
 
@@ -515,7 +512,6 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     }
 
     _onSizeChanged() {
-        console.log("on size changed")
         let needsScrollbar = this._needsScrollbar();
 
         this.scroller.vscrollbar_policy =
