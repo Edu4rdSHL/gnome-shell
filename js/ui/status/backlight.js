@@ -149,6 +149,8 @@ class KeyboardBrightnessToggle extends QuickMenuToggle {
             iconName: 'display-brightness-symbolic',
         });
 
+        this.menu.setHeader('display-brightness-symbolic', _('Keyboard'));
+
         this._proxy = new BrightnessProxy(Gio.DBus.session, BUS_NAME, OBJECT_PATH,
             (proxy, error) => {
                 if (error)
