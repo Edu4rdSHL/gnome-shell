@@ -45,6 +45,7 @@ const BackgroundAppMenuItem = GObject.registerClass({
 
         this.add_style_class_name('background-app-item');
         this.label.add_style_class_name('title');
+        this.label.y_expand = false;
 
         this.app = app;
 
