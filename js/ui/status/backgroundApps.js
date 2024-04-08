@@ -60,7 +60,7 @@ const BackgroundAppMenuItem = GObject.registerClass({
         box.add_child(this.label);
 
         const messageLabel = new St.Label({
-            y_expand: true,
+            y_expand: false,
             y_align: Clutter.ActorAlign.CENTER,
             style_class: 'subtitle',
         });
