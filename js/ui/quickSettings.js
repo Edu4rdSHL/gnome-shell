@@ -683,6 +683,7 @@ class BackButton extends QuickSettingsItem {
             style_class: 'icon-button',
             can_focus: true,
             icon_name: 'go-previous-symbolic',
+            accessible_name: _('Back Button'),
         });
     }
 });
