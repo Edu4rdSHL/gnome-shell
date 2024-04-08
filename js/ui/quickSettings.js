@@ -348,17 +348,15 @@ export const QuickSlider = GObject.registerClass({
 
 class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     constructor(sourceActor) {
-        super(sourceActor, 'quick-toggle-menu');
+        super(sourceActor);
 
         this.actor = new St.Widget({
-            layout_manager: new Clutter.BinLayout(),
-            style_class: 'quick-toggle-menu-container',
+            layout_manager: new Clutter.BoxLayout({orientation: Clutter.Orientation.VERTICAL}),
+            style_class: 'quick-toggle-menu-container quick-toggle-menu',
             reactive: true,
-            x_expand: true,
             y_expand: true,
         });
         this.actor._delegate = this;
-        this.actor.add_child(this.box);
 
         global.focus_manager.add_group(this.actor);
 
@@ -367,9 +365,19 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             style_class: 'header',
             layout_manager: headerLayout,
             visible: false,
+            y_expand: false
         });
         headerLayout.hookup_style(this._header);
-        this.box.add_child(this._header);
+        this.actor.add_child(this._header);
+
+        this.scroller = new St.ScrollView({
+            vscrollbar_policy: St.PolicyType.NEVER,
+            x_expand: true,
+            y_expand: true,
+            child: this.box,
+        });
+        this.actor.add_child(this.scroller)
+
 
         this._headerIcon = new St.Icon({
             style_class: 'icon',
@@ -401,6 +409,11 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
         sourceActor.connect('notify::checked',
             () => this._syncChecked());
         this._syncChecked();
+
+        this.connectObject('active-changed', () => {
+            console.log("active-changed")
+            this._onSizeChanged()
+        });
     }
 
     setHeader(icon, title, subtitle = '') {
@@ -433,29 +446,35 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             return;
 
         this.actor.show();
-        this.isOpen = true;
 
-        this.actor.height = -1;
-        const [targetHeight] = this.actor.get_preferred_height(-1);
+        let needsScrollbar = this._needsScrollbar();
+
+        // St.ScrollView always requests space horizontally for a possible vertical
+        // scrollbar if in AUTOMATIC mode. Doing better would require implementation
+        // of width-for-height in St.BoxLayout and St.ScrollView. This looks bad
+        // when we *don't* need it, so turn off the scrollbar when that's true.
+        // Dynamic changes in whether we need it aren't handled properly.
+        this.scroller.vscrollbar_policy =
+            needsScrollbar ? St.PolicyType.AUTOMATIC : St.PolicyType.NEVER;
+
+        if (needsScrollbar)
+            this.scroller.add_style_pseudo_class('scrolled');
+        else
+            this.scroller.remove_style_pseudo_class('scrolled');
+
+        this.isOpen = true;
+        this.emit('open-state-changed', true);
 
         const duration = animate !== PopupAnimation.NONE
-            ? POPUP_ANIMATION_TIME / 2
+            ? POPUP_ANIMATION_TIME
             : 0;
 
-        this.actor.height = 0;
         this.box.opacity = 0;
-        this.actor.ease({
+
+        this.box.ease({
             duration,
-            height: targetHeight,
-            onComplete: () => {
-                this.box.ease({
-                    duration,
-                    opacity: 255,
-                });
-                this.actor.height = -1;
-            },
+            opacity: 255,
         });
-        this.emit('open-state-changed', true);
     }
 
     close(animate) {
@@ -463,26 +482,28 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             return;
 
         const duration = animate !== PopupAnimation.NONE
-            ? POPUP_ANIMATION_TIME / 2
+            ? POPUP_ANIMATION_TIME
             : 0;
 
         this.box.ease({
             duration,
             opacity: 0,
-            onComplete: () => {
-                this.actor.ease({
-                    duration,
-                    height: 0,
-                    onComplete: () => {
-                        this.actor.hide();
-                        this.emit('menu-closed');
-                    },
-                });
-            },
+            onComplete: () => this.actor.hide(),
         });
 
         this.isOpen = false;
         this.emit('open-state-changed', false);
+        this.emit('menu-closed');
+    }
+
+    _needsScrollbar() {
+        let parent = this.actor.get_parent();
+        let [, maxHeight] = parent.get_preferred_height(-1);
+
+        let [, preferredHeight] = this.actor.get_preferred_height(-1);
+        console.log(maxHeight)
+        console.log(preferredHeight)
+        return preferredHeight >= maxHeight;
     }
 
     _syncChecked() {
@@ -490,6 +511,19 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             this._headerIcon.add_style_class_name('active');
         else
             this._headerIcon.remove_style_class_name('active');
+    }
+
+    _onSizeChanged() {
+        console.log("on size changed")
+        let needsScrollbar = this._needsScrollbar();
+
+        this.scroller.vscrollbar_policy =
+            needsScrollbar ? St.PolicyType.AUTOMATIC : St.PolicyType.NEVER;
+
+        if (needsScrollbar)
+            this.scroller.add_style_pseudo_class('scrolled');
+        else
+            this.scroller.remove_style_pseudo_class('scrolled');
     }
 
     // expected on toplevel menus
