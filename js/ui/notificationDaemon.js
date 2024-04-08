@@ -405,10 +405,6 @@ const PRIORITY_URGENCY_MAP = {
 const GtkNotificationDaemonNotification = GObject.registerClass(
 class GtkNotificationDaemonNotification extends MessageTray.Notification {
     constructor(source, id, notification) {
-        super({source});
-        this._serialized = GLib.Variant.new('a{sv}', notification);
-        this.id = id;
-
         const {
             title,
             body,
@@ -421,16 +417,19 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
             timestamp: time,
         } = notification;
 
-        if (priority) {
-            let urgency = PRIORITY_URGENCY_MAP[priority.unpack()];
-            this.urgency = urgency !== undefined ? urgency : MessageTray.Urgency.NORMAL;
-        } else if (urgent) {
-            this.urgency = urgent.unpack()
-                ? MessageTray.Urgency.CRITICAL
-                : MessageTray.Urgency.NORMAL;
-        } else {
-            this.urgency = MessageTray.Urgency.NORMAL;
-        }
+        const urgency = PRIORITY_URGENCY_MAP[priority?.unpack()] ??
+                      urgent?.unpack() ? MessageTray.Urgency.CRITICAL : MessageTray.Urgency.NORMAL;
+
+        super({
+            source,
+            title: title.unpack(),
+            body: body?.unpack(),
+            gicon: gicon
+                ? Gio.icon_deserialize(gicon) : null,
+            datetime: time
+                ? GLib.DateTime.new_from_unix_local(time.unpack()) : null,
+            urgency,
+        });
 
         if (buttons) {
             buttons.deepUnpack().forEach(button => {
@@ -440,17 +439,10 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
             });
         }
 
+        this._serialized = GLib.Variant.new('a{sv}', notification);
+        this.id = id;
         this._defaultAction = defaultAction?.unpack();
         this._defaultActionTarget = defaultActionTarget;
-
-        this.set({
-            title: title.unpack(),
-            body: body?.unpack(),
-            gicon: gicon
-                ? Gio.icon_deserialize(gicon) : null,
-            datetime: time
-                ? GLib.DateTime.new_from_unix_local(time.unpack()) : null,
-        });
     }
 
     _activateAction(actionId, target) {
