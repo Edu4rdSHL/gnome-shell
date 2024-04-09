@@ -43,7 +43,7 @@ export class WindowAttentionHandler {
             source,
             title,
             body,
-            forFeedback: true,
+            displayHint: MessageTray.DisplayHint.FORCE_IMMEDIATELY,
         });
         notification.connect('activated', () => {
             source.open();

@@ -247,15 +247,20 @@ class FdoNotificationDaemon {
             notification.urgency = MessageTray.Urgency.CRITICAL;
             break;
         }
-        notification.resident = !!hints.resident;
+
+        if (hints.resident)
+            notification.displayHint |= MessageTray.DisplayHint.RESIDENT;
+
         // 'transient' is a reserved keyword in JS, so we have to retrieve the value
         // of the 'transient' hint with hints['transient'] rather than hints.transient
-        notification.isTransient = !!hints['transient'];
+        if (hints['transient'])
+            notification.displayHint |= MessageTray.DisplayHint.TRANSIENT;
 
-        let privacyScope = hints['x-gnome-privacy-scope'] || 'user';
-        notification.privacyScope = privacyScope === 'system'
-            ? MessageTray.PrivacyScope.SYSTEM
-            : MessageTray.PrivacyScope.USER;
+        if (hints['x-gnome-privacy-scope'] === 'system')
+            notification.displayHint |= MessageTray.DisplayHint.SHOW_CONTENT_ON_LOCKSCREEN;
+        else
+            // Always show the notification on the lockscreen but without any content
+            notification.displayHint |= MessageTray.DisplayHint.SHOW_ON_LOCKSCREEN;
 
         // Only fallback to 'app-icon' when the source doesn't have a valid app
         const sourceGIcon = source.app ? null : this._iconForNotificationData(appIcon);

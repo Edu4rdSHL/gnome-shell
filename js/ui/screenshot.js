@@ -2092,7 +2092,7 @@ export const ScreenshotUI = GObject.registerClass({
             title,
             // Translators: notification body when a screencast was recorded.
             body: this._screencastPath ? _('Click here to view the video.') : '',
-            isTransient: true,
+            displayHint: MessageTray.DisplayHint.TRANSIENT,
         });
 
         if (this._screencastPath) {
@@ -2337,7 +2337,7 @@ function _storeScreenshot(bytes, pixbuf) {
         body: _('You can paste the image from the clipboard.'),
         datetime: time,
         gicon: content,
-        isTransient: true,
+        displayHint: MessageTray.DisplayHint.TRANSIENT,
     });
 
     if (!disableSaveToDisk) {

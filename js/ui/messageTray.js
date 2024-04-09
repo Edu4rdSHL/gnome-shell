@@ -466,7 +466,7 @@ export class Notification extends GObject.Object {
             // because it is common for such notifications to update themselves with new
             // information based on the action. We'd like to display the updated information
             // in place, rather than pop-up a new notification.
-            if (this.resident)
+            if (this.displayHint & DisplayHint.RESIDENT)
                 return;
 
             this.destroy();
@@ -499,7 +499,7 @@ export class Notification extends GObject.Object {
         // because it is common for such notifications to update themselves with new
         // information based on the action. We'd like to display the updated information
         // in place, rather than pop-up a new notification.
-        if (this.resident)
+        if (this.displayHint & DisplayHint.RESIDENT)
             return;
 
         this.destroy();
@@ -1093,7 +1093,9 @@ export const MessageTray = GObject.registerClass({
             let nextNotification = this._notificationQueue[0] || null;
             if (hasNotifications && nextNotification) {
                 let limited = this._busy || Main.layoutManager.primaryMonitor.inFullscreen;
-                let showNextNotification = !limited || nextNotification.forFeedback || nextNotification.urgency === Urgency.CRITICAL;
+                let showNextNotification = !limited ||
+                    nextNotification.displayHint & DisplayHint.FORCE_IMMEDIATELY ||
+                    nextNotification.urgency === Urgency.CRITICAL;
                 if (showNextNotification)
                     this._showNotification();
             }
@@ -1284,7 +1286,7 @@ export const MessageTray = GObject.registerClass({
     _hideNotificationCompleted() {
         let notification = this._notification;
         this._notification = null;
-        if (!this._notificationRemoved && notification.isTransient)
+        if (!this._notificationRemoved && notification.displayHint & DisplayHint.TRANSIENT)
             notification.destroy(NotificationDestroyedReason.EXPIRED);
 
         this._pointerInNotification = false;

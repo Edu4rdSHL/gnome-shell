@@ -204,8 +204,7 @@ class AppFavorites extends Signals.EventEmitter {
             source,
             title,
             body,
-            isTransient: true,
-            forFeedback: true,
+            displayHint: MessageTray.DisplayHint.TRANSIENT | MessageTray.DisplayHint.FORCE_IMMEDIATELY,
         });
         notification.addAction(_('Undo'), () => undoCallback());
         source.addNotification(notification);

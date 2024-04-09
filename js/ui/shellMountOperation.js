@@ -199,7 +199,7 @@ export class ShellMountOperation {
             source,
             title,
             body,
-            isTransient: true,
+            displayHint: MessageTray.DisplayHint.TRANSIENT,
             iconName: 'media-removable-symbolic',
         });
 
