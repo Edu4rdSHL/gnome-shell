@@ -78,6 +78,25 @@ export const PrivacyScope = {
     SYSTEM: 1,
 };
 
+/** @enum {number} */
+export const DisplayHint = {
+    NONE: 0,
+    // Only show a banner for the message.
+    TRANSIENT: 1 << 0,
+    // Don't show a banner but keep the message till dismissed.
+    NO_BANNER: 1 << 1,
+    // Show a banner immediately.
+    FORCE_IMMEDIATELY: 1 << 2,
+    // Message that can't be dismissed by the user.
+    PERSISTENT: 1 << 3,
+    // Message that won't automatically dismissed when an action is invoked.
+    RESIDENT: 1 << 4,
+    // Show on the lock screen that a source as a message, but without any content.
+    SHOW_ON_LOCKSCREEN: 1 << 5,
+    // Show the message on the lock screen.
+    SHOW_CONTENT_ON_LOCKSCREEN: 1 << 6,
+};
+
 class FocusGrabber {
     constructor(actor) {
         this._actor = actor;
@@ -408,6 +427,19 @@ export class Notification extends GObject.Object {
         this.notify('privacy-scope');
     }
 
+    get displayHint() {
+        return this._displayHint;
+    }
+
+    set displayHint(displayHint) {
+        // TODO: check if the value is in range
+        if (this._displayHint === displayHint)
+            return;
+
+        this._displayHint = displayHint;
+        this.notify('display-hint');
+    }
+
     get urgency() {
         return this._urgency;
     }
@@ -662,6 +694,11 @@ GObject.registerClass({
             'is-transient', 'is-transient', 'is-transient',
             GObject.ParamFlags.READWRITE,
             false),
+        'display-hint': GObject.ParamSpec.int(
+            'display-hint', 'display-hint', 'display-hint',
+            GObject.ParamFlags.READWRITE | GObject.ParamFlags.CONSTRUCT,
+            0, GLib.MAXINT32,
+            DisplayHint.NONE),
     },
     Signals: {
         'action-added': {param_types: [Action]},
