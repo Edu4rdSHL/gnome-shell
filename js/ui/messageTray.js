@@ -333,11 +333,43 @@ export const NotificationApplicationPolicy = GObject.registerClass({
 
 export const Sound = GObject.registerClass(
 class Sound extends GObject.Object {
-    constructor(file, themedName) {
-        super();
+    static newForFile(file) {
+        const sound = new Sound();
+        sound._soundFile = file;
+        return sound;
+    }
 
-        this._soundFile = file;
-        this._soundName = themedName;
+    static newForName(name) {
+        const sound = new Sound();
+        sound._soundName = name;
+        return sound;
+    }
+
+    static newForBytes(bytes) {
+        const sound = new Sound();
+        sound._soundBytes = bytes;
+        return sound;
+    }
+
+    static deserialize(serializedSound) {
+        const sound = serializedSound?.unpack();
+
+        if (!sound || sound === 'silent')
+            return null;
+
+        if (sound === 'default')
+            return Sound.newForName('message');
+
+        if (sound.length !== 2)
+            return null;
+
+        const [type, data] = sound.map(v => v.unpack());
+        if (type === 'file')
+            return Sound.newForFile(Gio.File.new_for_commandline_arg(data.unpack()));
+        if (type === 'bytes')
+            return Sound.newForBytes(data.unpack());
+
+        return null;
     }
 
     play() {
@@ -347,6 +379,22 @@ class Sound extends GObject.Object {
             player.play_from_theme(this._soundName, _('Notification sound'), null);
         else if (this._soundFile)
             player.play_from_file(this._soundFile, _('Notification sound'), null);
+        else if (this._soundBytes)
+            this._playSoundBytes();
+    }
+
+    async _playSoundBytes() {
+        const player = global.display.get_sound_player();
+        const [file, stream] = Gio.File.new_tmp('XXXXXX-notification-sound');
+        await stream.output_stream.write_bytes_async(this._soundBytes,
+            GLib.PRIORITY_DEFAULT, null);
+        stream.close_async(GLib.PRIORITY_DEFAULT, null);
+        player.play_from_file(file, _('Notification sound'), null);
+        this._tempFile = file;
+    }
+
+    cleanupTempFile() {
+        this._tempFile?.delete(null);
     }
 });
 
@@ -506,6 +554,7 @@ export class Notification extends GObject.Object {
     }
 
     destroy(reason = NotificationDestroyedReason.DISMISSED) {
+        this.sound?.cleanupTempFile();
         this.emit('destroy', reason);
 
         if (this._updateDatetimeId)

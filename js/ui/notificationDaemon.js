@@ -197,15 +197,18 @@ class FdoNotificationDaemon {
 
         const gicon = this._imageForNotificationData(hints);
 
-        const soundFile = 'sound-file' in hints
-            ? Gio.File.new_for_path(hints['sound-file']) : null;
+        let sound;
+        if ('sound-file' in hints)
+            sound = MessageTray.Sound.newForFile(Gio.File.new_for_path(hints['sound-file']));
+        else if ('sound-name' in hints)
+            sound = MessageTray.Sound.newForName(hints['sound-name']);
 
         notification.set({
             title: summary,
             body,
             gicon,
             useBodyMarkup: true,
-            sound: new MessageTray.Sound(soundFile, hints['sound-name']),
+            sound,
         });
         notification.clearActions();
 
@@ -413,6 +416,7 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
             urgent,
             priority,
             buttons,
+            sound,
             'default-action': defaultAction,
             'default-action-target': defaultActionTarget,
             'display-hint': displayHint,
@@ -429,6 +433,7 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
             useBodyMarkup: !!markupBody,
             gicon: gicon
                 ? Gio.icon_deserialize(gicon) : null,
+            sound: sound ? MessageTray.Sound.deserialize(sound) : null,
             datetime: time
                 ? GLib.DateTime.new_from_unix_local(time.unpack()) : null,
             urgency,
