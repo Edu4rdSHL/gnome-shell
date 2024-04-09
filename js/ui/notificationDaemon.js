@@ -415,6 +415,7 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
             buttons,
             'default-action': defaultAction,
             'default-action-target': defaultActionTarget,
+            'display-hint': displayHint,
             timestamp: time,
         } = notification;
 
@@ -439,6 +440,32 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
                     this._onButtonClicked(button);
                 });
             });
+        }
+
+        let showOnLockscreen = true;
+        let showContentOnLockscreen = true;
+        if (displayHint) {
+            for (const hint of displayHint.deepUnpack()) {
+                if (hint === 'transient')
+                    this.displayHint |= MessageTray.DisplayHint.TRANSIENT;
+                else if (hint === 'tray')
+                    this.displayHint |= MessageTray.DisplayHint.NO_BANNER;
+                else if (hint === 'persistent')
+                    this.displayHint |= MessageTray.DisplayHint.PERSISTENT;
+                else if (hint === 'resident')
+                    this.displayHint |= MessageTray.DisplayHint.RESIDENT;
+                else if (hint === 'hide-on-lockscreen')
+                    showOnLockscreen = false;
+                else if (hint === 'hide-content-on-lockscreen')
+                    showContentOnLockscreen = false;
+            }
+        }
+
+        if (showOnLockscreen) {
+            if (showContentOnLockscreen)
+                this.displayHint |= MessageTray.DisplayHint.SHOW_CONTENT_ON_LOCKSCREEN;
+            else
+                this.displayHint |= MessageTray.DisplayHint.SHOW_ON_LOCKSCREEN;
         }
 
         this._serialized = GLib.Variant.new('a{sv}', notification);
