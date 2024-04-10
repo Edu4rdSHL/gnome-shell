@@ -355,6 +355,7 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             coordinate: Clutter.BindCoordinate.Y,
             source: sourceActor,
         });
+        this.constraints = constraints
         sourceActor.bind_property('height',
             constraints, 'offset',
             GObject.BindingFlags.DEFAULT);
@@ -712,13 +713,14 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         this.actor = new St.Widget({reactive: true, width: 0, height: 0});
         this.actor.add_child(this._boxPointer);
 
-        this._boxPointer.add_style_pseudo_class('scrolled');
-
         this.scroller = new St.ScrollView({
-            vscrollbar_policy: St.PolicyType.AUTOMATIC,
+            vscrollbar_policy: St.PolicyType.NEVER,
+            overlay_scrollbars: false,
         })
-        this._boxPointer.bin.set_child(this.scroller);
-        this.scroller.set_child(this.box);
+        this._boxPointer.bin.set_child(this.box);
+        this._box = new St.BoxLayout({vertical: true});
+        this.box.add_child(this.scroller)
+        this.scroller.set_child(this._box);
 
         this.actor._delegate = this;
 
@@ -752,7 +754,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
                 nColumns,
             }),
         });
-        this.box.add_child(this._grid);
+        this._box.add_child(this._grid);
         this._grid.add_child(placeholder);
 
         const yConstraint = new Clutter.BindConstraint({
@@ -770,8 +772,9 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
                 return GLib.SOURCE_REMOVE;
             });
         };
+
         this._grid.connect('notify::y', updateOffset);
-        this.box.connect('notify::y', updateOffset);
+        this._box.connect('notify::y', updateOffset);
         this._boxPointer.bin.connect('notify::y', updateOffset);
 
         this._overlay.add_constraint(yConstraint);
@@ -804,10 +807,39 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         if (item.menu) {
             this._overlay.add_child(item.menu.actor);
 
+            item.menu.actor.connect('scroll-event', (m, event) => {
+                this.scroller.vfunc_scroll_event(event)
+                this.scroller.queue_redraw()
+                item.menu.actor.queue_redraw()
+
+                const scroller_position = this.scroller.get_vadjustment().get_value()
+                const source_height = item.get_height()
+
+                item.menu.constraints.offset = source_height - scroller_position
+            });
+
             item.menu.connect('open-state-changed', (m, isOpen) => {
                 this._setDimmed(isOpen);
                 this._activeMenu = isOpen ? item.menu : null;
+                this.apply_scrollbar();
+
+                const scroller_position = this.scroller.get_vadjustment().get_value()
+                const source_height = item.get_height()
+
+                item.menu.constraints.offset = source_height - scroller_position
+
+                const max_height = this.actor.get_theme_node().get_max_height()
+
+                this._boxPointer.bin.style = `max-height: ${max_height}px;`;
+                this.scroller.style = `max-height: ${max_height}px;`;
+                this._grid.style = `max-height: ${max_height}px;`;
             });
+
+            item.menu.connect('menu-closed', (m) => {
+                this.apply_scrollbar();
+            });
+
+            item.menu.connect()
         }
     }
 
@@ -815,15 +847,35 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         return this._grid.get_first_child();
     }
 
+    apply_scrollbar() {
+        var menuHeight, a
+        if (this._activeMenu) {
+            [, menuHeight] = this._activeMenu.box.get_preferred_height(-1)
+        } else {
+            menuHeight = 0
+        }
+        const max_height = this.actor.get_theme_node().get_max_height()
+        const [,preferred_height] = this._boxPointer.get_preferred_height(-1);
+        const needsScrollbar =
+            (preferred_height + menuHeight > max_height) && (max_height > 0)
+
+        this.scroller.vscrollbar_policy =
+            needsScrollbar ? St.PolicyType.ALWAYS : St.PolicyType.NEVER;
+
+        if (needsScrollbar) {
+            this.box.add_style_pseudo_class('scrolled');
+            this._grid.add_style_pseudo_class('scrolled');
+        } else {
+            this.box.remove_style_pseudo_class('scrolled');
+            this._grid.remove_style_pseudo_class('scrolled');
+        }
+    }
+
     open(animate) {
         this.actor.show();
         super.open(animate);
 
-        let max_height = this.actor.get_theme_node().get_max_height()
-
-        this._boxPointer.bin.style = `max-height: ${max_height}px;`;
-        this.scroller.style = `max-height: ${max_height}px;`;
-        this._grid.style = `max-height: ${max_height}px;`;
+        this.apply_scrollbar();
     }
 
     close(animate) {
