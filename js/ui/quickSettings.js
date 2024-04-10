@@ -711,6 +711,15 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
         this.actor = new St.Widget({reactive: true, width: 0, height: 0});
         this.actor.add_child(this._boxPointer);
+
+        this._boxPointer.add_style_pseudo_class('scrolled');
+
+        this.scroller = new St.ScrollView({
+            vscrollbar_policy: St.PolicyType.AUTOMATIC,
+        })
+        this._boxPointer.bin.set_child(this.scroller);
+        this.scroller.set_child(this.box);
+
         this.actor._delegate = this;
 
         this.connect('menu-closed', () => this.actor.hide());
@@ -809,6 +818,12 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
     open(animate) {
         this.actor.show();
         super.open(animate);
+
+        let max_height = this.actor.get_theme_node().get_max_height()
+
+        this._boxPointer.bin.style = `max-height: ${max_height}px;`;
+        this.scroller.style = `max-height: ${max_height}px;`;
+        this._grid.style = `max-height: ${max_height}px;`;
     }
 
     close(animate) {
