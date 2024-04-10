@@ -206,7 +206,6 @@ class FdoNotificationDaemon {
             gicon,
             useBodyMarkup: true,
             sound: new MessageTray.Sound(soundFile, hints['sound-name']),
-            acknowledged: false,
         });
         notification.clearActions();
 
