@@ -405,6 +405,10 @@ export const Message = GObject.registerClass({
             'datetime', 'datetime', 'datetime',
             GObject.ParamFlags.READWRITE,
             GLib.DateTime),
+        'can-close': GObject.ParamSpec.boolean(
+            'can-close', 'can-close', 'can-close',
+            GObject.ParamFlags.READWRITE,
+            false),
     },
     Signals: {
         'close': {},
@@ -487,7 +491,8 @@ export const Message = GObject.registerClass({
         this.connect('destroy', this._onDestroy.bind(this));
 
         this._header.closeButton.connect('clicked', this.close.bind(this));
-        this._header.closeButton.visible = this.canClose();
+
+        this.bind_property('can-close', this._header.closeButton, 'visible', GObject.BindingFlags.SYNC_CREATE);
 
         this._header.expandButton.connect('clicked', () => {
             if (this.expanded)
@@ -633,10 +638,6 @@ export const Message = GObject.registerClass({
         this.emit('unexpanded');
     }
 
-    canClose() {
-        return false;
-    }
-
     _onDestroy() {
     }
 
@@ -646,7 +647,7 @@ export const Message = GObject.registerClass({
         if (keysym === Clutter.KEY_Delete ||
             keysym === Clutter.KEY_KP_Delete ||
             keysym === Clutter.KEY_BackSpace) {
-            if (this.canClose()) {
+            if (this.canClose) {
                 this.close();
                 return Clutter.EVENT_STOP;
             }
@@ -816,7 +817,7 @@ export const MessageListSection = GObject.registerClass({
     }
 
     clear() {
-        let messages = this._messages.filter(msg => msg.canClose());
+        let messages = this._messages.filter(msg => msg.canClose);
 
         // If there are few messages, letting them all zoom out looks OK
         if (messages.length < 2) {
@@ -854,7 +855,7 @@ export const MessageListSection = GObject.registerClass({
             this.notify('empty');
         }
 
-        let canClear = messages.some(m => m.canClose());
+        let canClear = messages.some(m => m.canClose);
         if (this._canClear !== canClear) {
             this._canClear = canClear;
             this.notify('can-clear');

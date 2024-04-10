@@ -801,6 +801,11 @@ class NotificationMessage extends MessageList.Message {
         notification.bind_property('gicon',
             this, 'icon',
             GObject.BindingFlags.SYNC_CREATE);
+        notification.bind_property_full('display-hint',
+            this, 'can-close',
+            GObject.BindingFlags.SYNC_CREATE,
+            (bind, value) => [true, !(value & MessageTray.DisplayHint.PERSISTENT)],
+            null);
 
         this._actions = new Map();
         this.notification.actions.forEach(action => {
@@ -810,10 +815,6 @@ class NotificationMessage extends MessageList.Message {
 
     vfunc_clicked() {
         this.notification.activate();
-    }
-
-    canClose() {
-        return true;
     }
 
     _addAction(action) {
