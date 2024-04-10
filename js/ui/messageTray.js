@@ -602,13 +602,16 @@ export const Source = GObject.registerClass({
             this.countUpdated();
 
             // If acknowledged was set to false try to show the notification again
-            if (!notification.acknowledged)
+            if (!notification.acknowledged && !(notification.displayHint & DisplayHint.NO_BANNER))
                 this.emit('notification-request-banner', notification);
         });
         this.notifications.push(notification);
 
         this.emit('notification-added', notification);
-        this.emit('notification-request-banner', notification);
+
+        if (!(notification.displayHint & DisplayHint.NO_BANNER))
+            this.emit('notification-request-banner', notification);
+
         this.countUpdated();
     }
 
