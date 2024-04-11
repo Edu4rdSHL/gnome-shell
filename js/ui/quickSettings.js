@@ -507,6 +507,7 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     _setOpenedSubMenu(submenu) {
         this._openedSubMenu?.close(true);
         this._openedSubMenu = submenu;
+        this.emit('open-state-changed', true);
     }
 }
 
@@ -717,8 +718,9 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
             vscrollbar_policy: St.PolicyType.NEVER,
             overlay_scrollbars: false,
         })
+        this.scroller.add_style_class_name('vfade')
         this._boxPointer.bin.set_child(this.box);
-        this._box = new St.BoxLayout({vertical: true});
+        this._box = new St.Viewport();
         this.box.add_child(this.scroller)
         this.scroller.set_child(this._box);
 
@@ -807,15 +809,21 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         if (item.menu) {
             this._overlay.add_child(item.menu.actor);
 
-            item.menu.actor.connect('scroll-event', (m, event) => {
-                this.scroller.vfunc_scroll_event(event)
-                this.scroller.queue_redraw()
-                item.menu.actor.queue_redraw()
-
+            const update_menu_position = () => {
                 const scroller_position = this.scroller.get_vadjustment().get_value()
                 const source_height = item.get_height()
 
                 item.menu.constraints.offset = source_height - scroller_position
+            }
+
+            item.menu.actor.connect('scroll-event', (m, event) => {
+                this.scroller.vfunc_scroll_event(event)
+                update_menu_position()
+            });
+
+            item.menu.actor.connect('notify::height', (height) => {
+                update_menu_position();
+                this.apply_scrollbar();
             });
 
             item.menu.connect('open-state-changed', (m, isOpen) => {
@@ -823,23 +831,12 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
                 this._activeMenu = isOpen ? item.menu : null;
                 this.apply_scrollbar();
 
-                const scroller_position = this.scroller.get_vadjustment().get_value()
-                const source_height = item.get_height()
-
-                item.menu.constraints.offset = source_height - scroller_position
-
                 const max_height = this.actor.get_theme_node().get_max_height()
 
                 this._boxPointer.bin.style = `max-height: ${max_height}px;`;
                 this.scroller.style = `max-height: ${max_height}px;`;
                 this._grid.style = `max-height: ${max_height}px;`;
             });
-
-            item.menu.connect('menu-closed', (m) => {
-                this.apply_scrollbar();
-            });
-
-            item.menu.connect()
         }
     }
 
@@ -848,16 +845,9 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
     }
 
     apply_scrollbar() {
-        var menuHeight, a
-        if (this._activeMenu) {
-            [, menuHeight] = this._activeMenu.box.get_preferred_height(-1)
-        } else {
-            menuHeight = 0
-        }
         const max_height = this.actor.get_theme_node().get_max_height()
         const [,preferred_height] = this._boxPointer.get_preferred_height(-1);
-        const needsScrollbar =
-            (preferred_height + menuHeight > max_height) && (max_height > 0)
+        const needsScrollbar = (preferred_height > max_height) && (max_height > 0)
 
         this.scroller.vscrollbar_policy =
             needsScrollbar ? St.PolicyType.ALWAYS : St.PolicyType.NEVER;
