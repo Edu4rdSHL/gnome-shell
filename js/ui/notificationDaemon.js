@@ -408,6 +408,13 @@ const PRIORITY_URGENCY_MAP = {
 const GtkNotificationDaemonNotification = GObject.registerClass(
 class GtkNotificationDaemonNotification extends MessageTray.Notification {
     constructor(source, id, notification) {
+        super({source});
+
+        this.id = id;
+        this.update(notification);
+    }
+
+    update(notification) {
         const {
             title,
             body,
@@ -426,8 +433,7 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
         const urgency = PRIORITY_URGENCY_MAP[priority?.unpack()] ??
                       urgent?.unpack() ? MessageTray.Urgency.CRITICAL : MessageTray.Urgency.NORMAL;
 
-        super({
-            source,
+        this.set({
             title: title.unpack(),
             body: markupBody?.unpack() ?? body?.unpack() ?? null,
             useBodyMarkup: !!markupBody,
@@ -474,7 +480,6 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
         }
 
         this._serialized = GLib.Variant.new('a{sv}', notification);
-        this.id = id;
         this._defaultAction = defaultAction?.unpack();
         this._defaultActionTarget = defaultActionTarget;
     }
@@ -696,13 +701,22 @@ class GtkNotificationDaemon {
             throw e;
         }
 
-        let timestamp = GLib.DateTime.new_now_local().to_unix();
+        const timestamp = GLib.DateTime.new_now_local().to_unix();
         notificationSerialized['timestamp'] = new GLib.Variant('x', timestamp);
+        const showAsNew = notificationSerialized['display-hint']?.deepUnpack().some(hint => hint === 'show-as-new');
+        const oldNotification = source._notifications[notificationId];
 
-        const notification = new GtkNotificationDaemonNotification(source,
-            notificationId,
-            notificationSerialized);
-        source.addNotification(notification);
+        if (showAsNew || !oldNotification) {
+            const notification = new GtkNotificationDaemonNotification(
+                source,
+                notificationId,
+                notificationSerialized
+            );
+
+            source.addNotification(notification);
+        } else {
+            oldNotification.update(notificationSerialized);
+        }
 
         invocation.return_value(null);
     }
