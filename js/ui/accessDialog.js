@@ -15,6 +15,8 @@ import {loadInterfaceXML} from '../misc/fileUtils.js';
 const RequestIface = loadInterfaceXML('org.freedesktop.impl.portal.Request');
 const AccessIface = loadInterfaceXML('org.freedesktop.impl.portal.Access');
 
+const MONITOR_FOCUS_APP_TIMEOUT_MS = 2000;
+
 /** @enum {number} */
 const DialogResponse = {
     OK: 0,
@@ -151,8 +153,40 @@ export class AccessDialogDBus {
         this._accessDialog = dialog;
     }
 
+    _armFocusChangeTimeout(params, invocation) {
+        console.assert(!this._focusChangedId && !this._timeoutId);
+
+        this._focusChangedId = this._windowTracker.connect('notify::focus-app', () => {
+            const appId = params[1];
+
+            if (appId && `${appId}.desktop` === this._windowTracker.focus_app.id) {
+                GLib.source_remove(this._timeoutId);
+                delete this._timeoutId;
+
+                this._windowTracker.disconnect(this._focusChangedId);
+                delete this._focusChangedId;
+
+                this._showDialog(params, invocation);
+            }
+        });
+
+        this._timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MONITOR_FOCUS_APP_TIMEOUT_MS,
+            () => {
+                this._windowTracker.disconnect(this._focusChangedId);
+                delete this._focusChangedId;
+
+                invocation.return_error_literal(
+                    Gio.DBusError,
+                    Gio.DBusError.ACCESS_DENIED,
+                    'Only the focused app is allowed to show a system access dialog');
+
+                delete this._timeoutId;
+                return GLib.SOURCE_REMOVE;
+            });
+    }
+
     AccessDialogAsync(params, invocation) {
-        if (this._accessDialog) {
+        if (this._accessDialog || this._timeoutId) {
             invocation.return_error_literal(
                 Gio.DBusError,
                 Gio.DBusError.LIMITS_EXCEEDED,
@@ -163,11 +197,8 @@ export class AccessDialogDBus {
         const appId = params[1];
         // We probably want to use parentWindow and global.display.focus_window
         // for this check in the future
-        if (appId && `${appId}.desktop` !== this._windowTracker.focus_app.id) {
-            invocation.return_error_literal(
-                Gio.DBusError,
-                Gio.DBusError.ACCESS_DENIED,
-                'Only the focused app is allowed to show a system access dialog');
+        if (appId && `${appId}.desktop` !== this._windowTracker.focus_app?.id) {
+            this._armFocusChangeTimeout(params, invocation);
             return;
         }
 
