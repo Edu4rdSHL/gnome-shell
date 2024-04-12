@@ -140,6 +140,17 @@ export class AccessDialogDBus {
         Gio.DBus.session.own_name('org.gnome.Shell.Portal', Gio.BusNameOwnerFlags.REPLACE, null, null);
     }
 
+    _showDialog(params, invocation) {
+        const [handle, , , title, description, body, options] = params;
+
+        const dialog = new AccessDialog(
+            invocation, handle, title, description, body, options);
+        dialog.open();
+        dialog.connect('closed', () => (this._accessDialog = null));
+
+        this._accessDialog = dialog;
+    }
+
     AccessDialogAsync(params, invocation) {
         if (this._accessDialog) {
             invocation.return_error_literal(
@@ -149,7 +160,7 @@ export class AccessDialogDBus {
             return;
         }
 
-        let [handle, appId, parentWindow_, title, description, body, options] = params;
+        const appId = params[1];
         // We probably want to use parentWindow and global.display.focus_window
         // for this check in the future
         if (appId && `${appId}.desktop` !== this._windowTracker.focus_app.id) {
@@ -160,12 +171,6 @@ export class AccessDialogDBus {
             return;
         }
 
-        let dialog = new AccessDialog(
-            invocation, handle, title, description, body, options);
-        dialog.open();
-
-        dialog.connect('closed', () => (this._accessDialog = null));
-
-        this._accessDialog = dialog;
+        this._showDialog(params, invocation);
     }
 }
