@@ -355,7 +355,7 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             coordinate: Clutter.BindCoordinate.Y,
             source: sourceActor,
         });
-        this.constraints = constraints
+        this.constraints = constraints;
         sourceActor.bind_property('height',
             constraints, 'offset',
             GObject.BindingFlags.DEFAULT);
@@ -473,6 +473,10 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
         if (!this.isOpen)
             return;
 
+        if (this._openedSubMenu) {
+            this._openedSubMenu.close(animate);
+        }
+
         const duration = animate !== PopupAnimation.NONE
             ? POPUP_ANIMATION_TIME / 2
             : 0;
@@ -507,7 +511,7 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     _setOpenedSubMenu(submenu) {
         this._openedSubMenu?.close(true);
         this._openedSubMenu = submenu;
-        this.emit('open-state-changed', true);
+    //    this.emit('open-state-changed', true);
     }
 }
 
@@ -717,11 +721,11 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         this.scroller = new St.ScrollView({
             vscrollbar_policy: St.PolicyType.NEVER,
             overlay_scrollbars: false,
-        })
-        this.scroller.add_style_class_name('vfade')
+        });
+        this.scroller.add_style_class_name('vfade');
         this._boxPointer.bin.set_child(this.box);
         this._box = new St.Viewport();
-        this.box.add_child(this.scroller)
+        this.box.add_child(this.scroller);
         this.scroller.set_child(this._box);
 
         this.actor._delegate = this;
@@ -809,33 +813,33 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         if (item.menu) {
             this._overlay.add_child(item.menu.actor);
 
-            const update_menu_position = () => {
-                const scroller_position = this.scroller.get_vadjustment().get_value()
-                const source_height = item.get_height()
+            const updateMenuPosition = () => {
+                const scrollerPosition = this.scroller.get_vadjustment().get_value();
+                const sourceHeight = item.get_height();
 
-                item.menu.constraints.offset = source_height - scroller_position
+                item.menu.constraints.offset = sourceHeight - scrollerPosition;
             }
 
             item.menu.actor.connect('scroll-event', (m, event) => {
-                this.scroller.vfunc_scroll_event(event)
-                update_menu_position()
+                this.scroller.vfunc_scroll_event(event);
+                updateMenuPosition();
             });
 
-            item.menu.actor.connect('notify::height', (height) => {
-                update_menu_position();
-                this.apply_scrollbar();
+            item.menu.actor.connect('notify::height', () => {
+                updateMenuPosition();
+                this._applyScrollbar();
             });
 
             item.menu.connect('open-state-changed', (m, isOpen) => {
                 this._setDimmed(isOpen);
                 this._activeMenu = isOpen ? item.menu : null;
-                this.apply_scrollbar();
+                this._applyScrollbar();
 
-                const max_height = this.actor.get_theme_node().get_max_height()
+                const maxHeight = this.actor.get_theme_node().get_max_height();
 
-                this._boxPointer.bin.style = `max-height: ${max_height}px;`;
-                this.scroller.style = `max-height: ${max_height}px;`;
-                this._grid.style = `max-height: ${max_height}px;`;
+                this._boxPointer.bin.style = `max-height: ${maxHeight}px;`;
+                this.scroller.style = `max-height: ${maxHeight}px;`;
+                this._grid.style = `max-height: ${maxHeight}px;`;
             });
         }
     }
@@ -844,10 +848,10 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         return this._grid.get_first_child();
     }
 
-    apply_scrollbar() {
-        const max_height = this.actor.get_theme_node().get_max_height()
-        const [,preferred_height] = this._boxPointer.get_preferred_height(-1);
-        const needsScrollbar = (preferred_height > max_height) && (max_height > 0)
+    _applyScrollbar() {
+        const maxHeight = this.actor.get_theme_node().get_max_height();
+        const [, preferredHeight] = this._boxPointer.get_preferred_height(-1);
+        const needsScrollbar = (preferredHeight > maxHeight) && (maxHeight > 0);
 
         this.scroller.vscrollbar_policy =
             needsScrollbar ? St.PolicyType.ALWAYS : St.PolicyType.NEVER;
@@ -865,7 +869,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         this.actor.show();
         super.open(animate);
 
-        this.apply_scrollbar();
+        this._applyScrollbar();
     }
 
     close(animate) {
