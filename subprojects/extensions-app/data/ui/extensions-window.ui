@@ -274,8 +274,9 @@
                 <property name="name">noshell</property>
                 <property name="child">
                   <object class="AdwStatusPage">
-                    <property name="title" translatable="yes">Something’s gone wrong</property>
-                    <property name="description" translatable="yes">We’re very sorry, but it was not possible to get the list of installed extensions. Make sure you are logged into GNOME and try again.</property>
+                    <property name="icon-name">dialog-error-symbolic</property>
+                    <property name="title" translatable="yes">Unable to List Extensions</property>
+                    <property name="description" translatable="yes">Make sure you are logged into GNOME and try again</property>
                   </object>
                 </property>
               </object>
