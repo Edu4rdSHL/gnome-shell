@@ -665,6 +665,13 @@ const QuickSettingsLayout = GObject.registerClass({
             const [rowMin, rowNat] = this._getRowHeight(row);
             minHeight += rowMin;
             natHeight += rowNat;
+            row.forEach(child => {
+                if (child.menu?.actor.visible) {
+                    const [menuMin, menuNat] = child.menu.actor.get_preferred_height(-1);
+                    minHeight += menuMin;
+                    natHeight += menuNat;
+                }
+            })
         });
 
         return [minHeight, natHeight];
@@ -705,8 +712,12 @@ const QuickSettingsLayout = GObject.registerClass({
 
             y += rowNat + this.row_spacing;
 
-            if (row.some(c => c.menu?.actor.visible))
-                y += overlayHeight;
+            row.forEach(child => {
+                if (child.menu?.actor.visible) {
+                    const [, menuHeight] = child.menu.actor.get_preferred_height(-1);
+                    y += menuHeight;
+                }
+            });
         });
     }
 });
@@ -747,7 +758,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         });
 
         // "clone"
-        const placeholder = new Clutter.Actor({
+        this.placeholder = new Clutter.Actor({
             constraints: new Clutter.BindConstraint({
                 coordinate: Clutter.BindCoordinate.HEIGHT,
                 source: this._overlay,
@@ -756,44 +767,12 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
         this._grid = new St.Widget({
             style_class: 'quick-settings-grid',
-            layout_manager: new QuickSettingsLayout(placeholder, {
+            layout_manager: new QuickSettingsLayout(this.placeholder, {
                 nColumns,
             }),
         });
         this._box.add_child(this._grid);
-        this._grid.add_child(placeholder);
-
-        const yConstraint = new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.Y,
-            source: this._boxPointer,
-        });
-
-        // Pick up additional spacing from any intermediate actors
-        const updateOffset = () => {
-            const laters = global.compositor.get_laters();
-            laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
-                const offset = this._grid.apply_relative_transform_to_point(
-                    this._boxPointer, new Graphene.Point3D());
-                yConstraint.offset = offset.y;
-                return GLib.SOURCE_REMOVE;
-            });
-        };
-
-        this._grid.connect('notify::y', updateOffset);
-        this._box.connect('notify::y', updateOffset);
-        this._boxPointer.bin.connect('notify::y', updateOffset);
-
-        this._overlay.add_constraint(yConstraint);
-        this._overlay.add_constraint(new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.X,
-            source: this._boxPointer,
-        }));
-        this._overlay.add_constraint(new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.WIDTH,
-            source: this._boxPointer,
-        }));
-
-        this.actor.add_child(this._overlay);
+        this._grid.add_child(this.placeholder);
     }
 
     addItem(item, colSpan = 1) {
@@ -811,22 +790,17 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
             this._grid, item, 'column-span', colSpan);
 
         if (item.menu) {
-            this._overlay.add_child(item.menu.actor);
-
-            const updateMenuPosition = () => {
-                const scrollerPosition = this.scroller.get_vadjustment().get_value();
-                const sourceHeight = item.get_height();
-
-                item.menu.constraints.offset = sourceHeight - scrollerPosition;
-            }
+            this.placeholder.add_child(item.menu.actor);
+            item.menu.actor.add_constraint(new Clutter.BindConstraint({
+                coordinate: Clutter.BindCoordinate.WIDTH,
+                source: this._grid,
+            }));
 
             item.menu.actor.connect('scroll-event', (m, event) => {
                 this.scroller.vfunc_scroll_event(event);
-                updateMenuPosition();
             });
 
             item.menu.actor.connect('notify::height', () => {
-                updateMenuPosition();
                 this._applyScrollbar();
             });
 
@@ -836,10 +810,11 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
                 this._applyScrollbar();
 
                 const maxHeight = this.actor.get_theme_node().get_max_height();
+                const rise = this._boxPointer.get_theme_node().get_length('-arrow-rise');
 
-                this._boxPointer.bin.style = `max-height: ${maxHeight}px;`;
-                this.scroller.style = `max-height: ${maxHeight}px;`;
-                this._grid.style = `max-height: ${maxHeight}px;`;
+                this._boxPointer.bin.style = `max-height: ${maxHeight - 2 * rise}px;`;
+                this.scroller.style = `max-height: ${maxHeight - 2 * rise}px;`;
+                this._grid.style = `max-height: ${maxHeight - 2 * rise}px;`;
             });
         }
     }
@@ -850,8 +825,10 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
     _applyScrollbar() {
         const maxHeight = this.actor.get_theme_node().get_max_height();
+        const rise = this._boxPointer.get_theme_node().get_length('-arrow-rise');
+
         const [, preferredHeight] = this._boxPointer.get_preferred_height(-1);
-        const needsScrollbar = (preferredHeight > maxHeight) && (maxHeight > 0);
+        const needsScrollbar = (preferredHeight > maxHeight - 2 * rise) && (maxHeight > 0);
 
         this.scroller.vscrollbar_policy =
             needsScrollbar ? St.PolicyType.ALWAYS : St.PolicyType.NEVER;
@@ -859,6 +836,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         if (needsScrollbar) {
             this.box.add_style_pseudo_class('scrolled');
             this._grid.add_style_pseudo_class('scrolled');
+            this.scroller.get_vscroll_bar().style = `padding: 2px;`;
         } else {
             this.box.remove_style_pseudo_class('scrolled');
             this._grid.remove_style_pseudo_class('scrolled');
@@ -877,7 +855,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         super.close(animate);
     }
 
-    _setDimmed(dim) {
+    _setDimmed(dim, menu) {
         const val = 127 * (1 + (dim ? 1 : 0) * DIM_BRIGHTNESS);
         const color = Clutter.Color.new(val, val, val, 255);
 

@@ -20,11 +20,11 @@
   spacing-columns: $base_padding * 2;
   &:ltr {
     padding-right: $base_padding * 1.5;
-    &:scrolled { padding-right: $base_padding * 1.5 - 4px;}
+    &:scrolled { padding-right: $base_padding * 1.5 - 6px;}
    }
   &:rtl {
     padding-left: $base_padding * 1.5;
-    &:scrolled { padding-left: $base_padding * 1.5 - 4px;}
+    &:scrolled { padding-left: $base_padding * 1.5 - 6px;}
   }
 }
 
@@ -116,7 +116,15 @@
 
   border-radius: $base_border_radius * 3;
 
-  margin: $base_padding * 2 $base_padding * 3 0;
+  margin: $base_padding * 2 0 0;
+  &:ltr {
+    margin-right: $base_padding * 1.5;
+    &:scrolled { margin-right: $base_padding * 1.5 - 4px;}
+   }
+  &:rtl {
+    margin-left: $base_padding * 1.5;
+    &:scrolled { margin-left: $base_padding * 1.5 - 4px;}
+  }
 
   .popup-menu-item > StIcon {
     -st-icon-style: symbolic;
