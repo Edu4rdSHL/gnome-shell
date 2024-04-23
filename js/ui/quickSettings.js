@@ -833,10 +833,12 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         if (needsScrollbar) {
             this.box.add_style_pseudo_class('scrolled');
             this._grid.add_style_pseudo_class('scrolled');
+            this._activeMenu?.box.add_style_pseudo_class('scrolled');
             this.scroller.get_vscroll_bar().style = `padding: 2px;`;
         } else {
             this.box.remove_style_pseudo_class('scrolled');
             this._grid.remove_style_pseudo_class('scrolled');
+            this._activeMenu?.box.remove_style_pseudo_class('scrolled');
         }
     }
 
