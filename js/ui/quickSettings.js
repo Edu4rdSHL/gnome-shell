@@ -510,8 +510,7 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     // expected on toplevel menus
     _setOpenedSubMenu(submenu) {
         this._openedSubMenu?.close(true);
-        this._openedSubMenu = submenu;
-    //    this.emit('open-state-changed', true);
+        this._openedSubMenu = submenu;;
     }
 }
 
@@ -665,13 +664,6 @@ const QuickSettingsLayout = GObject.registerClass({
             const [rowMin, rowNat] = this._getRowHeight(row);
             minHeight += rowMin;
             natHeight += rowNat;
-            row.forEach(child => {
-                if (child.menu?.actor.visible) {
-                    const [menuMin, menuNat] = child.menu.actor.get_preferred_height(-1);
-                    minHeight += menuMin;
-                    natHeight += menuNat;
-                }
-            })
         });
 
         return [minHeight, natHeight];
@@ -773,6 +765,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         });
         this._box.add_child(this._grid);
         this._grid.add_child(this.placeholder);
+        this._box.add_child(this._overlay);
     }
 
     addItem(item, colSpan = 1) {
@@ -790,7 +783,11 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
             this._grid, item, 'column-span', colSpan);
 
         if (item.menu) {
-            this.placeholder.add_child(item.menu.actor);
+            this._overlay.add_child(item.menu.actor);
+            item.menu._brightEffect = new Clutter.BrightnessContrastEffect({
+                enabled: false,
+            });
+            item.menu.actor.add_effect_with_name('bright', item.menu._brightEffect);
             item.menu.actor.add_constraint(new Clutter.BindConstraint({
                 coordinate: Clutter.BindCoordinate.WIDTH,
                 source: this._grid,
@@ -805,7 +802,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
             });
 
             item.menu.connect('open-state-changed', (m, isOpen) => {
-                this._setDimmed(isOpen);
+                this._setDimmed(isOpen, item.menu);
                 this._activeMenu = isOpen ? item.menu : null;
                 this._applyScrollbar();
 
@@ -857,12 +854,22 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
     _setDimmed(dim, menu) {
         const val = 127 * (1 + (dim ? 1 : 0) * DIM_BRIGHTNESS);
+        const brightVal = 255 * (1 + DIM_BRIGHTNESS);
         const color = Clutter.Color.new(val, val, val, 255);
+        const brightColor = Clutter.Color.new(brightVal, brightVal, brightVal, 255);
 
         this._boxPointer.ease_property('@effects.dim.brightness', color, {
             mode: Clutter.AnimationMode.LINEAR,
             duration: POPUP_ANIMATION_TIME,
-            onStopped: () => (this._dimEffect.enabled = dim),
+            onStopped: () => {
+                this._dimEffect.enabled = dim
+
+            },
+        });
+        menu.actor.ease_property('@effects.bright.brightness', brightColor, {
+            mode: Clutter.AnimationMode.LINEAR,
+            duration: 0,
+            onStopped: () => (menu._brightEffect.enabled = dim),
         });
         this._dimEffect.enabled = true;
     }
