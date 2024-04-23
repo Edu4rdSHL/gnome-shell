@@ -21,6 +21,7 @@ const ALWAYS_SHOW_LOG_OUT_KEY = 'always-show-log-out';
 const POWER_OFF_ACTION_ID        = 'power-off';
 const RESTART_ACTION_ID          = 'restart';
 const LOCK_SCREEN_ACTION_ID      = 'lock-screen';
+const SECURE_LOCK_ACTION_ID      = 'secure-lock'
 const LOGOUT_ACTION_ID           = 'logout';
 const SUSPEND_ACTION_ID          = 'suspend';
 const SWITCH_USER_ACTION_ID      = 'switch-user';
@@ -55,6 +56,10 @@ const SystemActions = GObject.registerClass({
             false),
         'can-lock-screen': GObject.ParamSpec.boolean(
             'can-lock-screen', 'can-lock-screen', 'can-lock-screen',
+            GObject.ParamFlags.READABLE,
+            false),
+        'can-secure-lock': GObject.ParamSpec.boolean(
+            'can-secure-lock', 'can-secure-lock', 'can-secure-lock',
             GObject.ParamFlags.READABLE,
             false),
         'can-switch-user': GObject.ParamSpec.boolean(
@@ -108,6 +113,14 @@ const SystemActions = GObject.registerClass({
             iconName: 'system-lock-screen-symbolic',
             // Translators: A list of keywords that match the lock screen action, separated by semicolons
             keywords: tokenizeKeywords(_('lock screen')),
+            available: false,
+        });
+        this._actions.set(SECURE_LOCK_ACTION_ID, {
+            // Translators: The name of the secure lock action in search
+            name: C_('search-result', 'Secure Lock'),
+            iconName: 'security-high-symbolic',
+            // Translators: A list of keywords that match the secure lock action, separated by semicolons
+            keywords: tokenizeKeywords(_('encrypt;lock down;lockdown')),
             available: false,
         });
         this._actions.set(LOGOUT_ACTION_ID, {
@@ -176,8 +189,10 @@ const SystemActions = GObject.registerClass({
         global.settings.connect(`changed::${ALWAYS_SHOW_LOG_OUT_KEY}`,
             () => this._updateLogout());
 
-        this._lockdownSettings.connect(`changed::${DISABLE_LOCK_SCREEN_KEY}`,
-            () => this._updateLockScreen());
+        this._lockdownSettings.connect(`changed::${DISABLE_LOCK_SCREEN_KEY}`, () => {
+            this._updateLockScreen();
+            this._updateSecureLock();
+        });
 
         this._lockdownSettings.connect(`changed::${DISABLE_LOG_OUT_KEY}`,
             () => this._updateHaveShutdown());
@@ -213,6 +228,10 @@ const SystemActions = GObject.registerClass({
 
     get canLockScreen() {
         return this._actions.get(LOCK_SCREEN_ACTION_ID).available;
+    }
+
+    get canSecureLock() {
+        return this._actions.get(SECURE_LOCK_ACTION_ID).available;
     }
 
     get canSwitchUser() {
@@ -271,6 +290,9 @@ const SystemActions = GObject.registerClass({
         // latter, so their value may be outdated; force an update now
         this._updateHaveShutdown();
         this._updateHaveSuspend();
+
+        // CanSecureLock changes w/o notification in logind
+        this._updateSecureLock();
     }
 
     getMatchingActions(terms) {
@@ -311,6 +333,9 @@ const SystemActions = GObject.registerClass({
         case LOCK_SCREEN_ACTION_ID:
             this.activateLockScreen();
             break;
+        case SECURE_LOCK_ACTION_ID:
+            this.activateSecureLock();
+            break;
         case LOGOUT_ACTION_ID:
             this.activateLogout();
             break;
@@ -330,10 +355,19 @@ const SystemActions = GObject.registerClass({
     }
 
     _updateLockScreen() {
-        let showLock = !Main.sessionMode.isLocked && !Main.sessionMode.isGreeter;
-        let allowLockScreen = !this._lockdownSettings.get_boolean(DISABLE_LOCK_SCREEN_KEY);
-        this._actions.get(LOCK_SCREEN_ACTION_ID).available = showLock && allowLockScreen && LoginManager.canLock();
+        let showLock = !Main.sessionMode.isLocked && !Main.sessionMode.isGreeter &&
+                       !this._lockdownSettings.get_boolean(DISABLE_LOCK_SCREEN_KEY);
+        let canLock = LoginManager.canLock();
+        this._actions.get(LOCK_SCREEN_ACTION_ID).available = showLock && canLock;
         this.notify('can-lock-screen');
+    }
+
+    async _updateSecureLock() {
+        let showLock = !Main.sessionMode.isGreeter &&
+                       !this._lockdownSettings.get_boolean(DISABLE_LOCK_SCREEN_KEY);
+        let canSecureLock = await this._loginManager.canSecureLock();
+        this._actions.get(SECURE_LOCK_ACTION_ID).available = showLock && canSecureLock;
+        this.notify('can-secure-lock');
     }
 
     async _updateHaveShutdown() {
@@ -421,6 +455,13 @@ const SystemActions = GObject.registerClass({
             throw new Error('The lock-screen action is not available!');
 
         Main.screenShield.lock(true);
+    }
+
+    activateSecureLock() {
+        if (!this._actions.get(SECURE_LOCK_ACTION_ID).available)
+            throw new Error('The secure-lock action is not available!');
+
+        this._loginManager.secureLock();
     }
 
     activateSwitchUser() {
