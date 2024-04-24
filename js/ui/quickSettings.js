@@ -355,6 +355,7 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             coordinate: Clutter.BindCoordinate.Y,
             source: sourceActor,
         });
+        this.constraints = constraints;
         sourceActor.bind_property('height',
             constraints, 'offset',
             GObject.BindingFlags.DEFAULT);
@@ -472,6 +473,10 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
         if (!this.isOpen)
             return;
 
+        if (this._openedSubMenu) {
+            this._openedSubMenu.close(animate);
+        }
+
         const duration = animate !== PopupAnimation.NONE
             ? POPUP_ANIMATION_TIME / 2
             : 0;
@@ -505,7 +510,7 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     // expected on toplevel menus
     _setOpenedSubMenu(submenu) {
         this._openedSubMenu?.close(true);
-        this._openedSubMenu = submenu;
+        this._openedSubMenu = submenu;;
     }
 }
 
@@ -699,8 +704,12 @@ const QuickSettingsLayout = GObject.registerClass({
 
             y += rowNat + this.row_spacing;
 
-            if (row.some(c => c.menu?.actor.visible))
-                y += overlayHeight;
+            row.forEach(child => {
+                if (child.menu?.actor.visible) {
+                    const [, menuHeight] = child.menu.actor.get_preferred_height(-1);
+                    y += menuHeight;
+                }
+            });
         });
     }
 });
@@ -711,6 +720,17 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
         this.actor = new St.Widget({reactive: true, width: 0, height: 0});
         this.actor.add_child(this._boxPointer);
+
+        this.scroller = new St.ScrollView({
+            vscrollbar_policy: St.PolicyType.NEVER,
+            overlay_scrollbars: false,
+        });
+        this.scroller.add_style_class_name('vfade');
+        this._boxPointer.bin.set_child(this.box);
+        this._box = new St.Viewport();
+        this.box.add_child(this.scroller);
+        this.scroller.set_child(this._box);
+
         this.actor._delegate = this;
 
         this.connect('menu-closed', () => this.actor.hide());
@@ -730,7 +750,7 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         });
 
         // "clone"
-        const placeholder = new Clutter.Actor({
+        this.placeholder = new Clutter.Actor({
             constraints: new Clutter.BindConstraint({
                 coordinate: Clutter.BindCoordinate.HEIGHT,
                 source: this._overlay,
@@ -739,43 +759,13 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
         this._grid = new St.Widget({
             style_class: 'quick-settings-grid',
-            layout_manager: new QuickSettingsLayout(placeholder, {
+            layout_manager: new QuickSettingsLayout(this.placeholder, {
                 nColumns,
             }),
         });
-        this.box.add_child(this._grid);
-        this._grid.add_child(placeholder);
-
-        const yConstraint = new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.Y,
-            source: this._boxPointer,
-        });
-
-        // Pick up additional spacing from any intermediate actors
-        const updateOffset = () => {
-            const laters = global.compositor.get_laters();
-            laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
-                const offset = this._grid.apply_relative_transform_to_point(
-                    this._boxPointer, new Graphene.Point3D());
-                yConstraint.offset = offset.y;
-                return GLib.SOURCE_REMOVE;
-            });
-        };
-        this._grid.connect('notify::y', updateOffset);
-        this.box.connect('notify::y', updateOffset);
-        this._boxPointer.bin.connect('notify::y', updateOffset);
-
-        this._overlay.add_constraint(yConstraint);
-        this._overlay.add_constraint(new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.X,
-            source: this._boxPointer,
-        }));
-        this._overlay.add_constraint(new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.WIDTH,
-            source: this._boxPointer,
-        }));
-
-        this.actor.add_child(this._overlay);
+        this._box.add_child(this._grid);
+        this._grid.add_child(this.placeholder);
+        this._box.add_child(this._overlay);
     }
 
     addItem(item, colSpan = 1) {
@@ -794,10 +784,34 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
 
         if (item.menu) {
             this._overlay.add_child(item.menu.actor);
+            item.menu._brightEffect = new Clutter.BrightnessContrastEffect({
+                enabled: false,
+            });
+            item.menu.actor.add_effect_with_name('bright', item.menu._brightEffect);
+            item.menu.actor.add_constraint(new Clutter.BindConstraint({
+                coordinate: Clutter.BindCoordinate.WIDTH,
+                source: this._grid,
+            }));
+
+            item.menu.actor.connect('scroll-event', (m, event) => {
+                this.scroller.vfunc_scroll_event(event);
+            });
+
+            item.menu.actor.connect('notify::height', () => {
+                this._applyScrollbar();
+            });
 
             item.menu.connect('open-state-changed', (m, isOpen) => {
-                this._setDimmed(isOpen);
+                this._setDimmed(isOpen, item.menu);
                 this._activeMenu = isOpen ? item.menu : null;
+                this._applyScrollbar();
+
+                const maxHeight = this.actor.get_theme_node().get_max_height();
+                const rise = this._boxPointer.get_theme_node().get_length('-arrow-rise');
+
+                this._boxPointer.bin.style = `max-height: ${maxHeight - 2 * rise}px;`;
+                this.scroller.style = `max-height: ${maxHeight - 2 * rise}px;`;
+                this._grid.style = `max-height: ${maxHeight - 2 * rise}px;`;
             });
         }
     }
@@ -806,9 +820,33 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         return this._grid.get_first_child();
     }
 
+    _applyScrollbar() {
+        const maxHeight = this.actor.get_theme_node().get_max_height();
+        const rise = this._boxPointer.get_theme_node().get_length('-arrow-rise');
+
+        const [, preferredHeight] = this._boxPointer.get_preferred_height(-1);
+        const needsScrollbar = (preferredHeight > maxHeight - 2 * rise) && (maxHeight > 0);
+
+        this.scroller.vscrollbar_policy =
+            needsScrollbar ? St.PolicyType.ALWAYS : St.PolicyType.NEVER;
+
+        if (needsScrollbar) {
+            this.box.add_style_pseudo_class('scrolled');
+            this._grid.add_style_pseudo_class('scrolled');
+            this._activeMenu?.box.add_style_pseudo_class('scrolled');
+            this.scroller.get_vscroll_bar().style = `padding: 2px;`;
+        } else {
+            this.box.remove_style_pseudo_class('scrolled');
+            this._grid.remove_style_pseudo_class('scrolled');
+            this._activeMenu?.box.remove_style_pseudo_class('scrolled');
+        }
+    }
+
     open(animate) {
         this.actor.show();
         super.open(animate);
+
+        this._applyScrollbar();
     }
 
     close(animate) {
@@ -816,14 +854,24 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         super.close(animate);
     }
 
-    _setDimmed(dim) {
+    _setDimmed(dim, menu) {
         const val = 127 * (1 + (dim ? 1 : 0) * DIM_BRIGHTNESS);
+        const brightVal = 255 * (1 + DIM_BRIGHTNESS);
         const color = Clutter.Color.new(val, val, val, 255);
+        const brightColor = Clutter.Color.new(brightVal, brightVal, brightVal, 255);
 
         this._boxPointer.ease_property('@effects.dim.brightness', color, {
             mode: Clutter.AnimationMode.LINEAR,
             duration: POPUP_ANIMATION_TIME,
-            onStopped: () => (this._dimEffect.enabled = dim),
+            onStopped: () => {
+                this._dimEffect.enabled = dim
+
+            },
+        });
+        menu.actor.ease_property('@effects.bright.brightness', brightColor, {
+            mode: Clutter.AnimationMode.LINEAR,
+            duration: 0,
+            onStopped: () => (menu._brightEffect.enabled = dim),
         });
         this._dimEffect.enabled = true;
     }
