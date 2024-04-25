@@ -122,6 +122,9 @@ class WorkspaceGroup extends Clutter.Actor {
             y: windowActor.y - this._monitor.y,
         });
 
+        windowActor.bind_property('opacity', clone, 'opacity',
+            GObject.BindingFlags.SYNC_CREATE);
+
         const record = {windowActor, clone};
 
         windowActor.connectObject('destroy', () => {
