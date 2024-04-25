@@ -52,6 +52,7 @@ export const AuthPrompt = GObject.registerClass({
         'next': {},
         'prompted': {},
         'reset': {param_types: [GObject.TYPE_UINT]},
+        'verified': {},
     },
 }, class AuthPrompt extends St.BoxLayout {
     _init(gdmClient, mode) {
@@ -402,6 +403,7 @@ export const AuthPrompt = GObject.registerClass({
         this.verificationStatus = AuthPromptStatus.VERIFICATION_SUCCEEDED;
         this.cancelButton.reactive = false;
         this.cancelButton.can_focus = false;
+        this.emit('verified');
     }
 
     _onReset() {

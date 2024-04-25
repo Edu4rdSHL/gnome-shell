@@ -715,6 +715,7 @@ export const UnlockDialog = GObject.registerClass({
             this._authPrompt.connect('failed', this._fail.bind(this));
             this._authPrompt.connect('cancelled', this._fail.bind(this));
             this._authPrompt.connect('reset', this._onReset.bind(this));
+            this._authPrompt.connect('verified', this._onVerified.bind(this));
             this._promptBox.add_child(this._authPrompt);
         }
 
@@ -809,6 +810,14 @@ export const UnlockDialog = GObject.registerClass({
         }
 
         this._authPrompt.begin({userName});
+    }
+
+    _onVerified() {
+        // Make sure we don't get stuck at the successfully authenticated
+        // prompt, when we're running as the secure lock screen in GDM and
+        // the user immediately re-triggers a secure-lock
+        if (Main.sessionMode.isGreeter)
+                this._showClock();
     }
 
     _escape() {
