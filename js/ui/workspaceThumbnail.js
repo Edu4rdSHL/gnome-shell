@@ -61,6 +61,8 @@ export const WindowClone = GObject.registerClass({
 }, class WindowClone extends Clutter.Actor {
     _init(realWindow) {
         let clone = new Clutter.Clone({source: realWindow});
+        realWindow.bind_property('opacity', clone, 'opacity',
+            GObject.BindingFlags.SYNC_CREATE);
         super._init({
             layout_manager: new PrimaryActorLayout(clone),
             reactive: true,
@@ -152,6 +154,8 @@ export const WindowClone = GObject.registerClass({
 
     _doAddAttachedDialog(metaDialog, realDialog) {
         let clone = new Clutter.Clone({source: realDialog});
+        realDialog.bind_property('opacity', clone, 'opacity',
+            GObject.BindingFlags.SYNC_CREATE);
         this._updateDialogPosition(realDialog, clone);
 
         realDialog.connectObject(
