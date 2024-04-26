@@ -443,11 +443,38 @@ export const WorkspaceLayout = GObject.registerClass({
             this.layout_changed();
         });
 
+        this._overviewAdjustment?.connect('notify::value', () =>
+            this._syncOpacities());
+
         this._workarea = null;
         this._workareasChangedId = 0;
     }
 
     _syncOpacity(actor, metaWindow) {
+        const windowActor = metaWindow.get_compositor_private();
+        const {ControlsState} = OverviewControls;
+        const {finalState, initialState, progress} =
+            this._overviewAdjustment?.getStateTransitionParams() ?? {
+                initialState: ControlsState.HIDDEN,
+                finalState: ControlsState.HIDDEN,
+                progress: 1,
+            };
+
+        if (initialState !== ControlsState.WINDOW_PICKER &&
+            finalState !== ControlsState.WINDOW_PICKER) {
+            actor.opacity = windowActor.opacity;
+        } else if (finalState === ControlsState.WINDOW_PICKER) {
+            const initialOpacity = windowActor.opacity;
+            const finalOpacity = 255;
+            actor.opacity = Math.clamp(initialOpacity +
+                (progress * (finalOpacity - initialOpacity)), 0, 255);
+        } else if (initialState === ControlsState.WINDOW_PICKER) {
+            const initialOpacity = 255;
+            const finalOpacity = windowActor.opacity;
+            actor.opacity = Math.clamp(initialOpacity -
+                (progress * (initialOpacity - finalOpacity)), 0, 255);
+        }
+
         if (!metaWindow.showing_on_its_workspace())
             actor.opacity = this._stateAdjustment.value * 255;
     }
