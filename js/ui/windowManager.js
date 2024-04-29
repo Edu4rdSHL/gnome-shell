@@ -1129,6 +1129,9 @@ export class WindowManager {
     }
 
     _shouldAnimate() {
+        if (this._blockAnimations)
+            return false;
+
         const overviewOpen = Main.overview.visible && !Main.overview.closing;
         return !(overviewOpen || this._workspaceAnimation.gestureActive);
     }
