@@ -92,6 +92,8 @@ class WorkspaceGroup extends Clutter.Actor {
 
         for (const windowActor of windowActors) {
             const record = this._windowRecords.find(r => r.windowActor === windowActor);
+            if (!record)
+                continue;
 
             this.set_child_above_sibling(record.clone,
                 lastRecord ? lastRecord.clone : bottomActor);
