@@ -50,6 +50,10 @@ class WorkspaceGroup extends Clutter.Actor {
             this._syncStacking.bind(this), this);
     }
 
+    get monitor() {
+        return this._monitor;
+    }
+
     get workspace() {
         return this._workspace;
     }
@@ -174,26 +178,64 @@ export const MonitorGroup = GObject.registerClass({
         this.add_child(stickyGroup);
 
         this._workspaceGroups = [];
+        this._workspaceIndices = [];
+        this._movingWindow = movingWindow;
 
         const workspaceManager = global.workspace_manager;
-        const vertical = workspaceManager.layout_rows === -1;
         const activeWorkspace = workspaceManager.get_active_workspace();
+
+        this.setWorkspaceIndices(workspaceIndices);
+
+        this.progress = this.getWorkspaceProgress(activeWorkspace);
+
+        if (monitor.index === Main.layoutManager.primaryIndex) {
+            this._workspacesAdjustment = Main.createWorkspacesAdjustment(this);
+            this.bind_property_full('progress',
+                this._workspacesAdjustment, 'value',
+                GObject.BindingFlags.SYNC_CREATE,
+                (_bind, source) => {
+                    const indices = [
+                        this._workspaceIndices[Math.floor(source)],
+                        this._workspaceIndices[Math.ceil(source)],
+                    ];
+                    return [true, Util.lerp(...indices, source % 1.0)];
+                },
+                null);
+
+            this.connect('destroy', () => {
+                delete this._workspacesAdjustment;
+            });
+        }
+    }
+
+    setWorkspaceIndices(workspaceIndices) {
+        if (workspaceIndices.length === this._workspaceIndices.length &&
+            workspaceIndices.every((idx, i) => idx === this._workspaceIndices[i]))
+            return;
+
+        const {workspaceManager} = global;
+        const vertical = workspaceManager.layout_rows === -1;
 
         let x = 0;
         let y = 0;
 
+        this._workspaceGroups = [];
+        this._container.destroy_all_children();
+
         for (const i of workspaceIndices) {
             const ws = workspaceManager.get_workspace_by_index(i);
-            const fullscreen = ws.list_windows().some(w => w.get_monitor() === monitor.index && w.is_fullscreen());
+            const fullscreen = ws.list_windows().some(w =>
+                w.get_monitor() === this._monitor.index && w.is_fullscreen());
 
-            if (i > 0 && vertical && !fullscreen && monitor.index === Main.layoutManager.primaryIndex) {
+            if (i > 0 && vertical && !fullscreen &&
+                this._monitor.index === Main.layoutManager.primaryIndex) {
                 // We have to shift windows up or down by the height of the panel to prevent having a
                 // visible gap between the windows while switching workspaces. Since fullscreen windows
                 // hide the panel, they don't need to be shifted up or down.
                 y -= Main.panel.height;
             }
 
-            const group = new WorkspaceGroup(ws, monitor, movingWindow);
+            const group = new WorkspaceGroup(ws, this._monitor, this._movingWindow);
 
             this._workspaceGroups.push(group);
             this._container.add_child(group);
@@ -207,26 +249,11 @@ export const MonitorGroup = GObject.registerClass({
                 x += this.baseDistance;
         }
 
-        this.progress = this.getWorkspaceProgress(activeWorkspace);
+        this._workspaceIndices = workspaceIndices;
+    }
 
-        if (monitor.index === Main.layoutManager.primaryIndex) {
-            this._workspacesAdjustment = Main.createWorkspacesAdjustment(this);
-            this.bind_property_full('progress',
-                this._workspacesAdjustment, 'value',
-                GObject.BindingFlags.SYNC_CREATE,
-                (bind, source) => {
-                    const indices = [
-                        workspaceIndices[Math.floor(source)],
-                        workspaceIndices[Math.ceil(source)],
-                    ];
-                    return [true, Util.lerp(...indices, source % 1.0)];
-                },
-                null);
-
-            this.connect('destroy', () => {
-                delete this._workspacesAdjustment;
-            });
-        }
+    get workspaceIndices() {
+        return this._workspaceIndices;
     }
 
     get baseDistance() {
