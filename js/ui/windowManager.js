@@ -956,7 +956,6 @@ export class WindowManager {
             new WorkspaceAnimation.WorkspaceAnimationController();
 
         this._shellwm.connect('kill-switch-workspace', () => {
-            this._workspaceAnimation.cancelSwitchAnimation();
             this._switchWorkspaceDone();
         });
     }
