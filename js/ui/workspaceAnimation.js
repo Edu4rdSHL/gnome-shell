@@ -480,19 +480,39 @@ export class WorkspaceAnimationController {
             workspaceIndices.reverse();
 
         this._prepareWorkspaceSwitch(workspaceIndices);
+        const wasInProgress = this._switchData.inProgress;
         this._switchData.inProgress = true;
 
         const fromWs = global.workspace_manager.get_workspace_by_index(from);
         const toWs = global.workspace_manager.get_workspace_by_index(to);
 
         for (const monitorGroup of this._switchData.monitors) {
-            monitorGroup.progress = monitorGroup.getWorkspaceProgress(fromWs);
+            if (wasInProgress) {
+                monitorGroup.movingWindow = this._movingWindow;
+
+                if (!monitorGroup.workspaceIndices.includes(from))
+                    monitorGroup.addWorkspaceIndex(from);
+
+                if (!monitorGroup.workspaceIndices.includes(to))
+                    monitorGroup.addWorkspaceIndex(to);
+            } else {
+                monitorGroup.progress = monitorGroup.getWorkspaceProgress(fromWs);
+            }
+
             const progress = monitorGroup.getWorkspaceProgress(toWs);
 
             const params = {
                 duration: WINDOW_ANIMATION_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
             };
+
+            if (wasInProgress) {
+                const {progress: monitorGroupProgress} = monitorGroup;
+                if (progress > monitorGroupProgress)
+                    params.duration *= progress - monitorGroupProgress;
+                else
+                    params.duration *= monitorGroupProgress;
+            }
 
             if (monitorGroup.index === Main.layoutManager.primaryIndex) {
                 params.onComplete = () => {
