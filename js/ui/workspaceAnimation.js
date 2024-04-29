@@ -58,6 +58,10 @@ class WorkspaceGroup extends Clutter.Actor {
         return this._workspace;
     }
 
+    get movingWindow() {
+        return this._movingWindow;
+    }
+
     _shouldShowWindow(window) {
         if (!window.showing_on_its_workspace() || this._isDesktopWindow(window))
             return false;
@@ -209,18 +213,16 @@ export const MonitorGroup = GObject.registerClass({
     }
 
     setWorkspaceIndices(workspaceIndices) {
-        if (workspaceIndices.length === this._workspaceIndices.length &&
-            workspaceIndices.every((idx, i) => idx === this._workspaceIndices[i]))
-            return;
-
         const {workspaceManager} = global;
         const vertical = workspaceManager.layout_rows === -1;
 
         let x = 0;
         let y = 0;
 
+        let oldFirstGroup;
+        const oldGroups = this._workspaceGroups;
         this._workspaceGroups = [];
-        this._container.destroy_all_children();
+        this._container.remove_all_children();
 
         for (const i of workspaceIndices) {
             const ws = workspaceManager.get_workspace_by_index(i);
@@ -235,7 +237,18 @@ export const MonitorGroup = GObject.registerClass({
                 y -= Main.panel.height;
             }
 
-            const group = new WorkspaceGroup(ws, this._monitor, this._movingWindow);
+            let group;
+            let groupIndex = oldGroups.findIndex(g =>
+                g.workspace === ws && g.monitor === this._monitor &&
+                g.movingWindow === this._movingWindow);
+            if (groupIndex === -1) {
+                group = new WorkspaceGroup(ws, this._monitor, this._movingWindow);
+            } else {
+                [group] = oldGroups.splice(groupIndex, 1);
+
+                if (!oldFirstGroup && group.x === 0 && group.y === 0)
+                    oldFirstGroup = group;
+            }
 
             this._workspaceGroups.push(group);
             this._container.add_child(group);
@@ -249,11 +262,36 @@ export const MonitorGroup = GObject.registerClass({
                 x += this.baseDistance;
         }
 
+        if (oldFirstGroup) {
+            if (vertical)
+                this._container.y -= oldFirstGroup.y;
+            else
+                this._container.x -= oldFirstGroup.x;
+        }
+
+        oldGroups.forEach(g => g.destroy());
         this._workspaceIndices = workspaceIndices;
+    }
+
+    addWorkspaceIndex(wsIndex) {
+        const indices = new Set([...this._workspaceIndices, wsIndex]);
+        this.setWorkspaceIndices([...indices].sort((a, b) => a - b));
     }
 
     get workspaceIndices() {
         return this._workspaceIndices;
+    }
+
+    set movingWindow(movingWindow) {
+        if (this._movingWindow === movingWindow)
+            return;
+
+        this._movingWindow = movingWindow;
+        this.setWorkspaceIndices(this._workspaceIndices);
+    }
+
+    get movingWindow() {
+        return this._movingWindow;
     }
 
     get baseDistance() {
