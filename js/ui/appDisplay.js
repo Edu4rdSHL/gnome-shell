@@ -488,12 +488,6 @@ class BaseAppViewGridLayout extends Clutter.BinLayout {
 
 var BaseAppView = GObject.registerClass({
     GTypeFlags: GObject.TypeFlags.ABSTRACT,
-    Properties: {
-        'gesture-modes': GObject.ParamSpec.flags(
-            'gesture-modes', 'gesture-modes', 'gesture-modes',
-            GObject.ParamFlags.READWRITE | GObject.ParamFlags.CONSTRUCT_ONLY,
-            Shell.ActionMode, Shell.ActionMode.OVERVIEW),
-    },
     Signals: {
         'view-loaded': {},
     },
@@ -626,7 +620,7 @@ var BaseAppView = GObject.registerClass({
         // Swipe
         this._swipeTracker = new SwipeTracker.SwipeTracker(this._scrollView,
             Clutter.Orientation.HORIZONTAL,
-            this.gestureModes,
+            Shell.ActionMode.ALL,
             {
                 name: 'AppDisplay swipe tracker',
             });
@@ -2132,7 +2126,6 @@ class FolderView extends BaseAppView {
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
-            gesture_modes: Shell.ActionMode.POPUP,
         });
 
         // If it not expand, the parent doesn't take into account its preferred_width when allocating
