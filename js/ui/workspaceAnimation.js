@@ -190,6 +190,12 @@ export const MonitorGroup = GObject.registerClass({
         const workspaceManager = global.workspace_manager;
         const activeWorkspace = workspaceManager.get_active_workspace();
 
+        this._updateBaseDistance();
+        St.ThemeContext.get_for_stage(global.stage).connectObject(
+            'notify::scale-factor', () => this._updateBaseDistance(), this);
+        Main.layoutManager.connectObject('monitors-changed',
+            () => this._updateBaseDistance(), this);
+
         this.setWorkspaceIndices(workspaceIndices);
 
         this.progress = this.getWorkspaceProgress(activeWorkspace);
@@ -212,6 +218,13 @@ export const MonitorGroup = GObject.registerClass({
                 delete this._workspacesAdjustment;
             });
         }
+    }
+
+    _updateBaseDistance() {
+        this._baseDistance = global.workspace_manager.layout_rows === -1
+            ? this._monitor.height : this._monitor.width;
+        this._baseDistance += WORKSPACE_SPACING *
+            St.ThemeContext.get_for_stage(global.stage).scaleFactor;
     }
 
     setWorkspaceIndices(workspaceIndices) {
@@ -297,12 +310,7 @@ export const MonitorGroup = GObject.registerClass({
     }
 
     get baseDistance() {
-        const spacing = WORKSPACE_SPACING * St.ThemeContext.get_for_stage(global.stage).scale_factor;
-
-        if (global.workspace_manager.layout_rows === -1)
-            return this._monitor.height + spacing;
-        else
-            return this._monitor.width + spacing;
+        return this._baseDistance;
     }
 
     get progress() {
