@@ -36,6 +36,8 @@
 #define PRIVATE(obj) (obj)->priv
 
 struct _CRDocHandlerPriv {
+        gulong ref_count;
+
 	/**
 	 *This pointer is to hold an application parsing context.
 	 *For example, it used by the Object Model parser to 
@@ -75,14 +77,14 @@ cr_doc_handler_new (void)
 
         g_return_val_if_fail (result, NULL);
 
-        result->ref_count++;
-
         result->priv = g_try_malloc0 (sizeof (CRDocHandlerPriv));
         if (!result->priv) {
                 cr_utils_trace_info ("Out of memory exception");
                 g_free (result);
                 return NULL;
         }
+
+        PRIVATE (result)->ref_count++;
 
         return result;
 }
@@ -208,7 +210,7 @@ cr_doc_handler_ref (CRDocHandler * a_this)
 {
         g_return_if_fail (a_this);
 
-        a_this->ref_count++;
+        PRIVATE (a_this)->ref_count++;
 }
 
 /**
@@ -225,11 +227,11 @@ cr_doc_handler_unref (CRDocHandler * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        if (a_this->ref_count > 0) {
-                a_this->ref_count--;
+        if (PRIVATE (a_this)->ref_count > 0) {
+                PRIVATE (a_this)->ref_count--;
         }
 
-        if (a_this->ref_count == 0) {
+        if (PRIVATE (a_this)->ref_count == 0) {
                 cr_doc_handler_destroy (a_this);
                 return TRUE;
         }

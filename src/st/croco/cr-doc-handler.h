@@ -269,7 +269,6 @@ struct _CRDocHandler
 	void (*unrecoverable_error) (CRDocHandler *a_this) ;
 
 	gboolean resolve_import ;
-	gulong ref_count ;
 } ;
 
 CRDocHandler * cr_doc_handler_new (void) ;
