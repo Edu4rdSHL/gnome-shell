@@ -192,14 +192,12 @@ cr_rgb_new (void)
 {
         CRRgb *result = NULL;
 
-        result = g_try_malloc (sizeof (CRRgb));
+        result = g_try_malloc0 (sizeof (CRRgb));
 
         if (result == NULL) {
                 cr_utils_trace_info ("No more memory");
                 return NULL;
         }
-
-        memset (result, 0, sizeof (CRRgb));
 
         return result;
 }

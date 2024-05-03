@@ -34,12 +34,11 @@ cr_string_new (void)
 {
 	CRString *result = NULL ;
 
-	result = g_try_malloc (sizeof (CRString)) ;
+	result = g_try_malloc0 (sizeof (CRString)) ;
 	if (!result) {
 		cr_utils_trace_info ("Out of memory") ;
 		return NULL ;
 	}
-	memset (result, 0, sizeof (CRString)) ;
         result->stryng = g_string_new (NULL) ;
 	return result ;
 }

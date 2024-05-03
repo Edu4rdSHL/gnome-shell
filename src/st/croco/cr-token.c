@@ -135,14 +135,12 @@ cr_token_new (void)
 {
         CRToken *result = NULL;
 
-        result = g_try_malloc (sizeof (CRToken));
+        result = g_try_malloc0 (sizeof (CRToken));
 
         if (result == NULL) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-
-        memset (result, 0, sizeof (CRToken));
 
         return result;
 }

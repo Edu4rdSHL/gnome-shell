@@ -86,12 +86,11 @@ cr_declaration_new (CRStatement * a_statement,
                                           || (a_statement->type
                                               == AT_PAGE_RULE_STMT)), NULL);
 
-        result = g_try_malloc (sizeof (CRDeclaration));
+        result = g_try_malloc0 (sizeof (CRDeclaration));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRDeclaration));
         result->property = a_property;
         result->value = a_value;
 

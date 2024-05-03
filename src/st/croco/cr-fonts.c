@@ -155,14 +155,13 @@ cr_font_family_new (enum CRFontFamilyType a_type, guchar * a_name)
 {
         CRFontFamily *result = NULL;
 
-        result = g_try_malloc (sizeof (CRFontFamily));
+        result = g_try_malloc0 (sizeof (CRFontFamily));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CRFontFamily));
         result->type = a_type;
 
         cr_font_family_set_name (result, a_name);
@@ -335,12 +334,11 @@ cr_font_size_new (void)
 {
         CRFontSize *result = NULL;
 
-        result = g_try_malloc (sizeof (CRFontSize));
+        result = g_try_malloc0 (sizeof (CRFontSize));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRFontSize));
 
         return result;
 }
@@ -921,12 +919,11 @@ cr_font_size_adjust_new (void)
 {
         CRFontSizeAdjust *result = NULL;
 
-        result = g_try_malloc (sizeof (CRFontSizeAdjust));
+        result = g_try_malloc0 (sizeof (CRFontSizeAdjust));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRFontSizeAdjust));
 
         return result;
 }

@@ -1596,16 +1596,14 @@ cr_tknzr_new (CRInput * a_input)
 {
         CRTknzr *result = NULL;
 
-        result = g_try_malloc (sizeof (CRTknzr));
+        result = g_try_malloc0 (sizeof (CRTknzr));
 
         if (result == NULL) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CRTknzr));
-
-        result->priv = g_try_malloc (sizeof (CRTknzrPriv));
+        result->priv = g_try_malloc0 (sizeof (CRTknzrPriv));
 
         if (result->priv == NULL) {
                 cr_utils_trace_info ("Out of memory");
@@ -1617,7 +1615,6 @@ cr_tknzr_new (CRInput * a_input)
 
                 return NULL;
         }
-        memset (result->priv, 0, sizeof (CRTknzrPriv));
         if (a_input)
                 cr_tknzr_set_input (result, a_input);
         return result;

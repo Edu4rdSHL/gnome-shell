@@ -418,14 +418,12 @@ cr_parser_error_new (const guchar * a_msg, enum CRStatus a_status)
 {
         CRParserError *result = NULL;
 
-        result = g_try_malloc (sizeof (CRParserError));
+        result = g_try_malloc0 (sizeof (CRParserError));
 
         if (result == NULL) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-
-        memset (result, 0, sizeof (CRParserError));
 
         cr_parser_error_set_msg (result, a_msg);
         cr_parser_error_set_status (result, a_status);

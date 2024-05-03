@@ -71,21 +71,18 @@ cr_doc_handler_new (void)
 {
         CRDocHandler *result = NULL;
 
-        result = g_try_malloc (sizeof (CRDocHandler));
+        result = g_try_malloc0 (sizeof (CRDocHandler));
 
         g_return_val_if_fail (result, NULL);
 
-        memset (result, 0, sizeof (CRDocHandler));
         result->ref_count++;
 
-        result->priv = g_try_malloc (sizeof (CRDocHandlerPriv));
+        result->priv = g_try_malloc0 (sizeof (CRDocHandlerPriv));
         if (!result->priv) {
                 cr_utils_trace_info ("Out of memory exception");
                 g_free (result);
                 return NULL;
         }
-
-        cr_doc_handler_set_default_sac_handler (result);
 
         return result;
 }

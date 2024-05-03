@@ -86,12 +86,11 @@ cr_term_new (void)
 {
         CRTerm *result = NULL;
 
-        result = g_try_malloc (sizeof (CRTerm));
+        result = g_try_malloc0 (sizeof (CRTerm));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRTerm));
         return result;
 }
 

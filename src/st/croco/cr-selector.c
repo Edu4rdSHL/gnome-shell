@@ -40,12 +40,11 @@ cr_selector_new (CRSimpleSel * a_simple_sel)
 {
         CRSelector *result = NULL;
 
-        result = g_try_malloc (sizeof (CRSelector));
+        result = g_try_malloc0 (sizeof (CRSelector));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRSelector));
         result->simple_sel = a_simple_sel;
         return result;
 }

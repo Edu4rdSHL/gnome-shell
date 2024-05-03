@@ -45,14 +45,12 @@ cr_num_new (void)
 {
         CRNum *result = NULL;
 
-        result = g_try_malloc (sizeof (CRNum));
+        result = g_try_malloc0 (sizeof (CRNum));
 
         if (result == NULL) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-
-        memset (result, 0, sizeof (CRNum));
 
         return result;
 }

@@ -795,22 +795,19 @@ cr_om_parser_new (CRInput * a_input)
         CROMParser *result = NULL;
         enum CRStatus status = CR_OK;
 
-        result = g_try_malloc (sizeof (CROMParser));
+        result = g_try_malloc0 (sizeof (CROMParser));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CROMParser));
-        PRIVATE (result) = g_try_malloc (sizeof (CROMParserPriv));
+        PRIVATE (result) = g_try_malloc0 (sizeof (CROMParserPriv));
 
         if (!PRIVATE (result)) {
                 cr_utils_trace_info ("Out of memory");
                 goto error;
         }
-
-        memset (PRIVATE (result), 0, sizeof (CROMParserPriv));
 
         PRIVATE (result)->parser = cr_parser_new_from_input (a_input);
 
