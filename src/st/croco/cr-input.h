@@ -38,7 +38,6 @@ G_BEGIN_DECLS
  */
 
 typedef struct _CRInput CRInput ;
-typedef struct _CRInputPriv CRInputPriv ;
 
 /**
  *The #CRInput class provides the abstraction of 
@@ -46,7 +45,7 @@ typedef struct _CRInputPriv CRInputPriv ;
  */
 struct _CRInput 
 {
-        CRInputPriv *priv ;
+        gpointer dummy;
 } ;
 
 typedef struct _CRInputPos CRInputPos ;

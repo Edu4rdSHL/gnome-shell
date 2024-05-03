@@ -235,7 +235,7 @@ parse_at_media_start_media_cb (CRDocHandler * a_this,
         CRStatement *at_media = NULL;
         GList *media_list = NULL;
 
-        g_return_if_fail (a_this && a_this->priv);
+        g_return_if_fail (a_this);
 
         if (a_media_list) {
                 /*duplicate media list */
@@ -287,7 +287,7 @@ parse_at_media_start_selector_cb (CRDocHandler * a_this,
         CRStatement **at_media_ptr = NULL;
 	CRStatement *ruleset = NULL;
 
-        g_return_if_fail (a_this && a_this->priv && a_sellist);
+        g_return_if_fail (a_this && a_sellist);
 
 	at_media_ptr = &at_media;
         status = cr_doc_handler_get_ctxt (a_this, (gpointer *) at_media_ptr);
@@ -367,7 +367,7 @@ parse_at_media_end_media_cb (CRDocHandler * a_this,
         CRStatement *at_media = NULL;
         CRStatement **at_media_ptr = NULL;
 
-        g_return_if_fail (a_this && a_this->priv);
+        g_return_if_fail (a_this);
 
 	at_media_ptr = &at_media;
         status = cr_doc_handler_get_ctxt (a_this, 
@@ -382,7 +382,7 @@ parse_ruleset_start_selector_cb (CRDocHandler * a_this,
 {
         CRStatement *ruleset = NULL;
 
-        g_return_if_fail (a_this && a_this->priv && a_sellist);
+        g_return_if_fail (a_this && a_sellist);
 
         ruleset = cr_statement_new_ruleset (NULL, a_sellist, NULL, NULL);
         g_return_if_fail (ruleset);
@@ -422,7 +422,7 @@ parse_ruleset_property_cb (CRDocHandler * a_this,
         CRDeclaration *decl = NULL;
         CRString *stringue = NULL;
 
-        g_return_if_fail (a_this && a_this->priv && a_name);
+        g_return_if_fail (a_this && a_name);
 
         stringue = cr_string_dup (a_name);
         g_return_if_fail (stringue);

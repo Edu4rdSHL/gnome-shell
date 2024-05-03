@@ -38,7 +38,6 @@ G_BEGIN_DECLS
 	
 	
 typedef struct _CRTknzr CRTknzr ;
-typedef struct _CRTknzrPriv CRTknzrPriv ;
 
 /**
  *The tokenizer is the class that knows
@@ -48,8 +47,7 @@ typedef struct _CRTknzrPriv CRTknzrPriv ;
  */
 struct _CRTknzr
 {
-        /*the private data of the tokenizer.*/
-        CRTknzrPriv *priv ;
+        gpointer dummy;
 } ;
 
 CRTknzr * cr_tknzr_new (CRInput *a_input) ;

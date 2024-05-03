@@ -29,11 +29,10 @@
 G_BEGIN_DECLS
 
 typedef struct _CRPropList CRPropList ;
-typedef struct _CRPropListPriv CRPropListPriv ;
 
 struct _CRPropList 
 {
-	CRPropListPriv * priv;
+	gpointer dummy;
 } ;
 
 CRPropList * cr_prop_list_append (CRPropList *a_this,

@@ -38,8 +38,6 @@
 G_BEGIN_DECLS
 
 
-typedef struct _CRCascadePriv CRCascadePriv ;
-
 /**
  *An abstraction of the "Cascade" defined
  *in the css2 spec, chapter 6.4.
@@ -48,7 +46,7 @@ typedef struct _CRCascade CRCascade ;
 
 struct _CRCascade
 {
-	CRCascadePriv *priv ;
+        gpointer dummy;
 };
 
 

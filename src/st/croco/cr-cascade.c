@@ -29,9 +29,11 @@
 #include <string.h>
 #include "cr-cascade.h"
 
-#define PRIVATE(a_this) ((a_this)->priv)
+#define PRIVATE(a_this) ((CRCascadeReal *) a_this)
 
-struct _CRCascadePriv {
+typedef struct _CRCascadeReal {
+        CRCascade parent;
+
  /**
 	 *the 3 style sheets of the cascade:
 	 *author, user, and useragent sheet.
@@ -41,7 +43,7 @@ struct _CRCascadePriv {
 	 */
         CRStyleSheet *sheets[3];
         guint ref_count;
-};
+} CRCascadeReal;
 
 /**
  * cr_cascade_new:
@@ -66,16 +68,9 @@ cr_cascade_new (CRStyleSheet * a_author_sheet,
 {
         CRCascade *result = NULL;
 
-        result = g_try_malloc0 (sizeof (CRCascade));
+        result = g_try_malloc0 (sizeof (CRCascadeReal));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
-                return NULL;
-        }
-
-        PRIVATE (result) = g_try_malloc0 (sizeof (CRCascadePriv));
-        if (!PRIVATE (result)) {
-                cr_utils_trace_info ("Out of memory");
-                g_free (result);
                 return NULL;
         }
 
@@ -194,20 +189,14 @@ cr_cascade_destroy (CRCascade * a_this)
 {
         g_return_if_fail (a_this);
 
-        if (PRIVATE (a_this)) {
-                gulong i = 0;
-
-                for (i = 0; i < NB_ORIGINS; i++) {
-                        if (PRIVATE (a_this)->sheets[i]) {
-                                if (cr_stylesheet_unref
-                                    (PRIVATE (a_this)->sheets[i])
-                                    == TRUE) {
-                                        PRIVATE (a_this)->sheets[i] = NULL;
-                                }
+        for (int i = 0; i < NB_ORIGINS; i++) {
+                if (PRIVATE (a_this)->sheets[i]) {
+                        if (cr_stylesheet_unref
+                                (PRIVATE (a_this)->sheets[i])
+                                == TRUE) {
+                                PRIVATE (a_this)->sheets[i] = NULL;
                         }
                 }
-                g_free (PRIVATE (a_this));
-                PRIVATE (a_this) = NULL;
         }
         g_free (a_this);
 }
