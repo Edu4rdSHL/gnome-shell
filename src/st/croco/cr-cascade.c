@@ -42,7 +42,7 @@ typedef struct _CRCascadeReal {
 	 *of sheets[ORIGIN_UA] ;
 	 */
         CRStyleSheet *sheets[3];
-        guint ref_count;
+        grefcount ref_count;
 } CRCascadeReal;
 
 /**
@@ -74,7 +74,7 @@ cr_cascade_new (CRStyleSheet * a_author_sheet,
                 return NULL;
         }
 
-        PRIVATE (result)->ref_count = 1;
+        g_ref_count_init (&PRIVATE (result)->ref_count);
 
         if (a_author_sheet) {
                 cr_cascade_set_sheet (result, a_author_sheet, ORIGIN_AUTHOR);
@@ -154,7 +154,7 @@ cr_cascade_ref (CRCascade * a_this)
 {
         g_return_if_fail (a_this && PRIVATE (a_this));
 
-        PRIVATE (a_this)->ref_count++;
+        g_ref_count_inc (&PRIVATE (a_this)->ref_count);
 }
 
 /**
@@ -172,10 +172,7 @@ cr_cascade_unref (CRCascade * a_this)
 {
         g_return_if_fail (a_this && PRIVATE (a_this));
 
-        g_assert (PRIVATE (a_this)->ref_count > 0);
-        PRIVATE (a_this)->ref_count--;
-
-        if (!PRIVATE (a_this)->ref_count) {
+        if (g_ref_count_dec (&PRIVATE (a_this)->ref_count)) {
                 cr_cascade_destroy (a_this);
         }
 }

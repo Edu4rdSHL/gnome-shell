@@ -74,7 +74,7 @@ typedef struct _CRInputReal {
          *the reference count of this
          *instance.
          */
-        guint ref_count;
+        grefcount ref_count;
         gboolean free_in_buf;
 } CRInputReal;
 
@@ -98,7 +98,7 @@ cr_input_new_real (void)
                 return NULL;
         }
 
-        PRIVATE (result)->ref_count = 1;
+        g_ref_count_init (&PRIVATE (result)->ref_count);
         PRIVATE (result)->free_in_buf = TRUE;
         return result;
 }
@@ -298,7 +298,7 @@ cr_input_ref (CRInput * a_this)
 {
         g_return_if_fail (a_this);
 
-        PRIVATE (a_this)->ref_count++;
+        g_ref_count_inc (&PRIVATE (a_this)->ref_count);
 }
 
 /**
@@ -316,10 +316,7 @@ cr_input_unref (CRInput * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        g_assert (PRIVATE(a_this)->ref_count > 0);
-        PRIVATE(a_this)->ref_count--;
-
-        if (PRIVATE (a_this)->ref_count == 0) {
+        if (g_ref_count_dec (&PRIVATE (a_this)->ref_count)) {
                 cr_input_destroy (a_this);
                 return TRUE;
         }

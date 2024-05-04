@@ -36,7 +36,7 @@ typedef struct {
          *It can be manipulated with cr_stylesheet_ref() and
          *cr_stylesheet_unref()
         */
-        gulong ref_count;
+        grefcount ref_count;
 
         /**
          *custom application data pointer
@@ -67,7 +67,7 @@ cr_stylesheet_new (CRStatement * a_stmts)
         }
 
         real = (CRStyleSheetReal *) result;
-        real->ref_count = 1;
+        g_ref_count_init (&real->ref_count);
 
         if (a_stmts)
                 result->statements = a_stmts;
@@ -166,7 +166,7 @@ cr_stylesheet_ref (CRStyleSheet * a_this)
 
         g_return_val_if_fail (a_this, NULL);
 
-        real->ref_count++;
+        g_ref_count_inc (&real->ref_count);
 
         return a_this;
 }
@@ -176,10 +176,7 @@ cr_stylesheet_unref (CRStyleSheet * a_this)
 {
         CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
 
-        g_assert (real->ref_count > 0);
-        real->ref_count--;
-
-        if (!real->ref_count) {
+        if (g_ref_count_dec (&real->ref_count)) {
                 cr_stylesheet_destroy (a_this);
                 return TRUE;
         }

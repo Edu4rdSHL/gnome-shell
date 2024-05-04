@@ -59,7 +59,7 @@ typedef struct _CRTknzrReal {
          *of #CRTknzr. Is manipulated by cr_tknzr_ref()
          *and cr_tknzr_unref().
          */
-        glong ref_count;
+        grefcount ref_count;
 } CRTknzrReal;
 
 #define PRIVATE(obj) ((CRTknzrReal *) obj)
@@ -1590,7 +1590,7 @@ cr_tknzr_new (CRInput * a_input)
                 return NULL;
         }
 
-        PRIVATE (result)->ref_count = 1;
+        g_ref_count_init (&PRIVATE (result)->ref_count);
 
         if (a_input)
                 cr_tknzr_set_input (result, a_input);
@@ -1637,7 +1637,7 @@ cr_tknzr_ref (CRTknzr * a_this)
 {
         g_return_if_fail (a_this);
 
-        PRIVATE (a_this)->ref_count++;
+        g_ref_count_inc (&PRIVATE (a_this)->ref_count);
 }
 
 gboolean
@@ -1645,10 +1645,7 @@ cr_tknzr_unref (CRTknzr * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        g_assert (PRIVATE (a_this)->ref_count > 0);
-        PRIVATE (a_this)->ref_count--;
-
-        if (PRIVATE (a_this)->ref_count == 0) {
+        if (g_ref_count_dec (&PRIVATE (a_this)->ref_count)) {
                 cr_tknzr_destroy (a_this);
                 return TRUE;
         }

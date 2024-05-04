@@ -38,7 +38,7 @@
 typedef struct _CRDocHandlerReal {
         CRDocHandler parent;
 
-        gulong ref_count;
+        grefcount ref_count;
 
 	/**
 	 *This pointer is to hold an application parsing context.
@@ -81,7 +81,7 @@ cr_doc_handler_new (void)
 
         cr_doc_handler_set_default_sac_handler (result);
 
-        PRIVATE (result)->ref_count++;
+        g_ref_count_init (&PRIVATE (result)->ref_count);
 
         return result;
 }
@@ -207,7 +207,7 @@ cr_doc_handler_ref (CRDocHandler * a_this)
 {
         g_return_if_fail (a_this);
 
-        PRIVATE (a_this)->ref_count++;
+        g_ref_count_inc (&PRIVATE (a_this)->ref_count);
 }
 
 /**
@@ -224,10 +224,7 @@ cr_doc_handler_unref (CRDocHandler * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        g_assert (PRIVATE (a_this)->ref_count > 0);
-        PRIVATE (a_this)->ref_count--;
-
-        if (PRIVATE (a_this)->ref_count == 0) {
+        if (g_ref_count_dec (&PRIVATE (a_this)->ref_count)) {
                 cr_doc_handler_destroy (a_this);
                 return TRUE;
         }

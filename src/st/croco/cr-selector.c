@@ -46,7 +46,7 @@ cr_selector_new (CRSimpleSel * a_simple_sel)
                 return NULL;
         }
         result->simple_sel = a_simple_sel;
-        result->ref_count = 1;
+        g_ref_count_init (&result->ref_count);
         return result;
 }
 
@@ -214,7 +214,7 @@ cr_selector_ref (CRSelector * a_this)
 {
         g_return_if_fail (a_this);
 
-        a_this->ref_count++;
+        g_ref_count_inc (&a_this->ref_count);
 }
 
 /**
@@ -235,10 +235,7 @@ cr_selector_unref (CRSelector * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        g_assert (a_this->ref_count > 0);
-        a_this->ref_count--;
-
-        if (a_this->ref_count == 0) {
+        if (g_ref_count_dec (&a_this->ref_count)) {
                 cr_selector_destroy (a_this);
                 return TRUE;
         }

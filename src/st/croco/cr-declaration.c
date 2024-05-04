@@ -93,7 +93,7 @@ cr_declaration_new (CRStatement * a_statement,
         }
         result->property = a_property;
         result->value = a_value;
-        result->ref_count = 1;
+        g_ref_count_init (&result->ref_count);
 
         if (a_value) {
                 cr_term_ref (a_value);
@@ -726,7 +726,7 @@ cr_declaration_ref (CRDeclaration * a_this)
 {
         g_return_if_fail (a_this);
 
-        a_this->ref_count++;
+        g_ref_count_inc (&a_this->ref_count);
 }
 
 /**
@@ -744,10 +744,7 @@ cr_declaration_unref (CRDeclaration * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        g_assert (a_this->ref_count > 0);
-        a_this->ref_count--;
-
-        if (a_this->ref_count == 0) {
+        if (g_ref_count_dec (&a_this->ref_count)) {
                 cr_declaration_destroy (a_this);
                 return TRUE;
         }
