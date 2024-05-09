@@ -39,19 +39,6 @@
   }
 }
 
-.message-list-sections {
-  // to account for scrollbar
-  &:ltr {margin-right: $base_margin * 3; }
-  &:rtl {margin-left: $base_margin * 3;}
-
-  spacing: $base_padding * 2;
-}
-
-.message-list-section,
-.message-list-section-list {
-  spacing: $base_padding * 2;
-}
-
 // do-not-disturb + clear button
 .message-list-controls {
   // NOTE: remove the padding if notification_bubble could remove margin for drop shadow
