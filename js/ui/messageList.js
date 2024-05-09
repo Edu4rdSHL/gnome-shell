@@ -856,10 +856,6 @@ export const MessageListSection = GObject.registerClass({
         this.emit('message-focused', messageActor);
     }
 
-    get allowed() {
-        return true;
-    }
-
     addMessage(message, animate) {
         this.addMessageAtIndex(message, -1, animate);
     }
@@ -1002,8 +998,6 @@ export const MessageListSection = GObject.registerClass({
             this._canClear = canClear;
             this.notify('can-clear');
         }
-
-        this.visible = this.allowed && this._shouldShow();
     }
 });
 
@@ -1018,11 +1012,6 @@ class NotificationSection extends MessageListSection {
         Main.messageTray.getSources().forEach(source => {
             this._sourceAdded(Main.messageTray, source);
         });
-    }
-
-    get allowed() {
-        return Main.sessionMode.hasNotifications &&
-               !Main.sessionMode.isGreeter;
     }
 
     _sourceAdded(tray, source) {
@@ -1108,9 +1097,5 @@ class MediaSection extends MessageListSection {
             this.removeMessage(message, true);
 
         this._players.delete(player);
-    }
-
-    get allowed() {
-        return !Main.sessionMode.isGreeter;
     }
 });
