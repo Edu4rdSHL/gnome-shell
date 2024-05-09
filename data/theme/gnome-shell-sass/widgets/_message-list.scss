@@ -25,6 +25,20 @@
   }
 }
 
+.message-view {
+  // to account for scrollbar
+  &:ltr {margin-right: $base_margin * 3; }
+  &:rtl {margin-left: $base_margin * 3;}
+
+  .message {
+    margin-bottom: $base_padding * 2 !important;
+  }
+
+  > :last-child > .message {
+    margin-bottom: 0 !important;
+  }
+}
+
 .message-list-sections {
   // to account for scrollbar
   &:ltr {margin-right: $base_margin * 3; }

@@ -13,6 +13,7 @@ import * as MessageTray from './messageTray.js';
 import * as Mpris from './mpris.js';
 
 import * as Util from '../misc/util.js';
+import {ensureActorVisibleInScrollView} from '../misc/animationUtils.js';
 import {formatTimeSpan} from '../misc/dateUtils.js';
 
 const MAX_NOTIFICATION_BUTTONS = 3;
@@ -1101,5 +1102,251 @@ class MediaSection extends MessageListSection {
             this.removeMessage(message, true);
 
         this._players.delete(player);
+    }
+});
+
+export const MessageView = GObject.registerClass({
+    Implements: [St.Scrollable],
+    Properties: {
+        'can-clear': GObject.ParamSpec.boolean(
+            'can-clear', 'can-clear', 'can-clear',
+            GObject.ParamFlags.READABLE,
+            false),
+        'empty': GObject.ParamSpec.boolean(
+            'empty', 'empty', 'empty',
+            GObject.ParamFlags.READABLE,
+            true),
+    },
+}, class MessageView extends St.BoxLayout {
+    constructor() {
+        super({
+            style_class: 'message-view',
+            vertical: true,
+            x_expand: true,
+            y_expand: true,
+        });
+
+        this._setupMpris();
+        this._setupNotifications();
+    }
+
+    vfunc_map() {
+        this._messages.forEach(message => {
+            message.notification.acknowledged = true;
+        });
+        super.vfunc_map();
+    }
+
+    _setupMpris() {
+        this._players = new Map();
+        this._mediaSource = new Mpris.MediaSource();
+
+        this._mediaSource.connectObject(
+            'player-added', (_, player) => this._addPlayer(player),
+            'player-removed', (_, player) => this._removePlayer(player),
+            this);
+
+        this._mediaSource.players.forEach(player => {
+            this._addPlayer(player);
+        });
+    }
+
+    _addPlayer(player) {
+        const message = new MediaMessage(player);
+        this._players.set(player, message);
+        this._addMessage(message, 0);
+    }
+
+    _removePlayer(player) {
+        const message = this._players.get(player);
+        this._removeMessage(message);
+        this._players.delete(player);
+    }
+
+    _setupNotifications() {
+        this._notifications = new Map();
+        this._nUrgent = 0;
+        Main.messageTray.connectObject(
+            'source-added', (_, source) => this._addNotificationSource(source),
+            'source-removed', (_, source) => this._removeNotificationSource(source),
+            this);
+
+        Main.messageTray.getSources().forEach(source => {
+            this._addSource(source);
+        });
+    }
+
+    _addNotificationSource(source) {
+        source.connectObject(
+            'notification-added', (_, notification) => this._addNotification(notification),
+            'notification-removed', (_, notification) => this._removeNotification(notification),
+            this);
+
+        source.notifications.forEach(this._addNotification);
+    }
+
+    _removeNotificationSource(source) {
+        source.notifications.forEach(this._removeNotification);
+    }
+
+    _addNotification(notification) {
+        const message = new NotificationMessage(notification);
+        this._notifications.set(notification, message);
+
+        notification.connectObject(
+            'notify::urgency', () => {
+                const isUrgent = notification.urgency === MessageTray.Urgency.CRITICAL;
+
+                if (isUrgent)
+                    this._nUrgent++;
+                else
+                    this._nUrgent--;
+
+                const index = this._players.size + isUrgent ? 0 : this._nUrgent;
+                this._moveMessage(message, index);
+            }, this);
+
+        const isUrgent = notification.urgency === MessageTray.Urgency.CRITICAL;
+
+        if (isUrgent)
+            this._nUrgent++;
+
+        // Add notifications always after media messages
+        const index = this._players.size + isUrgent ? 0 : this._nUrgent;
+        this._addMessage(message, index);
+    }
+
+    _removeNotification(notification) {
+        const message = this._notifications.get(notification);
+        this._removeMessage(message);
+
+        if (notification.urgency === MessageTray.Urgency.CRITICAL)
+            this._nUrgent--;
+
+        this._notifications.delete(notification);
+    }
+
+    get canClear() {
+        return this._messages.some(msg => msg.canClose());
+    }
+
+    get empty() {
+        return this.get_first_child() === null;
+    }
+
+    get _messages() {
+        return this.get_children().map(item => item.child);
+    }
+
+    clear() {
+        const messages = this._messages.filter(msg => msg.canClose());
+
+        // If there are few messages, letting them all zoom out looks OK
+        if (messages.length < 2) {
+            messages.forEach(message => {
+                message.close();
+            });
+        } else {
+            // Otherwise we slide them out one by one, and then zoom them
+            // out "off-screen" in the end to smoothly shrink the parent
+            const delay = MESSAGE_ANIMATION_TIME / Math.max(messages.length, 5);
+            for (let i = 0; i < messages.length; i++) {
+                const message = messages[i];
+                message.ease({
+                    translation_x: this.width,
+                    opacity: 0,
+                    duration: MESSAGE_ANIMATION_TIME,
+                    delay: i * delay,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    onComplete: () => message.close(),
+                });
+            }
+        }
+    }
+
+    _addMessage(message, index) {
+        const wasEmpty = this.empty;
+
+        const item = new St.Bin({
+            child: message,
+            canFocus: false,
+            layout_manager: new ScaleLayout(),
+            pivot_point: new Graphene.Point({x: .5, y: .5}),
+            scale_x: 0,
+            scale_y: 0,
+        });
+
+        message.connect('key-focus-in', () => ensureActorVisibleInScrollView(this.get_parent(), message));
+
+        this.insert_child_at_index(item, index);
+
+        if (wasEmpty) {
+            this.notify('can-clear');
+            this.notify('empty');
+        }
+
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        item.ease({
+            scale_x: 1,
+            scale_y: 1,
+            duration,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
+    }
+
+    _removeMessage(message) {
+        const messages = this._messages;
+        const item = message.get_parent();
+        let nextMessage = null;
+
+        if (message.has_key_focus()) {
+            const index = messages.indexOf(message);
+            nextMessage =
+                messages[index + 1] ||
+                messages[index - 1] ||
+                this;
+        }
+
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        item.ease({
+            scale_x: 0,
+            scale_y: 0,
+            duration,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            onComplete: () => {
+                item.destroy();
+
+                if (this.empty) {
+                    this.notify('can-clear');
+                    this.notify('empty');
+                }
+
+                nextMessage?.grab_key_focus();
+            },
+        });
+    }
+
+    _moveMessage(message, index) {
+        if (this.get_child_at_index(index)?.child === message)
+            return;
+
+        const item = message.get_parent();
+
+        const duration = this.mapped ? MESSAGE_ANIMATION_TIME : 0;
+        item.ease({
+            scale_x: 0,
+            scale_y: 0,
+            duration,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            onComplete: () => {
+                this.set_child_at_index(item, index);
+                item.ease({
+                    scale_x: 1,
+                    scale_y: 1,
+                    duration,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                });
+            },
+        });
     }
 });
