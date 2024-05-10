@@ -408,7 +408,9 @@ export const Message = GObject.registerClass({
             GLib.DateTime),
     },
     Signals: {
-        'close': {},
+        'close': {
+            flags: GObject.SignalFlags.RUN_LAST,
+        },
         'expanded': {},
         'unexpanded': {},
     },
@@ -663,19 +665,10 @@ class NotificationMessage extends Message {
 
         this.notification = notification;
 
-        this.connect('close', () => {
-            this._closed = true;
-            if (this.notification)
-                this.notification.destroy(MessageTray.NotificationDestroyedReason.DISMISSED);
-        });
         notification.connectObject(
             'action-added', (_, action) => this._addAction(action),
             'action-removed', (_, action) => this._removeAction(action),
-            'destroy', () => {
-                this.notification = null;
-                if (!this._closed)
-                    this.close();
-            }, this);
+            this);
 
         notification.bind_property('title',
             this, 'title',
@@ -697,6 +690,10 @@ class NotificationMessage extends Message {
         this.notification.actions.forEach(action => {
             this._addAction(action);
         });
+    }
+
+    on_close() {
+        this.notification.destroy(MessageTray.NotificationDestroyedReason.DISMISSED);
     }
 
     vfunc_clicked() {
@@ -966,20 +963,18 @@ class NotificationSection extends MessageListSection {
     }
 
     _sourceAdded(tray, source) {
-        source.connectObject('notification-added',
-            this._onNotificationAdded.bind(this), this);
+        source.connectObject(
+            'notification-added', this._onNotificationAdded.bind(this),
+            'notification-removed', this._onNotificationRemoved.bind(this),
+            this);
     }
 
     _onNotificationAdded(source, notification) {
         let message = new NotificationMessage(notification);
 
-        let isUrgent = notification.urgency === MessageTray.Urgency.CRITICAL;
+        const isUrgent = notification.urgency === MessageTray.Urgency.CRITICAL;
 
         notification.connectObject(
-            'destroy', () => {
-                if (isUrgent)
-                    this._nUrgent--;
-            },
             'notify::datetime', () => {
                 // The datetime property changes whenever the notification is updated
                 this.moveMessage(message, isUrgent ? 0 : this._nUrgent, this.mapped);
@@ -995,8 +990,17 @@ class NotificationSection extends MessageListSection {
             notification.acknowledged = true;
         }
 
-        let index = isUrgent ? 0 : this._nUrgent;
+        const index = isUrgent ? 0 : this._nUrgent;
         this.addMessageAtIndex(message, index, this.mapped);
+    }
+
+    _onNotificationRemoved(source_, notification) {
+        const message = this._messages.find(m => m.notification === notification);
+
+        if (notification.urgency === MessageTray.Urgency.CRITICAL)
+            this._nUrgent--;
+
+        this.removeMessage(message, this.mapped);
     }
 
     vfunc_map() {
