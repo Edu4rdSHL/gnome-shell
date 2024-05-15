@@ -163,9 +163,7 @@ export const InputMethod = GObject.registerClass({
     }
 
     _onHidePreeditText() {
-        this.set_preedit_text(
-            null, this._preeditPos, this._preeditAnchor,
-            this._preeditCommitMode);
+        this.set_preedit_text(null, 0, 0, this._preeditCommitMode);
         this._preeditVisible = false;
     }
 
