@@ -368,7 +368,6 @@ class FdoNotificationDaemonSource extends MessageTray.Source {
 
     open() {
         this.openApp();
-        this.destroyNonResidentNotifications();
     }
 
     openApp() {
