@@ -412,6 +412,9 @@ export const Message = GObject.registerClass({
         'close': {
             flags: GObject.SignalFlags.RUN_LAST,
         },
+        'toggle-expand': {
+            flags: GObject.SignalFlags.RUN_LAST,
+        },
         'expanded': {},
         'unexpanded': {},
     },
@@ -491,12 +494,7 @@ export const Message = GObject.registerClass({
         this._header.closeButton.connect('clicked', this.close.bind(this));
         this._header.closeButton.visible = this.canClose();
 
-        this._header.expandButton.connect('clicked', () => {
-            if (this.expanded)
-                this.unexpand(true);
-            else
-                this.expand(true);
-        });
+        this._header.expandButton.connect('clicked', this.toggleExpand.bind(this));
         this._bodyLabel.connect('notify::allocation', this._updateExpandButton.bind(this));
         this._updateExpandButton();
     }
@@ -512,6 +510,17 @@ export const Message = GObject.registerClass({
 
     close() {
         this.emit('close');
+    }
+
+    toggleExpand() {
+        this.emit('toggle-expand');
+    }
+
+    on_toggle_expand() {
+        if (this.expanded)
+            this.unexpand(true);
+        else
+            this.expand(true);
     }
 
     set icon(icon) {
