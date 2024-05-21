@@ -16,7 +16,7 @@ import * as Util from '../misc/util.js';
 import {formatTimeSpan} from '../misc/dateUtils.js';
 
 const MAX_NOTIFICATION_BUTTONS = 3;
-const MESSAGE_ANIMATION_TIME = 100;
+export const MESSAGE_ANIMATION_TIME = 200;
 
 const DEFAULT_EXPAND_LINES = 6;
 
@@ -598,7 +598,7 @@ export const Message = GObject.registerClass({
 
         this._actionBin.visible = !!this._actionBin.child;
 
-        const duration = animate ? MessageTray.ANIMATION_TIME : 0;
+        const duration = animate ? MESSAGE_ANIMATION_TIME : 0;
         this._bodyBin.ease_property('@layout.expansion', 1, {
             progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             duration,
@@ -620,7 +620,7 @@ export const Message = GObject.registerClass({
     }
 
     unexpand(animate) {
-        const duration = animate ? MessageTray.ANIMATION_TIME : 0;
+        const duration = animate ? MESSAGE_ANIMATION_TIME : 0;
         this._bodyBin.ease_property('@layout.expansion', 0, {
             progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             duration,

@@ -16,8 +16,6 @@ import * as SignalTracker from '../misc/signalTracker.js';
 
 const SHELL_KEYBINDINGS_SCHEMA = 'org.gnome.shell.keybindings';
 
-export const ANIMATION_TIME = 200;
-
 const NOTIFICATION_TIMEOUT = 4000;
 
 const HIDE_TIMEOUT = 200;
@@ -1159,12 +1157,12 @@ export const MessageTray = GObject.registerClass({
         this._bannerBin.remove_all_transitions();
         this._bannerBin.ease({
             opacity: 255,
-            duration: ANIMATION_TIME,
+            duration: MessageList.MESSAGE_ANIMATION_TIME,
             mode: Clutter.AnimationMode.LINEAR,
         });
         this._bannerBin.ease({
             y: 0,
-            duration: ANIMATION_TIME,
+            duration: MessageList.MESSAGE_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_BACK,
             onComplete: () => {
                 this._notificationState = State.SHOWN;
@@ -1224,7 +1222,7 @@ export const MessageTray = GObject.registerClass({
         this._resetNotificationLeftTimeout();
         this._bannerBin.remove_all_transitions();
 
-        const duration = animate ? ANIMATION_TIME : 0;
+        const duration = animate ? MessageList.MESSAGE_ANIMATION_TIME : 0;
         this._notificationState = State.HIDING;
         this._bannerBin.ease({
             opacity: 0,
