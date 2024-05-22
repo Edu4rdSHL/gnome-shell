@@ -488,8 +488,6 @@ export const Message = GObject.registerClass({
         });
         contentBox.add_child(this._bodyBin);
 
-        this.connect('destroy', this._onDestroy.bind(this));
-
         this._header.closeButton.connect('clicked', this.close.bind(this));
         this._header.closeButton.visible = this.canClose();
 
@@ -639,9 +637,6 @@ export const Message = GObject.registerClass({
 
     canClose() {
         return false;
-    }
-
-    _onDestroy() {
     }
 
     vfunc_key_press_event(event) {
