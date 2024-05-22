@@ -483,12 +483,6 @@ class BaseAppViewGridLayout extends Clutter.BinLayout {
 
 var BaseAppView = GObject.registerClass({
     GTypeFlags: GObject.TypeFlags.ABSTRACT,
-    Properties: {
-        'gesture-modes': GObject.ParamSpec.flags(
-            'gesture-modes', 'gesture-modes', 'gesture-modes',
-            GObject.ParamFlags.READWRITE | GObject.ParamFlags.CONSTRUCT_ONLY,
-            Shell.ActionMode, Shell.ActionMode.OVERVIEW),
-    },
     Signals: {
         'view-loaded': {},
     },
@@ -620,11 +614,15 @@ var BaseAppView = GObject.registerClass({
 
         // Swipe
         this._swipeTracker = new SwipeTracker.SwipeTracker(this._scrollView,
-            Clutter.Orientation.HORIZONTAL, this.gestureModes);
+            Clutter.Orientation.HORIZONTAL,
+            Shell.ActionMode.ALL,
+            {
+                name: 'AppDisplay swipe tracker',
+            });
         this._swipeTracker.orientation = Clutter.Orientation.HORIZONTAL;
-        this._swipeTracker.connect('begin', this._swipeBegin.bind(this));
-        this._swipeTracker.connect('update', this._swipeUpdate.bind(this));
-        this._swipeTracker.connect('end', this._swipeEnd.bind(this));
+        this._swipeTracker.connect('swipe-begin', this._swipeBegin.bind(this));
+        this._swipeTracker.connect('swipe-update', this._swipeUpdate.bind(this));
+        this._swipeTracker.connect('swipe-end', this._swipeEnd.bind(this));
 
         this._orientation = Clutter.Orientation.HORIZONTAL;
 
@@ -720,11 +718,6 @@ var BaseAppView = GObject.registerClass({
     _swipeBegin(tracker, monitor) {
         if (monitor !== Main.layoutManager.primaryIndex)
             return;
-
-        if (this._dragFocus) {
-            this._dragFocus.cancelActions();
-            this._dragFocus = null;
-        }
 
         const adjustment = this._adjustment;
         adjustment.remove_transition('value');
@@ -948,8 +941,6 @@ var BaseAppView = GObject.registerClass({
         };
         DND.addDragMonitor(this._dragMonitor);
         this._appGridLayout.showPageIndicators();
-        this._dragFocus = null;
-        this._swipeTracker.enabled = false;
     }
 
     _onDragMotion(dragEvent) {
@@ -997,7 +988,6 @@ var BaseAppView = GObject.registerClass({
         this._resetDragPageSwitch();
 
         this._appGridLayout.hidePageIndicators();
-        this._swipeTracker.enabled = true;
     }
 
     _onDragCancelled() {
@@ -1005,7 +995,6 @@ var BaseAppView = GObject.registerClass({
         // will move all items to their original positions
         this._redisplay();
         this._appGridLayout.hidePageIndicators();
-        this._swipeTracker.enabled = true;
     }
 
     _canAccept(source) {
@@ -1275,10 +1264,6 @@ var BaseAppView = GObject.registerClass({
         this._appGridLayout.goToPage(pageNumber, animate);
         this._grid.goToPage(pageNumber, animate);
     }
-
-    updateDragFocus(dragFocus) {
-        this._dragFocus = dragFocus;
-    }
 });
 
 const PageManager = GObject.registerClass({
@@ -1465,10 +1450,6 @@ class AppDisplay extends BaseAppView {
             global.settings.is_writable('app-picker-layout');
 
         this._placeholder = new AppIcon(app, {isDraggable});
-        this._placeholder.connect('notify::pressed', icon => {
-            if (icon.pressed)
-                this.updateDragFocus(icon);
-        });
         this._placeholder.scaleAndFade();
         this._redisplay();
     }
@@ -1544,10 +1525,6 @@ class AppDisplay extends BaseAppView {
                     this._redisplay();
                     this._savePages();
                 });
-                icon.connect('notify::pressed', () => {
-                    if (icon.pressed)
-                        this.updateDragFocus(icon);
-                });
             }
 
             // Don't try to display empty folders
@@ -1581,10 +1558,6 @@ class AppDisplay extends BaseAppView {
                 let app = appSys.lookup_app(appId);
 
                 icon = new AppIcon(app, {isDraggable});
-                icon.connect('notify::pressed', () => {
-                    if (icon.pressed)
-                        this.updateDragFocus(icon);
-                });
             }
 
             appIcons.push(icon);
@@ -1894,10 +1867,11 @@ class AppViewItem extends St.Button {
 
         if (isDraggable) {
             this._draggable = DND.makeDraggable(this, {timeoutThreshold: 200});
-
-            this._draggable.connect('drag-begin', this._onDragBegin.bind(this));
-            this._draggable.connect('drag-cancelled', this._onDragCancelled.bind(this));
-            this._draggable.connect('drag-end', this._onDragEnd.bind(this));
+            this._draggable.connectObject(
+                'drag-begin', this._onDragBegin.bind(this),
+                'drag-cancelled', this._onDragCancelled.bind(this),
+                'drag-end', this._onDragEnd.bind(this),
+                this);
         }
 
         this._otherIconIsHovering = false;
@@ -2073,12 +2047,6 @@ class AppViewItem extends St.Button {
         return true;
     }
 
-    cancelActions() {
-        if (this._draggable)
-            this._draggable.fakeRelease();
-        this.fake_release();
-    }
-
     get id() {
         return this._id;
     }
@@ -2123,7 +2091,6 @@ class FolderView extends BaseAppView {
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
-            gesture_modes: Shell.ActionMode.POPUP,
         });
 
         // If it not expand, the parent doesn't take into account its preferred_width when allocating
@@ -2502,16 +2469,19 @@ export const AppFolderDialog = GObject.registerClass({
 
         this.add_constraint(new Layout.MonitorConstraint({primary: true}));
 
-        const clickAction = new Clutter.ClickAction();
-        clickAction.connect('clicked', () => {
-            const [x, y] = clickAction.get_coords();
-            const actor =
-                global.stage.get_actor_at_pos(Clutter.PickMode.ALL, x, y);
+        const clickGesture = new Clutter.ClickGesture();
+        clickGesture.connect('may-recognize', () => {
+            const coords = clickGesture.get_coords();
+            const point = new Graphene.Point3D({x: coords.x, y: coords.y});
+            const transformedPoint = this.apply_transform_to_point(point);
 
-            if (actor === this)
-                this.popdown();
+            const actor = global.stage.get_actor_at_pos(
+                Clutter.PickMode.ALL, transformedPoint.x, transformedPoint.y);
+
+            return actor === this;
         });
-        this.add_action(clickAction);
+        clickGesture.connect('recognize', () => this.popdown());
+        this.add_action(clickGesture);
 
         this._source = source;
         this._folder = folder;
@@ -2979,9 +2949,11 @@ export const AppIcon = GObject.registerClass({
     },
 }, class AppIcon extends AppViewItem {
     _init(app, iconParams = {}) {
-        // Get the isDraggable property without passing it on to the BaseIcon:
+        // Get properties without passing them on to the BaseIcon:
         const isDraggable = iconParams['isDraggable'] ?? true;
         delete iconParams['isDraggable'];
+        const popupMenuSide = iconParams['popupMenuSide'] ?? St.Side.LEFT;
+        delete iconParams['popupMenuSide'];
         const expandTitleOnHover = iconParams['expandTitleOnHover'];
         delete iconParams['expandTitleOnHover'];
 
@@ -2990,6 +2962,7 @@ export const AppIcon = GObject.registerClass({
         this.app = app;
         this._id = app.get_id();
         this._name = app.get_name();
+        this._popupMenuSide = popupMenuSide;
 
         this._iconContainer = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
@@ -3024,10 +2997,19 @@ export const AppIcon = GObject.registerClass({
         this._menu = null;
         this._menuManager = new PopupMenu.PopupMenuManager(this);
 
-        this._menuTimeoutId = 0;
         this.app.connectObject('notify::state',
             () => this._updateRunningStyle(), this);
         this._updateRunningStyle();
+
+        const longPressGesture = new Clutter.LongPressGesture({
+            long_press_duration: MENU_POPUP_TIMEOUT,
+        });
+        longPressGesture.connect('recognize', () => this.popupMenu(false));
+        longPressGesture.connect('end', () => this._menu.openTakeGrab());
+        longPressGesture.connect('cancel', () => this._menu.close(true));
+        if (this._draggable)
+            longPressGesture.can_not_cancel(this._draggable.startGesture);
+        this.add_action(longPressGesture);
     }
 
     _onDestroy() {
@@ -3037,26 +3019,10 @@ export const AppIcon = GObject.registerClass({
             GLib.source_remove(this._folderPreviewId);
             this._folderPreviewId = 0;
         }
-
-        this._removeMenuTimeout();
-    }
-
-    _onDragBegin() {
-        if (this._menu)
-            this._menu.close(true);
-        this._removeMenuTimeout();
-        super._onDragBegin();
     }
 
     _createIcon(iconSize) {
         return this.app.create_icon_texture(iconSize);
-    }
-
-    _removeMenuTimeout() {
-        if (this._menuTimeoutId > 0) {
-            GLib.source_remove(this._menuTimeoutId);
-            this._menuTimeoutId = 0;
-        }
     }
 
     _updateRunningStyle() {
@@ -3066,46 +3032,17 @@ export const AppIcon = GObject.registerClass({
             this._dot.hide();
     }
 
-    _setPopupTimeout() {
-        this._removeMenuTimeout();
-        this._menuTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MENU_POPUP_TIMEOUT, () => {
-            this._menuTimeoutId = 0;
-            this.popupMenu();
-            return GLib.SOURCE_REMOVE;
-        });
-        GLib.Source.set_name_by_id(this._menuTimeoutId, '[gnome-shell] this.popupMenu');
-    }
-
-    vfunc_leave_event(event) {
-        const ret = super.vfunc_leave_event(event);
-
-        this.fake_release();
-        this._removeMenuTimeout();
-        return ret;
-    }
-
     vfunc_button_press_event(event) {
-        const ret = super.vfunc_button_press_event(event);
         const button = event.get_button();
-        if (button === 1) {
-            this._setPopupTimeout();
-        } else if (button === 3) {
+        if (button === Clutter.BUTTON_SECONDARY) {
             this.popupMenu();
             return Clutter.EVENT_STOP;
         }
-        return ret;
-    }
 
-    vfunc_touch_event(event) {
-        const ret = super.vfunc_touch_event(event);
-        if (event.type() === Clutter.EventType.TOUCH_BEGIN)
-            this._setPopupTimeout();
-
-        return ret;
+        return Clutter.EVENT_PROPAGATE;
     }
 
     vfunc_clicked(button) {
-        this._removeMenuTimeout();
         this.activate(button);
     }
 
@@ -3118,13 +3055,11 @@ export const AppIcon = GObject.registerClass({
         return this.app.get_id();
     }
 
-    popupMenu(side = St.Side.LEFT) {
+    popupMenu(takeGrab = true) {
         this.setForcedHighlight(true);
-        this._removeMenuTimeout();
-        this.fake_release();
 
         if (!this._menu) {
-            this._menu = new AppMenu(this, side, {
+            this._menu = new AppMenu(this, this._popupMenuSide, {
                 favoritesSection: true,
                 showSingleWindows: true,
             });
@@ -3142,7 +3077,11 @@ export const AppIcon = GObject.registerClass({
 
         this.emit('menu-state-changed', true);
 
-        this._menu.open(BoxPointer.PopupAnimation.FULL);
+        if (takeGrab)
+            this._menu.open(BoxPointer.PopupAnimation.FULL);
+        else
+            this._menu.openNoGrab(BoxPointer.PopupAnimation.FULL);
+
         this._menuManager.ignoreRelease();
         this.emit('sync-tooltip');
 
@@ -3256,13 +3195,6 @@ export const AppIcon = GObject.registerClass({
         let apps = [this.id, source.id];
 
         return view?.createFolder(apps);
-    }
-
-    cancelActions() {
-        if (this._menu)
-            this._menu.close(true);
-        this._removeMenuTimeout();
-        super.cancelActions();
     }
 });
 

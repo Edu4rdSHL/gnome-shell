@@ -26,11 +26,8 @@ class DashIcon extends AppDisplay.AppIcon {
         super._init(app, {
             setSizeManually: true,
             showLabel: false,
+            popupMenuSide: St.Side.BOTTOM,
         });
-    }
-
-    popupMenu() {
-        super.popupMenu(St.Side.BOTTOM);
     }
 
     // Disable scale-n-fade methods used during DND by parent

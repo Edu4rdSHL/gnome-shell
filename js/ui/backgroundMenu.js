@@ -1,6 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 import Clutter from 'gi://Clutter';
+import Graphene from 'gi://Graphene';
 import St from 'gi://St';
 
 import * as BoxPointer from './boxpointer.js';
@@ -39,27 +40,28 @@ export function addBackgroundMenu(actor, layoutManager) {
         actor._backgroundMenu.open(BoxPointer.PopupAnimation.FULL);
     }
 
-    let clickAction = new Clutter.ClickAction();
-    clickAction.connect('long-press', (action, theActor, state) => {
-        if (state === Clutter.LongPressState.QUERY) {
-            return (action.get_button() === 0 ||
-                     action.get_button() === 1) &&
-                    !actor._backgroundMenu.isOpen;
-        }
-        if (state === Clutter.LongPressState.ACTIVATE) {
-            let [x, y] = action.get_coords();
-            openMenu(x, y);
-            actor._backgroundManager.ignoreRelease();
-        }
-        return true;
+    const longPressGesture = new Clutter.LongPressGesture();
+    longPressGesture.set_required_button(Clutter.BUTTON_PRIMARY);
+    longPressGesture.connect('recognize', () => {
+        if (actor._backgroundMenu.isOpen)
+            return;
+
+        const coords = longPressGesture.get_coords();
+        const point = new Graphene.Point3D({x: coords.x, y: coords.y});
+        const transformedPoint = actor.apply_transform_to_point(point);
+        openMenu(transformedPoint.x, transformedPoint.y);
     });
-    clickAction.connect('clicked', action => {
-        if (action.get_button() === 3) {
-            let [x, y] = action.get_coords();
-            openMenu(x, y);
-        }
+    actor.add_action(longPressGesture);
+
+    const clickGesture = new Clutter.ClickGesture();
+    clickGesture.set_required_button(Clutter.BUTTON_SECONDARY);
+    clickGesture.connect('recognize', () => {
+        const coords = clickGesture.get_coords();
+        const point = new Graphene.Point3D({x: coords.x, y: coords.y});
+        const transformedPoint = actor.apply_transform_to_point(point);
+        openMenu(transformedPoint.x, transformedPoint.y);
     });
-    actor.add_action(clickAction);
+    actor.add_action(clickGesture);
 
     actor.connect('destroy', () => {
         actor._backgroundMenu.destroy();
