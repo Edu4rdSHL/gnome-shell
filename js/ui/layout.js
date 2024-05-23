@@ -566,6 +566,10 @@ export const LayoutManager = GObject.registerClass({
         this.keyboardIndex = this.primaryIndex;
     }
 
+    _updateUiGroups() {
+        this.uiGroup.set_size(global.screen_width, global.screen_height);
+    }
+
     _panelBoxChanged() {
         this._updatePanelBarrier();
 
@@ -604,6 +608,7 @@ export const LayoutManager = GObject.registerClass({
     _monitorsChanged() {
         this._updateMonitors();
         this._updateBoxes();
+        this._updateUiGroups();
         this._updateHotCorners();
         this._updateBackgrounds();
         this._updateFullscreen();
