@@ -1,6 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Pango from 'gi://Pango';
@@ -11,9 +12,12 @@ import * as Animation from '../ui/animation.js';
 import * as AuthList from './authList.js';
 import * as Batch from './batch.js';
 import * as GdmUtil from './util.js';
+import * as Main from '../ui/main.js';
+import * as MessageTray from '../ui/messageTray.js';
 import * as Params from '../misc/params.js';
 import * as ShellEntry from '../ui/shellEntry.js';
 import * as UserWidget from '../ui/userWidget.js';
+import * as WebLogin from './webLogin.js';
 import {wiggle} from '../misc/animationUtils.js';
 
 const DEFAULT_BUTTON_WELL_ICON_SIZE = 16;
@@ -51,6 +55,7 @@ export const AuthPrompt = GObject.registerClass({
         'failed': {},
         'next': {},
         'prompted': {},
+        'mechanisms-changed': {param_types: [GObject.TYPE_STRING]},
         'reset': {param_types: [GObject.TYPE_UINT]},
     },
 }, class AuthPrompt extends St.BoxLayout {
@@ -81,6 +86,10 @@ export const AuthPrompt = GObject.registerClass({
         this._userVerifier.connect('ask-question', this._onAskQuestion.bind(this));
         this._userVerifier.connect('show-message', this._onShowMessage.bind(this));
         this._userVerifier.connect('show-choice-list', this._onShowChoiceList.bind(this));
+        this._userVerifier.connect('mechanisms-list-changed', this._onAuthMechanismsListChanged.bind(this));
+        this._userVerifier.connect('foreground-mechanism-changed', this._onForegroundMechanismChanged.bind(this));
+        this._userVerifier.connect('web-login', this._onWebLogin.bind(this));
+        this._userVerifier.connect('web-login-time-out', this._onWebLoginTimeOut.bind(this));
         this._userVerifier.connect('verification-failed', this._onVerificationFailed.bind(this));
         this._userVerifier.connect('verification-complete', this._onVerificationComplete.bind(this));
         this._userVerifier.connect('reset', this._onReset.bind(this));
@@ -89,6 +98,7 @@ export const AuthPrompt = GObject.registerClass({
         this.smartcardDetected = this._userVerifier.smartcardDetected;
 
         this.connect('destroy', this._onDestroy.bind(this));
+        this.mechanisms = new Map();
 
         this._userWell = new St.Bin({
             x_expand: true,
@@ -154,7 +164,7 @@ export const AuthPrompt = GObject.registerClass({
             button_mask: St.ButtonMask.ONE | St.ButtonMask.THREE,
             reactive: this._hasCancelButton,
             can_focus: this._hasCancelButton,
-            x_align: Clutter.ActorAlign.START,
+            x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.CENTER,
             icon_name: 'go-previous-symbolic',
         });
@@ -163,6 +173,13 @@ export const AuthPrompt = GObject.registerClass({
         else
             this.cancelButton.opacity = 0;
         this._mainBox.add_child(this.cancelButton);
+
+        this._webLoginPromptWell = new St.Widget({
+            layout_manager: new Clutter.BinLayout(),
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._mainBox.add_child(this._webLoginPromptWell);
 
         this._authList = new AuthList.AuthList();
         this._authList.set({
@@ -297,6 +314,9 @@ export const AuthPrompt = GObject.registerClass({
             this._inactiveEntry = this._passwordEntry;
         }
         this._capsLockWarningLabel.visible = secret;
+
+        this._webLoginPromptWell.visible = false;
+        this._entry.visible = true;
     }
 
     _onAskQuestion(verifier, serviceName, question, secret) {
@@ -338,6 +358,115 @@ export const AuthPrompt = GObject.registerClass({
         this.emit('prompted');
     }
 
+    _onAuthMechanismsListChanged(userVerifier, serviceName, mechanismsList) {
+        this.mechanisms.set(serviceName, mechanismsList);
+        this.emit('mechanisms-changed', serviceName);
+    }
+
+    _onWebLogin(userVerifier, serviceName, introMessage, linkMessage, uri, code) {
+        const introAlreadyUp = this._queryingService === serviceName;
+
+        if (this._queryingService)
+            this.clear();
+
+        this._entry.visible = false;
+
+        if (this._preemptiveAnswer)
+            this._preemptiveAnswer = null;
+
+        this._webLoginPromptWell.remove_all_children();
+
+        if (this._spinner)
+            this._spinner.stop();
+
+        if (!introAlreadyUp) {
+            this._webLoginIntro = new WebLogin.WebLoginIntro({message: introMessage});
+            this._webLoginIntro.set({
+                x_expand: true,
+                y_align: Clutter.ActorAlign.START,
+            });
+            this._webLoginIntro.connect('clicked', () => {
+                this._queryingService = serviceName;
+
+                if (this._webLoginTimedOut)
+                    this._refreshWebLogin(serviceName);
+                else
+                    this._openWebLoginDialog(userVerifier, serviceName, linkMessage, uri, code);
+            });
+            this._webLoginPromptWell.add_child(this._webLoginIntro);
+            this._webLoginPromptWell.visible = true;
+
+            this.updateSensitivity(true);
+        } else {
+            this._openWebLoginDialog(userVerifier, serviceName, linkMessage, uri, code);
+        }
+
+        this._webLoginTimedOut = false;
+        this.emit('prompted');
+    }
+
+    _refreshWebLogin(serviceName) {
+        this.reset({
+            beginRequestType: BeginRequestType.REUSE_USERNAME,
+            queryingService: serviceName,
+        });
+    }
+
+    _onWebLoginTimeOut(userVerifier, serviceName) {
+        this._webLoginTimedOut = true;
+
+        if (this._queryingService !== serviceName)
+            return;
+
+        this._refreshWebLogin(serviceName);
+    }
+
+    _closeWebLoginDialog() {
+        if (!this._webLoginDialog)
+            return;
+
+        this._webLoginDialog.close();
+        this._webLoginDialog = null;
+    }
+
+    _openWebLoginDialog(userVerifier, serviceName, message, url, code) {
+        if (this._queryingService)
+            this.clear();
+
+        this._closeWebLoginDialog();
+
+        this._queryingService = serviceName;
+
+        this._webLoginPromptWell.remove_all_children();
+
+        this._webLoginDialog = new WebLogin.WebLoginDialog({message, url, code});
+        this._webLoginDialog.open(global.get_current_time());
+        this._webLoginDialog.connect('cancel', () => {
+            if (this.verificationStatus !== AuthPromptStatus.VERIFICATION_SUCCEEDED)
+                this.reset();
+        });
+        this._webLoginDialog.connect('done', () => {
+            userVerifier.connectObject(
+                `service-request::${serviceName}`, this._closeWebLoginDialog.bind(this),
+
+                'verification-complete', this._closeWebLoginDialog.bind(this),
+
+                'verification-failed', () => {
+                    this._closeWebLoginDialog();
+                    this.showLoginFailedNotification();
+                    this.reset();
+                },
+                this);
+            userVerifier.webLoginDone(serviceName);
+        });
+
+        if (this._spinner)
+            this._spinner.stop();
+
+        this.updateSensitivity(true);
+        this.emit('prompted');
+    }
+
     _onCredentialManagerAuthenticated() {
         if (this.verificationStatus !== AuthPromptStatus.VERIFICATION_SUCCEEDED)
             this.reset();
@@ -361,6 +490,11 @@ export const AuthPrompt = GObject.registerClass({
 
         if (this.verificationStatus !== AuthPromptStatus.VERIFICATION_SUCCEEDED)
             this.reset();
+    }
+
+    _onForegroundMechanismChanged() {
+        if (this.verificationStatus !== AuthPromptStatus.VERIFICATION_SUCCEEDED)
+            this.reset({beginRequestType: BeginRequestType.REUSE_USERNAME});
     }
 
     _onShowMessage(_userVerifier, serviceName, message, type) {
@@ -404,6 +538,11 @@ export const AuthPrompt = GObject.registerClass({
         this.verificationStatus = AuthPromptStatus.VERIFICATION_SUCCEEDED;
         this.cancelButton.reactive = false;
         this.cancelButton.can_focus = false;
+        this.cancelButton.ease({
+            opacity: 0,
+            duration: MESSAGE_FADE_OUT_ANIMATION_TIME,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
     }
 
     _onReset() {
@@ -489,12 +628,16 @@ export const AuthPrompt = GObject.registerClass({
         this.stopSpinning();
         this._authList.clear();
         this._authList.hide();
+        this._webLoginPromptWell.remove_all_children();
+        this._webLoginPromptWell.visible = false;
     }
 
     setQuestion(question) {
         this._entry.hint_text = question;
 
         this._authList.hide();
+        this._closeWebLoginDialog();
+
         this._entry.show();
         this._entry.grab_key_focus();
     }
@@ -575,6 +718,9 @@ export const AuthPrompt = GObject.registerClass({
     }
 
     updateSensitivity(sensitive) {
+        if (this._webLoginDialog)
+            return;
+
         if (this._entry.reactive === sensitive)
             return;
 
@@ -613,7 +759,40 @@ export const AuthPrompt = GObject.registerClass({
             this._updateEntry(false);
     }
 
-    reset() {
+    setForegroundMechanism(mechanism) {
+        this._userVerifier.setForegroundService(mechanism.serviceName);
+        this._userVerifier.setForegroundMechanism(mechanism);
+    }
+
+    showLoginFailedNotification() {
+        const source = new MessageTray.getSystemSource();
+
+        this._loginFailedNotification = new MessageTray.Notification({
+            source,
+            title: _('Login Failed'),
+            body: _('Please try again'),
+            isTransient: true,
+        });
+
+        this._loginFailedNotification.iconName = 'dialog-password-symbolic';
+
+        source.addNotification(this._loginFailedNotification);
+    }
+
+    hideLoginFailedNotification() {
+        if (!this._loginFailedNotification)
+            return;
+
+        this._loginFailedNotification.destroy();
+        this._loginFailedNotification = null;
+    }
+
+    reset(params) {
+        let {beginRequestType, queryingService} = Params.parse(params, {
+            beginRequestType: null,
+            queryingService: null,
+        });
+
         let oldStatus = this.verificationStatus;
         this.verificationStatus = AuthPromptStatus.NOT_VERIFYING;
         this.cancelButton.reactive = this._hasCancelButton;
@@ -623,7 +802,7 @@ export const AuthPrompt = GObject.registerClass({
         if (this._userVerifier)
             this._userVerifier.cancel();
 
-        this._queryingService = null;
+        this._queryingService = queryingService;
         this.clear();
         this._message.opacity = 0;
         this.setUser(null);
@@ -635,24 +814,24 @@ export const AuthPrompt = GObject.registerClass({
         else if (oldStatus === AuthPromptStatus.VERIFICATION_CANCELLED)
             this.emit('cancelled');
 
-        let beginRequestType;
-
-        if (this._mode === AuthPromptMode.UNLOCK_ONLY) {
-            // The user is constant at the unlock screen, so it will immediately
-            // respond to the request with the username
-            if (oldStatus === AuthPromptStatus.VERIFICATION_CANCELLED)
-                return;
-            beginRequestType = BeginRequestType.PROVIDE_USERNAME;
-        } else if (this._userVerifier.foregroundServiceDeterminesUsername()) {
-            // We don't need to know the username if the user preempted the login screen
-            // with a smartcard or with preauthenticated oVirt credentials
-            beginRequestType = BeginRequestType.DONT_PROVIDE_USERNAME;
-        } else if (oldStatus === AuthPromptStatus.VERIFICATION_IN_PROGRESS) {
-            // We're going back to retry with current user
-            beginRequestType = BeginRequestType.REUSE_USERNAME;
-        } else {
-            // In all other cases, we should get the username up front.
-            beginRequestType = BeginRequestType.PROVIDE_USERNAME;
+        if (beginRequestType === null) {
+            if (this._mode === AuthPromptMode.UNLOCK_ONLY) {
+                // The user is constant at the unlock screen, so it will immediately
+                // respond to the request with the username
+                if (oldStatus === AuthPromptStatus.VERIFICATION_CANCELLED)
+                    return;
+                beginRequestType = BeginRequestType.PROVIDE_USERNAME;
+            } else if (this._userVerifier.foregroundServiceDeterminesUsername()) {
+                // We don't need to know the username if the user preempted the login screen
+                // with a smartcard or with preauthenticated oVirt credentials
+                beginRequestType = BeginRequestType.DONT_PROVIDE_USERNAME;
+            } else if (oldStatus === AuthPromptStatus.VERIFICATION_IN_PROGRESS) {
+                // We're going back to retry with current user
+                beginRequestType = BeginRequestType.REUSE_USERNAME;
+            } else {
+                // In all other cases, we should get the username up front.
+                beginRequestType = BeginRequestType.PROVIDE_USERNAME;
+            }
         }
 
         this.emit('reset', beginRequestType);
@@ -672,6 +851,7 @@ export const AuthPrompt = GObject.registerClass({
             hold: null,
         });
 
+        this.hideLoginFailedNotification();
         this.updateSensitivity(false);
 
         let hold = params.hold;

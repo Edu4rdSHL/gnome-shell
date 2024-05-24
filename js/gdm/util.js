@@ -25,13 +25,23 @@ Gio._promisify(Gdm.UserVerifierProxy.prototype,
     'call_begin_verification_for_user');
 Gio._promisify(Gdm.UserVerifierProxy.prototype, 'call_begin_verification');
 
+export const SWITCHABLE_AUTH_SERVICE_NAME = 'gdm-switchable-auth';
 export const PASSWORD_SERVICE_NAME = 'gdm-password';
 export const FINGERPRINT_SERVICE_NAME = 'gdm-fingerprint';
 export const SMARTCARD_SERVICE_NAME = 'gdm-smartcard';
 const CLONE_FADE_ANIMATION_TIME = 250;
 
+export const PASSWORD_ROLE_NAME = 'password';
+export const SMARTCARD_ROLE_NAME = 'smartcard';
+export const FINGERPRINT_ROLE_NAME = 'fingerprint';
+export const WEB_LOGIN_ROLE_NAME = 'eidp';
+
+export const AUTH_MECHANISM_PROTOCOL = 'auth-mechanisms';
+
 export const LOGIN_SCREEN_SCHEMA = 'org.gnome.login-screen';
+export const SWITCHABLE_AUTHENTICATION_KEY = 'enable-switchable-authentication';
 export const PASSWORD_AUTHENTICATION_KEY = 'enable-password-authentication';
+export const WEB_LOGIN_AUTHENTICATION_KEY = 'enable-web-authentication';
 export const FINGERPRINT_AUTHENTICATION_KEY = 'enable-fingerprint-authentication';
 export const SMARTCARD_AUTHENTICATION_KEY = 'enable-smartcard-authentication';
 export const BANNER_MESSAGE_KEY = 'banner-message-enable';
@@ -41,10 +51,47 @@ export const ALLOWED_FAILURES_KEY = 'allowed-failures';
 export const LOGO_KEY = 'logo';
 export const DISABLE_USER_LIST_KEY = 'disable-user-list';
 
+const AUTH_SELECTION_COMPLETION_STATUS = 'Ok';
+
+const SWITCHABLE_AUTH_SUPPORTED_ROLES = [
+    PASSWORD_ROLE_NAME,
+    WEB_LOGIN_ROLE_NAME,
+];
+
 // Give user 48ms to read each character of a PAM message
 const USER_READ_TIME = 48;
 const FINGERPRINT_SERVICE_PROXY_TIMEOUT = 5000;
 const FINGERPRINT_ERROR_TIMEOUT_WAIT = 15;
+
+// Note these are specified in order of preference
+const DiscreteServiceMechanismDefinitions = [
+    {
+        serviceName: PASSWORD_SERVICE_NAME,
+        mechanismId: 'password',
+        mechanismName: _('Password'),
+        setting: PASSWORD_AUTHENTICATION_KEY,
+        role: PASSWORD_ROLE_NAME,
+        selectable: true,
+    },
+
+    {
+        serviceName: SMARTCARD_SERVICE_NAME,
+        mechanismId: 'smartcard',
+        mechanismName: _('Smartcard'),
+        setting: SMARTCARD_AUTHENTICATION_KEY,
+        role: SMARTCARD_ROLE_NAME,
+        selectable: true,
+    },
+
+    {
+        serviceName: FINGERPRINT_SERVICE_NAME,
+        mechanismId: 'fingerprint',
+        mechanismName: _('Fingerprint'),
+        setting: FINGERPRINT_AUTHENTICATION_KEY,
+        role: FINGERPRINT_ROLE_NAME,
+        selectable: false,
+    },
+];
 
 /**
  * Keep messages in order by priority
@@ -56,6 +103,7 @@ export const MessageType = {
     HINT: 1,
     INFO: 2,
     ERROR: 3,
+    BACKGROUND: 4,
 };
 
 const FingerprintReaderType = {
@@ -108,6 +156,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
 
         this._defaultService = null;
         this._preemptingService = null;
+        this._foregroundMechanism = null;
         this._fingerprintReaderType = FingerprintReaderType.NONE;
 
         this._messageQueue = [];
@@ -116,6 +165,9 @@ export class ShellUserVerifier extends Signals.EventEmitter {
         this._failCounter = 0;
         this._activeServices = new Set();
         this._unavailableServices = new Set();
+        this._activeServices = new Set();
+        this._publishedMechanisms = new Map();
+        this._pendingMechanisms = new Map();
 
         this._credentialManagers = {};
 
@@ -178,7 +230,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
         // If possible, reauthenticate an already running session,
         // so any session specific credentials get updated appropriately
         if (userName)
-            this._openReauthenticationChannel(userName);
+            this._openReauthenticationChannel(userName).catch(logError);
         else
             this._getUserVerifier();
     }
@@ -194,6 +246,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
     }
 
     _clearUserVerifier() {
+        this._pendingMechanisms.clear();
         if (this._userVerifier) {
             this._disconnectSignals();
             this._userVerifier.run_dispose();
@@ -201,6 +254,10 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             if (this._userVerifierChoiceList) {
                 this._userVerifierChoiceList.run_dispose();
                 this._userVerifierChoiceList = null;
+            }
+            if (this._userVerifierCustomJSON) {
+                this._userVerifierCustomJSON.run_dispose();
+                this._userVerifierCustomJSON = null;
             }
         }
     }
@@ -211,6 +268,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             this._cancellable = null;
         }
 
+        this._clearWebLoginTimeout();
         this._clearUserVerifier();
         this._clearMessageQueue();
         this._activeServices.clear();
@@ -238,7 +296,20 @@ export class ShellUserVerifier extends Signals.EventEmitter {
     async answerQuery(serviceName, answer) {
         try {
             await this._handlePendingMessages();
-            this._userVerifier.call_answer_query(serviceName, answer, this._cancellable, null);
+            if (this._pendingMechanisms.has(PASSWORD_ROLE_NAME))
+                this._replyWithAuthSelectionResponse(serviceName, PASSWORD_ROLE_NAME, {password: answer});
+            else
+                this._userVerifier.call_answer_query(serviceName, answer, this._cancellable, null);
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                logError(e);
+        }
+    }
+
+    async replyWithJSON(serviceName, json) {
+        try {
+            await this._handlePendingMessages();
+            this._userVerifierCustomJSON.call_reply(serviceName, json, this._cancellable, null);
         } catch (e) {
             if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
                 logError(e);
@@ -447,7 +518,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
     }
 
     _onCredentialManagerAuthenticated(credentialManager, _token) {
-        this._preemptingService = credentialManager.service;
+        this.setForegroundService(credentialManager.service);
         this.emit('credential-manager-authenticated');
     }
 
@@ -483,9 +554,9 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             this.smartcardDetected = smartcardDetected;
 
             if (this.smartcardDetected)
-                this._preemptingService = SMARTCARD_SERVICE_NAME;
+                this.setForegroundService(SMARTCARD_SERVICE_NAME);
             else if (this._preemptingService === SMARTCARD_SERVICE_NAME)
-                this._preemptingService = null;
+                this.setForegroundService(null);
 
             this.emit('smartcard-status-changed');
         }
@@ -498,6 +569,18 @@ export class ShellUserVerifier extends Signals.EventEmitter {
         this._queueMessage(serviceName, _('Authentication error'), MessageType.ERROR);
         this._failCounter++;
         this._verificationFailed(serviceName, false);
+    }
+
+    _getClientExtensionProxies() {
+        if (this._client.get_user_verifier_choice_list)
+            this._userVerifierChoiceList = this._client.get_user_verifier_choice_list();
+        else
+            this._userVerifierChoiceList = null;
+
+        if (this._client.get_user_verifier_custom_json)
+            this._userVerifierCustomJSON = this._client.get_user_verifier_custom_json();
+        else
+            this._userVerifierCustomJSON = null;
     }
 
     async _openReauthenticationChannel(userName) {
@@ -521,10 +604,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             return;
         }
 
-        if (this._client.get_user_verifier_choice_list)
-            this._userVerifierChoiceList = this._client.get_user_verifier_choice_list();
-        else
-            this._userVerifierChoiceList = null;
+        this._getClientExtensionProxies();
 
         this.reauthenticating = true;
         this._connectSignals();
@@ -544,10 +624,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             return;
         }
 
-        if (this._client.get_user_verifier_choice_list)
-            this._userVerifierChoiceList = this._client.get_user_verifier_choice_list();
-        else
-            this._userVerifierChoiceList = null;
+        this._getClientExtensionProxies();
 
         this._connectSignals();
         this._beginVerification();
@@ -573,11 +650,17 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             this._userVerifierChoiceList.connectObject('choice-query',
                 this._onChoiceListQuery.bind(this), this);
         }
+
+        if (this._userVerifierCustomJSON) {
+            this._userVerifierCustomJSON.connectObject('request',
+                this._onCustomJSONRequest.bind(this), this);
+        }
     }
 
     _disconnectSignals() {
         this._userVerifier?.disconnectObject(this);
         this._userVerifierChoiceList?.disconnectObject(this);
+        this._userVerifierCustomJSON?.disconnectObject(this);
     }
 
     _getForegroundService() {
@@ -585,6 +668,50 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             return this._preemptingService;
 
         return this._defaultService;
+    }
+
+    setForegroundService(serviceName) {
+        if (this._getForegroundService() === serviceName)
+            return;
+
+        this._preemptingService = serviceName;
+        this.emit('foreground-service-changed');
+    }
+
+    _getForegroundMechanism() {
+        if (this._foregroundMechanism)
+            return this._foregroundMechanism;
+
+        const foregroundService = this._getForegroundService();
+        if (foregroundService === this._defaultService) {
+            const definition = DiscreteServiceMechanismDefinitions.find(
+                def => def.serviceName === foregroundService);
+
+            if (!definition)
+                return null;
+
+            const {mechanismName, mechanismId, role, serviceName} = definition;
+
+            return {name: mechanismName, id: mechanismId, role, serviceName};
+        }
+
+        return null;
+    }
+
+    setForegroundMechanism(mechanism) {
+        const foregroundMechanism = this._getForegroundMechanism();
+
+        this._foregroundMechanism = mechanism;
+
+        if (foregroundMechanism === mechanism)
+            return;
+
+        if (foregroundMechanism?.role === mechanism?.role &&
+            foregroundMechanism?.mechanismName === mechanism?.mechanismName &&
+            foregroundMechanism?.serviceName === mechanism?.serviceName)
+            return;
+
+        this.emit('foreground-mechanism-changed');
     }
 
     serviceIsForeground(serviceName) {
@@ -641,14 +768,26 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             this._cancelAndReset();
     }
 
+    _isDiscreteServiceEnabled(definition) {
+        switch (definition.serviceName) {
+        case PASSWORD_AUTHENTICATION_KEY:
+            return this._settings.get_boolean(definition.setting);
+        case FINGERPRINT_AUTHENTICATION_KEY:
+            return this._fingerprintReaderType !== FingerprintReaderType.NONE;
+        case SMARTCARD_SERVICE_NAME:
+            return !!this._smartcardManager;
+        default:
+            return false;
+        }
+    }
+
     _getDetectedDefaultService() {
-        if (this._settings.get_boolean(PASSWORD_AUTHENTICATION_KEY))
-            return PASSWORD_SERVICE_NAME;
-        else if (this._smartcardManager)
-            return SMARTCARD_SERVICE_NAME;
-        else if (this._fingerprintReaderType !== FingerprintReaderType.NONE)
-            return FINGERPRINT_SERVICE_NAME;
-        return null;
+        if (this._settings.get_boolean(SWITCHABLE_AUTHENTICATION_KEY))
+            return SWITCHABLE_AUTH_SERVICE_NAME;
+
+        const definition = DiscreteServiceMechanismDefinitions.find(
+            def => this._isDiscreteServiceEnabled(def.setting));
+        return definition?.serviceName ?? null;
     }
 
     _updateDefaultService() {
@@ -667,6 +806,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
     }
 
     async _startService(serviceName) {
+        this._activeServices.add(serviceName);
         this._hold.acquire();
         try {
             this._activeServices.add(serviceName);
@@ -697,11 +837,6 @@ export class ShellUserVerifier extends Signals.EventEmitter {
         this._hold.release();
     }
 
-    _beginVerification() {
-        this._startService(this._getForegroundService());
-        this._maybeStartFingerprintVerification().catch(logError);
-    }
-
     async _maybeStartFingerprintVerification() {
         if (this._userName &&
             this._fingerprintReaderType !== FingerprintReaderType.NONE &&
@@ -709,14 +844,252 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             await this._startService(FINGERPRINT_SERVICE_NAME);
     }
 
+    _startBackgroundServices() {
+        this._maybeStartFingerprintVerification().catch(logError);
+    }
+
+    _startMechanismFromUnifiedService(mechanism) {
+        const roleHandlers = {
+            [WEB_LOGIN_ROLE_NAME]: this._startWebLogin,
+            [PASSWORD_ROLE_NAME]: this._startPasswordLogin,
+        };
+
+        const handler = roleHandlers[mechanism.role];
+        if (handler)
+            handler.call(this, mechanism.serviceName, mechanism.id);
+    }
+
+    _shouldStartBackgroundService(serviceName) {
+        if (!this._userName)
+            return false;
+
+        if (this.serviceIsForeground(serviceName))
+            return false;
+
+        if (this._activeServices.has(serviceName))
+            return false;
+
+        if (this._unavailableServices.has(serviceName))
+            return false;
+
+        if (serviceName === FINGERPRINT_SERVICE_NAME)
+            return this._fingerprintReaderType !== FingerprintReaderType.NONE;
+
+        return true;
+    }
+
+    _onMechanismsListChanged(serviceName, mechanismsList) {
+        /* Start all non-selectable (background) mechanisms and the foreground
+         * mechanism. Note for discrete auth (e.g. not the non-switchable services),
+         * the foreground mechanism is already started explicitly in beginVerification
+         */
+        if (this._foregroundMechanism?.serviceName === SWITCHABLE_AUTH_SERVICE_NAME)
+            this._startMechanismFromUnifiedService(this._foregroundMechanism);
+
+        if (this._unavailableServices.has(serviceName))
+            return;
+
+        for (const mechanism of mechanismsList) {
+            /* If it's selectable we wait until it's selected to start it
+             */
+            if (mechanism.selectable)
+                continue;
+
+            if (this._shouldStartBackgroundService(serviceName))
+                this._startService(serviceName);
+
+            if (serviceName === SWITCHABLE_AUTH_SERVICE_NAME)
+                this._startMechanismFromUnifiedService(mechanism);
+        }
+    }
+
+    _beginVerification() {
+        const foregroundService = this._getForegroundService();
+
+        this._mechanismsListChangedSignalId =
+            this.connect('mechanisms-list-changed',
+                (_, ...args) => this._onMechanismsListChanged(...args));
+
+        this._startService(foregroundService);
+        this._generateMechanismsFromDiscreteServices();
+    }
+
     _onChoiceListQuery(client, serviceName, promptMessage, list) {
+        this.emit(`service-request::${serviceName}`);
+
         if (!this.serviceIsForeground(serviceName))
             return;
 
         this.emit('show-choice-list', serviceName, promptMessage, list.deepUnpack());
     }
 
+    _startPasswordLogin(serviceName, mechanismId) {
+        const mechanisms = this._publishedMechanisms.get(serviceName);
+
+        if (!mechanisms)
+            return;
+
+        if (!mechanisms[mechanismId])
+            return;
+
+        const {prompt, role} = mechanisms[mechanismId];
+
+        this._pendingMechanisms.set(role, mechanismId);
+        this.emit('ask-question', serviceName, prompt, true);
+    }
+
+    async _replyWithAuthSelectionResponse(serviceName, role, response) {
+        const mechanismId = this._pendingMechanisms.get(role);
+        this._pendingMechanisms.delete(role);
+
+        const reply = {
+            'auth-selection': {
+                'status': AUTH_SELECTION_COMPLETION_STATUS,
+                [mechanismId]: response,
+            },
+        };
+
+        await this.replyWithJSON(serviceName, JSON.stringify(reply));
+    }
+
+    _startWebLogin(serviceName, mechanismId) {
+        const mechanisms = this._publishedMechanisms.get(serviceName);
+
+        if (!mechanisms)
+            return;
+
+        if (!mechanisms[mechanismId])
+            return;
+
+        const {init_prompt: initPrompt, link_prompt: linkPrompt, uri, code, role, timeout} = mechanisms[mechanismId];
+
+        if (!linkPrompt || !uri)
+            return;
+
+        if (timeout) {
+            this._webLoginTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, timeout * 1000,
+                () => {
+                    this.emit('web-login-time-out', serviceName);
+                    this._webLoginTimeoutId = 0;
+                    return GLib.SOURCE_REMOVE;
+                });
+        }
+
+        this._pendingMechanisms.set(role, mechanismId);
+        this.emit('web-login', serviceName, initPrompt, linkPrompt, uri, code);
+    }
+
+    _clearWebLoginTimeout() {
+        if (this._webLoginTimeoutId) {
+            GLib.source_remove(this._webLoginTimeoutId);
+            this._webLoginTimeoutId = 0;
+        }
+    }
+
+    webLoginDone(serviceName) {
+        this._clearWebLoginTimeout();
+        this._replyWithAuthSelectionResponse(serviceName, WEB_LOGIN_ROLE_NAME, {});
+    }
+
+    _filterAuthMechanisms(mechanismsList, filterFunc) {
+        return mechanismsList.filter(mechanism => {
+            const mapping = DiscreteServiceMechanismDefinitions.find(m =>
+                m.role === mechanism.role);
+
+            if (!mapping)
+                return true;
+
+            if (!mapping.selectable) {
+                if (filterFunc)
+                    filterFunc(mechanism);
+                return false;
+            }
+
+            const enabled = this._settings.get_boolean(mapping.setting);
+
+            if (!enabled && filterFunc)
+                filterFunc(mechanism);
+
+            return enabled;
+        });
+    }
+
+    _handleAuthSelection(serviceName, authSelection) {
+        let mechanisms = authSelection.mechanisms;
+        const priorityList = authSelection.priority;
+
+        if (!mechanisms)
+            return;
+
+        const ids = Object.keys(mechanisms);
+        ids.sort((a, b) => {
+            const priorityA = priorityList.indexOf(a);
+            const priorityB = priorityList.indexOf(b);
+
+            if (priorityA !== -1 && priorityB !== -1)
+                return priorityA - priorityB;
+
+            if (priorityA !== -1)
+                return -1;
+
+            if (priorityB !== -1)
+                return 1;
+
+            return 0;
+        });
+
+        let mechanismsList = [];
+        for (const id of ids) {
+            const name = mechanisms[id].name;
+            const role = mechanisms[id].role;
+
+            if (!name || !role)
+                continue;
+
+            let selectable = mechanisms[id].selectable;
+            if (selectable === undefined)
+                selectable = true;
+
+            mechanismsList.push({id, name, role, serviceName, selectable});
+        }
+
+        mechanismsList = this._filterAuthMechanisms(mechanismsList, mechanism => {
+            delete mechanisms[mechanism.id];
+        });
+
+        log(`newly published mechanisms: ${JSON.stringify(mechanisms)}`);
+        this._publishedMechanisms.set(serviceName, mechanisms);
+
+        this.emit('mechanisms-list-changed', serviceName, mechanismsList);
+    }
+
+    _handleAuthMechanismsRequest(serviceName, requestObject) {
+        const authSelection = requestObject['auth-selection'];
+
+        if (authSelection)
+            this._handleAuthSelection(serviceName, authSelection);
+    }
+
+    _onCustomJSONRequest(client, serviceName, protocol, version, json) {
+        this.emit(`service-request::${serviceName}`);
+
+        if (protocol === AUTH_MECHANISM_PROTOCOL) {
+            let requestObject;
+
+            try {
+                requestObject = JSON.parse(json);
+            } catch (e) {
+                logError(e);
+                return;
+            }
+
+            this._handleAuthMechanismsRequest(serviceName, requestObject);
+        }
+    }
+
     _onInfo(client, serviceName, info) {
+        this.emit(`service-request::${serviceName}`);
+
         if (this.serviceIsForeground(serviceName)) {
             this._queueMessage(serviceName, info, MessageType.INFO);
         } else if (this.serviceIsFingerprint(serviceName)) {
@@ -738,6 +1111,8 @@ export class ShellUserVerifier extends Signals.EventEmitter {
     }
 
     _onProblem(client, serviceName, problem) {
+        this.emit(`service-request::${serviceName}`);
+
         const isFingerprint = this.serviceIsFingerprint(serviceName);
 
         if (!this.serviceIsForeground(serviceName) && !isFingerprint)
@@ -774,6 +1149,8 @@ export class ShellUserVerifier extends Signals.EventEmitter {
     }
 
     _onInfoQuery(client, serviceName, question) {
+        this.emit(`service-request::${serviceName}`);
+
         if (!this.serviceIsForeground(serviceName))
             return;
 
@@ -781,6 +1158,8 @@ export class ShellUserVerifier extends Signals.EventEmitter {
     }
 
     _onSecretInfoQuery(client, serviceName, secretQuestion) {
+        this.emit(`service-request::${serviceName}`);
+
         if (!this.serviceIsForeground(serviceName))
             return;
 
@@ -796,11 +1175,39 @@ export class ShellUserVerifier extends Signals.EventEmitter {
         this.emit('ask-question', serviceName, secretQuestion, true);
     }
 
+    _generateMechanismsFromDiscreteServices() {
+        // Unified auth doesn't support all authentication mechanisms (e.g. fingerprint) and also sometimes switchable auth
+        // isn't available at all. Fill in the gaps in coverage with mechanisms synthesized from non-switchable authentication
+        // services.
+        const switchableAuthAvailable = this._activeServices.has(SWITCHABLE_AUTH_SERVICE_NAME) && !this._unavailableServices.has(SWITCHABLE_AUTH_SERVICE_NAME);
+        for (const definition of DiscreteServiceMechanismDefinitions) {
+            const enabled = this._settings.get_boolean(definition.setting);
+            const available = this._activeServices.has(definition.serviceName) && !this._unavailableServices.has(definition.serviceName);
+            const supportedByUnifiedAuth = switchableAuthAvailable && SWITCHABLE_AUTH_SUPPORTED_ROLES.includes(definition.role);
+
+            const mechanismsList = [];
+            if (enabled && available && !supportedByUnifiedAuth) {
+                mechanismsList.push({
+                    id: definition.mechanismId,
+                    name: definition.mechanismName,
+                    role: definition.role,
+                    selectable: definition.selectable,
+                });
+            }
+            this.emit('mechanisms-list-changed', definition.serviceName, mechanismsList);
+        }
+    }
+
     _onReset() {
         // Clear previous attempts to authenticate
         this._failCounter = 0;
         this._activeServices.clear();
         this._unavailableServices.clear();
+        this._activeServices.clear();
+        if (this._mechanismsListChangedSignalId) {
+            this.disconnect(this._mechanismsListChangedSignalId);
+            this._mechanismsListChangedSignalId = 0;
+        }
         this._updateDefaultService();
 
         this.emit('reset');
@@ -841,6 +1248,10 @@ export class ShellUserVerifier extends Signals.EventEmitter {
         const doneTrying = !shouldRetry || !this._canRetry();
 
         this.emit('verification-failed', serviceName, !doneTrying);
+
+        if (!this._userVerifier)
+            return;
+
         try {
             if (doneTrying) {
                 this._disconnectSignals();
@@ -875,6 +1286,9 @@ export class ShellUserVerifier extends Signals.EventEmitter {
     _onServiceUnavailable(_client, serviceName, errorMessage) {
         this._unavailableServices.add(serviceName);
 
+        if (serviceName === SWITCHABLE_AUTH_SERVICE_NAME)
+            this._generateMechanismsFromDiscreteServices();
+
         if (!errorMessage)
             return;
 
@@ -888,6 +1302,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
 
     _onConversationStopped(client, serviceName) {
         this._activeServices.delete(serviceName);
+        this.emit('mechanisms-list-changed', serviceName, []);
 
         // If the login failed with the preauthenticated oVirt credentials
         // then discard the credentials and revert to default authentication
@@ -896,7 +1311,7 @@ export class ShellUserVerifier extends Signals.EventEmitter {
             this.serviceIsForeground(service));
         if (foregroundService) {
             this._credentialManagers[foregroundService].token = null;
-            this._preemptingService = null;
+            this.setForegroundService(null);
             this._verificationFailed(serviceName, false);
             return;
         }

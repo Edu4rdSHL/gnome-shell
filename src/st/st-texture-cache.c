@@ -1198,6 +1198,7 @@ ensure_monitor_for_file (StTextureCache *cache,
 typedef struct {
   GFile *gfile;
   gint   grid_width, grid_height;
+  gfloat output_scale;
   gint   paint_scale;
   gfloat resource_scale;
   ClutterActor *actor;
@@ -1283,7 +1284,7 @@ on_loader_size_prepared (GdkPixbufLoader *loader,
                          gpointer user_data)
 {
   AsyncImageData *data = user_data;
-  int scale = ceilf (data->paint_scale * data->resource_scale);
+  int scale = ceilf (data->paint_scale * data->resource_scale * data->output_scale);
 
   gdk_pixbuf_loader_set_size (loader, width * scale, height * scale);
 }
@@ -1330,7 +1331,7 @@ load_sliced_image (GTask        *result,
   pix = gdk_pixbuf_loader_get_pixbuf (loader);
   width = gdk_pixbuf_get_width (pix);
   height = gdk_pixbuf_get_height (pix);
-  scale_factor = ceilf (data->paint_scale * data->resource_scale);
+  scale_factor = ceilf (data->paint_scale * data->resource_scale * data->output_scale);
   for (y = 0; y < height; y += data->grid_height * scale_factor)
     {
       for (x = 0; x < width; x += data->grid_width * scale_factor)
@@ -1356,8 +1357,10 @@ load_sliced_image (GTask        *result,
  * st_texture_cache_load_sliced_image:
  * @cache: A #StTextureCache
  * @file: A #GFile
- * @grid_width: Width in pixels
- * @grid_height: Height in pixels
+ * @grid_width: Width of animation cell in pixels
+ * @grid_height: Height of animation cell in pixels
+ * @image_width: Width of output image in pixels
+ * @image_height: Height of output image in pixels
  * @paint_scale: Scale factor of the display
  * @load_callback: (scope async) (nullable): Function called when the image is loaded, or %NULL
  * @user_data: Data to pass to the load callback
@@ -1374,6 +1377,8 @@ st_texture_cache_load_sliced_image (StTextureCache *cache,
                                     GFile          *file,
                                     gint            grid_width,
                                     gint            grid_height,
+                                    gint            image_width,
+                                    gint            image_height,
                                     gint            paint_scale,
                                     gfloat          resource_scale,
                                     GFunc           load_callback,
@@ -1391,6 +1396,7 @@ st_texture_cache_load_sliced_image (StTextureCache *cache,
   data = g_new0 (AsyncImageData, 1);
   data->grid_width = grid_width;
   data->grid_height = grid_height;
+  data->output_scale = MIN((double) image_width / grid_width, (double) image_height / grid_height);
   data->paint_scale = paint_scale;
   data->resource_scale = resource_scale;
   data->gfile = g_object_ref (file);

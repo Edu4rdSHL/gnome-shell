@@ -2,6 +2,7 @@
 <gresources>
   <gresource prefix="/org/gnome/shell">
     <file>gdm/authList.js</file>
+    <file>gdm/authMenuButton.js</file>
     <file>gdm/authPrompt.js</file>
     <file>gdm/batch.js</file>
     <file>gdm/credentialManager.js</file>
@@ -10,6 +11,7 @@
     <file>gdm/realmd.js</file>
     <file>gdm/util.js</file>
     <file>gdm/vmware.js</file>
+    <file>gdm/webLogin.js</file>
 
     <file>extensions/extension.js</file>
     <file>extensions/sharedInternals.js</file>
