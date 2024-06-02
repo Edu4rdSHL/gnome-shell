@@ -14,7 +14,6 @@ import {Slider} from './slider.js';
 
 import {PopupAnimation} from './boxpointer.js';
 
-const DIM_BRIGHTNESS = -0.4;
 const POPUP_ANIMATION_TIME = 400;
 const MENU_BUTTON_BRIGHTNESS = 0.1;
 
@@ -349,26 +348,15 @@ export const QuickSlider = GObject.registerClass({
 
 class QuickToggleMenu extends PopupMenu.PopupMenuBase {
     constructor(sourceActor) {
-        super(sourceActor, 'quick-toggle-menu');
-
-        const constraints = new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.Y,
-            source: sourceActor,
-        });
-        sourceActor.bind_property('height',
-            constraints, 'offset',
-            GObject.BindingFlags.DEFAULT);
+        super(sourceActor);
 
         this.actor = new St.Widget({
-            layout_manager: new Clutter.BinLayout(),
-            style_class: 'quick-toggle-menu-container',
+            layout_manager: new Clutter.BoxLayout({orientation: Clutter.Orientation.VERTICAL}),
+            style_class: 'quick-toggle-menu-container quick-toggle-menu',
             reactive: true,
-            x_expand: true,
-            y_expand: false,
-            constraints,
+            y_expand: true,
         });
         this.actor._delegate = this;
-        this.actor.add_child(this.box);
 
         global.focus_manager.add_group(this.actor);
 
@@ -377,9 +365,19 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             style_class: 'header',
             layout_manager: headerLayout,
             visible: false,
+            y_expand: false
         });
         headerLayout.hookup_style(this._header);
-        this.box.add_child(this._header);
+        this.actor.add_child(this._header);
+
+        this.scroller = new St.ScrollView({
+            vscrollbar_policy: St.PolicyType.NEVER,
+            x_expand: true,
+            y_expand: true,
+            child: this.box,
+        });
+        this.actor.add_child(this.scroller)
+
 
         this._headerIcon = new St.Icon({
             style_class: 'icon',
@@ -411,6 +409,10 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
         sourceActor.connect('notify::checked',
             () => this._syncChecked());
         this._syncChecked();
+
+        this.connectObject('active-changed', () => {
+            this._onSizeChanged()
+        });
     }
 
     setHeader(icon, title, subtitle = '') {
@@ -443,29 +445,35 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             return;
 
         this.actor.show();
-        this.isOpen = true;
 
-        this.actor.height = -1;
-        const [targetHeight] = this.actor.get_preferred_height(-1);
+        let needsScrollbar = this._needsScrollbar();
+
+        // St.ScrollView always requests space horizontally for a possible vertical
+        // scrollbar if in AUTOMATIC mode. Doing better would require implementation
+        // of width-for-height in St.BoxLayout and St.ScrollView. This looks bad
+        // when we *don't* need it, so turn off the scrollbar when that's true.
+        // Dynamic changes in whether we need it aren't handled properly.
+        this.scroller.vscrollbar_policy =
+            needsScrollbar ? St.PolicyType.AUTOMATIC : St.PolicyType.NEVER;
+
+        if (needsScrollbar)
+            this.scroller.add_style_pseudo_class('scrolled');
+        else
+            this.scroller.remove_style_pseudo_class('scrolled');
+
+        this.isOpen = true;
+        this.emit('open-state-changed', true);
 
         const duration = animate !== PopupAnimation.NONE
-            ? POPUP_ANIMATION_TIME / 2
+            ? POPUP_ANIMATION_TIME
             : 0;
 
-        this.actor.height = 0;
         this.box.opacity = 0;
-        this.actor.ease({
+
+        this.box.ease({
             duration,
-            height: targetHeight,
-            onComplete: () => {
-                this.box.ease({
-                    duration,
-                    opacity: 255,
-                });
-                this.actor.height = -1;
-            },
+            opacity: 255,
         });
-        this.emit('open-state-changed', true);
     }
 
     close(animate) {
@@ -473,26 +481,27 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             return;
 
         const duration = animate !== PopupAnimation.NONE
-            ? POPUP_ANIMATION_TIME / 2
+            ? POPUP_ANIMATION_TIME
             : 0;
 
         this.box.ease({
             duration,
             opacity: 0,
-            onComplete: () => {
-                this.actor.ease({
-                    duration,
-                    height: 0,
-                    onComplete: () => {
-                        this.actor.hide();
-                        this.emit('menu-closed');
-                    },
-                });
-            },
+            onComplete: () => this.actor.hide(),
         });
 
         this.isOpen = false;
         this.emit('open-state-changed', false);
+        this.emit('menu-closed');
+    }
+
+    _needsScrollbar() {
+        return true
+        let parent = this.actor.get_parent();
+        let [, maxHeight] = parent.get_preferred_height(-1);
+
+        let [, preferredHeight] = this.actor.get_preferred_height(-1);
+        return preferredHeight >= maxHeight;
     }
 
     _syncChecked() {
@@ -500,6 +509,18 @@ class QuickToggleMenu extends PopupMenu.PopupMenuBase {
             this._headerIcon.add_style_class_name('active');
         else
             this._headerIcon.remove_style_class_name('active');
+    }
+
+    _onSizeChanged() {
+        let needsScrollbar = this._needsScrollbar();
+
+        this.scroller.vscrollbar_policy =
+            needsScrollbar ? St.PolicyType.AUTOMATIC : St.PolicyType.NEVER;
+
+        if (needsScrollbar)
+            this.scroller.add_style_pseudo_class('scrolled');
+        else
+            this.scroller.remove_style_pseudo_class('scrolled');
     }
 
     // expected on toplevel menus
@@ -534,12 +555,6 @@ const QuickSettingsLayout = GObject.registerClass({
             1, GLib.MAXINT32, 1),
     },
 }, class QuickSettingsLayout extends Clutter.LayoutManager {
-    _init(overlay, params) {
-        super._init(params);
-
-        this._overlay = overlay;
-    }
-
     _containerStyleChanged() {
         const node = this._container.get_theme_node();
 
@@ -568,9 +583,6 @@ const QuickSettingsLayout = GObject.registerClass({
         let [minWidth, natWidth] = [0, 0];
 
         for (const child of container) {
-            if (child === this._overlay)
-                continue;
-
             const [childMin, childNat] = child.get_preferred_width(-1);
             const colSpan = this._getColSpan(container, child);
             minWidth = Math.max(minWidth, childMin / colSpan);
@@ -594,9 +606,6 @@ const QuickSettingsLayout = GObject.registerClass({
 
         for (const child of container) {
             if (!child.visible)
-                continue;
-
-            if (child === this._overlay)
                 continue;
 
             if (lineIndex === 0)
@@ -649,7 +658,7 @@ const QuickSettingsLayout = GObject.registerClass({
     vfunc_get_preferred_height(container, _forWidth) {
         const rows = this._getRows(container);
 
-        let [minHeight, natHeight] = this._overlay.get_preferred_height(-1);
+        let [minHeight, natHeight] = [0, 0]
 
         const spacing = (rows.length - 1) * this.row_spacing;
         minHeight += spacing;
@@ -667,12 +676,8 @@ const QuickSettingsLayout = GObject.registerClass({
     vfunc_allocate(container, box) {
         const rows = this._getRows(container);
 
-        const [, overlayHeight] = this._overlay.get_preferred_height(-1);
-
         const availWidth = box.get_width() - (this.nColumns - 1) * this.column_spacing;
         const childWidth = Math.floor(availWidth / this.nColumns);
-
-        this._overlay.allocate_available_size(0, 0, box.get_width(), box.get_height());
 
         const isRtl = container.text_direction === Clutter.TextDirection.RTL;
 
@@ -698,9 +703,18 @@ const QuickSettingsLayout = GObject.registerClass({
             });
 
             y += rowNat + this.row_spacing;
+        });
+    }
+});
 
-            if (row.some(c => c.menu?.actor.visible))
-                y += overlayHeight;
+const BackButton = GObject.registerClass(
+class BackButton extends QuickSettingsItem {
+    _init() {
+        super._init({
+            style_class: 'icon-button',
+            can_focus: true,
+            icon_name: 'go-previous-symbolic',
+            accessible_name: _('Back Button'),
         });
     }
 });
@@ -721,61 +735,67 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         this._dimEffect = new Clutter.BrightnessContrastEffect({
             enabled: false,
         });
-        this._boxPointer.add_effect_with_name('dim', this._dimEffect);
         this.box.add_style_class_name('quick-settings');
-
-        // Overlay layer for menus
-        this._overlay = new Clutter.Actor({
-            layout_manager: new Clutter.BinLayout(),
-        });
-
-        // "clone"
-        const placeholder = new Clutter.Actor({
-            constraints: new Clutter.BindConstraint({
-                coordinate: Clutter.BindCoordinate.HEIGHT,
-                source: this._overlay,
-            }),
-        });
 
         this._grid = new St.Widget({
             style_class: 'quick-settings-grid',
-            layout_manager: new QuickSettingsLayout(placeholder, {
+            layout_manager: new QuickSettingsLayout({
                 nColumns,
             }),
         });
-        this.box.add_child(this._grid);
-        this._grid.add_child(placeholder);
+        this._grid.add_effect_with_name('dim', this._dimEffect);
+        const dummy = new Clutter.Actor()
+        dummy.hide()
+        this._grid.add_child(dummy);
 
-        const yConstraint = new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.Y,
-            source: this._boxPointer,
+
+        this._menuWidget = new St.Bin();
+        this.menuBox = new Clutter.Actor({
+            layout_manager: new Clutter.BoxLayout({
+                orientation: Clutter.Orientation.VERTICAL,
+            }),
         });
+        this._menuWidget.set_child(this.menuBox)
 
-        // Pick up additional spacing from any intermediate actors
+        this.menuBox.add_constraint(new Clutter.BindConstraint({
+            coordinate: Clutter.BindCoordinate.SIZE,
+            source: this._grid,
+        }));
+        const xConstraint = new Clutter.BindConstraint({
+            coordinate: Clutter.BindCoordinate.X,
+            source: this._grid
+        });
+        this.menuBox.add_constraint(xConstraint);
+
         const updateOffset = () => {
             const laters = global.compositor.get_laters();
             laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
-                const offset = this._grid.apply_relative_transform_to_point(
-                    this._boxPointer, new Graphene.Point3D());
-                yConstraint.offset = offset.y;
+                [, xConstraint.offset] = this._boxPointer.get_preferred_width(-1);
                 return GLib.SOURCE_REMOVE;
             });
         };
-        this._grid.connect('notify::y', updateOffset);
-        this.box.connect('notify::y', updateOffset);
-        this._boxPointer.bin.connect('notify::y', updateOffset);
+        this._grid.connect('notify::x', updateOffset);
+        this.box.connect('notify::x', updateOffset);
+        this._boxPointer.bin.connect('notify::x', updateOffset);
 
-        this._overlay.add_constraint(yConstraint);
-        this._overlay.add_constraint(new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.X,
-            source: this._boxPointer,
-        }));
-        this._overlay.add_constraint(new Clutter.BindConstraint({
-            coordinate: Clutter.BindCoordinate.WIDTH,
-            source: this._boxPointer,
-        }));
 
-        this.actor.add_child(this._overlay);
+
+        const topRow = new St.BoxLayout()
+        this.backButton = new BackButton();
+        this.backButton.connect('clicked', () => {
+            this._activeMenu.close()
+        });
+        topRow.add_child(this.backButton);
+        topRow.add_child(new Clutter.Actor({x_expand: true}))
+
+        this.menuBox.add_child(topRow)
+
+        this.menuBox.hide();
+        this.bin = new St.Bin()
+        this.box.add_child(this.bin)
+
+        this.bin.add_child(this._grid);
+        this.bin.add_child(this._menuWidget)
     }
 
     addItem(item, colSpan = 1) {
@@ -793,9 +813,10 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
             this._grid, item, 'column-span', colSpan);
 
         if (item.menu) {
-            this._overlay.add_child(item.menu.actor);
+            this.menuBox.add_child(item.menu.actor)
 
             item.menu.connect('open-state-changed', (m, isOpen) => {
+                this._slide(isOpen);
                 this._setDimmed(isOpen);
                 this._activeMenu = isOpen ? item.menu : null;
             });
@@ -816,16 +837,32 @@ export const QuickSettingsMenu = class extends PopupMenu.PopupMenu {
         super.close(animate);
     }
 
-    _setDimmed(dim) {
-        const val = 127 * (1 + (dim ? 1 : 0) * DIM_BRIGHTNESS);
-        const color = Clutter.Color.new(val, val, val, 255);
+    _slide(out) {
+        this._grid.show();
+        this.menuBox.show();
+        const [, width] = this._boxPointer.get_preferred_width(-1);
+        const x = this._grid.get_x();
 
-        this._boxPointer.ease_property('@effects.dim.brightness', color, {
+        const target = out ? x - width : x + width
+
+        this._grid.ease({
+            x: target,
+            duration: POPUP_ANIMATION_TIME,
+            mode: Clutter.AnimationMode.EASE_OUT_EXPO,
+            onComplete: () => {
+                this._grid.visible = !out;
+                this.menuBox.visible = out;
+            },
+        });
+    }
+
+    _setDimmed(dim) {
+        const val = dim ? 0 : 255;
+
+        this._grid.ease_property('opacity', val, {
             mode: Clutter.AnimationMode.LINEAR,
             duration: POPUP_ANIMATION_TIME,
-            onStopped: () => (this._dimEffect.enabled = dim),
         });
-        this._dimEffect.enabled = true;
     }
 };
 

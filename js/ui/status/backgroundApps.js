@@ -45,6 +45,7 @@ const BackgroundAppMenuItem = GObject.registerClass({
 
         this.add_style_class_name('background-app-item');
         this.label.add_style_class_name('title');
+        this.label.y_expand = false;
 
         this.app = app;
 
@@ -60,7 +61,7 @@ const BackgroundAppMenuItem = GObject.registerClass({
         box.add_child(this.label);
 
         const messageLabel = new St.Label({
-            y_expand: true,
+            y_expand: false,
             y_align: Clutter.ActorAlign.CENTER,
             style_class: 'subtitle',
         });
