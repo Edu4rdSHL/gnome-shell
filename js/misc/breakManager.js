@@ -74,13 +74,7 @@ export const BreakState = {
  * @returns {string} A string form of `breakState`.
  */
 export function breakStateToString(breakState) {
-    return [
-        'DISABLED',
-        'ACTIVE',
-        'IDLE',
-        'IN_BREAK',
-        'BREAK_DUE',
-    ][breakState];
+    return Object.keys(BreakState).find(k => BreakState[k] === breakState);
 }
 
 let _singleton = null;
