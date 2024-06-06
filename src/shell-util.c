@@ -824,6 +824,14 @@ spawn_child_setup (gpointer user_data)
   meta_context_restore_rlimit_nofile (meta_context, NULL);
 }
 
+static void
+wait_pid (GDesktopAppInfo *appinfo,
+          GPid             pid,
+          gpointer         user_data)
+{
+  g_child_watch_add (pid, (GChildWatchFunc) g_spawn_close_pid, NULL);
+}
+
 /**
  * shell_util_spawn_async_with_pipes_and_fds:
  * @working_directory: (type filename) (nullable): child's current working
@@ -984,4 +992,50 @@ shell_util_spawn_async (const char          *working_directory,
 {
   return shell_util_spawn_async_with_pipes (working_directory, argv, envp,
                                             flags, NULL, NULL, NULL, error);
+}
+
+/**
+ * shell_util_spawn_app_info_with_fds:
+ * @context: (nullable): a launch context
+ * @flags: flags from #GSpawnFlags
+ * @stdin_fd: File descriptor to use for child’s stdin, or -1.
+ * @stdout_fd: File descriptor to use for child’s stdout, or -1.
+ * @stderr_fd: File descriptor to use for child’s stderr, or -1.
+ * @error: return location for error
+ *
+ * A wrapper around g_desktop_app_info_launch_uris_as_manager_with_fds()
+ * with async-signal-safe implementation of #GSpawnChildSetupFunc to
+ * launch a child program asynchronously resetting the rlimit nofile
+ * on child setup.
+ *
+ * Returns: TRUE on successful launch, FALSE otherwise.
+ **/
+gboolean
+shell_util_spawn_app_info_with_fds (GAppInfo           *app_info,
+                                    GAppLaunchContext  *context,
+                                    GSpawnFlags         flags,
+                                    int                 stdin_fd,
+                                    int                 stdout_fd,
+                                    int                 stderr_fd,
+                                    GError            **error)
+{
+  MetaContext *meta_context;
+
+  /* Hack: Use GAppInfo in public API, so it works with infos created with
+   * g_app_info_create_from_commandline(), but assume GDesktopAppInfo
+   * internally (considering that it has been the only backend on
+   * Unix since GIO was created, the assumption should be fairly safe)
+   */
+
+  g_return_val_if_fail (G_IS_DESKTOP_APP_INFO (app_info), FALSE);
+
+  meta_context = shell_global_get_context (shell_global_get ());
+  return g_desktop_app_info_launch_uris_as_manager_with_fds (G_DESKTOP_APP_INFO (app_info),
+                                                             NULL, /* uris */
+                                                             context,
+                                                             flags,
+                                                             spawn_child_setup, meta_context,
+                                                             wait_pid, NULL,
+                                                             stdin_fd, stdout_fd, stderr_fd,
+                                                             error);
 }

@@ -119,6 +119,14 @@ GPid shell_util_spawn_async (const char          *working_directory,
                              GSpawnFlags          flags,
                              GError             **error);
 
+gboolean shell_util_spawn_app_info_with_fds (GAppInfo           *app_info,
+                                             GAppLaunchContext  *context,
+                                             GSpawnFlags         flags,
+                                             int                 stdin_fd,
+                                             int                 stdout_fd,
+                                             int                 stderr_fd,
+                                             GError            **error);
+
 G_END_DECLS
 
 #endif /* __SHELL_UTIL_H__ */
