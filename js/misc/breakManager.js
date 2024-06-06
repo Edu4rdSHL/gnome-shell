@@ -67,6 +67,20 @@ export const BreakState = {
     BREAK_DUE: 4,
 };
 
+/* The code supports whatever break types the user wants. However, they each
+ * need to be backed by a org.gnome.desktop.break-reminders.* child schema, and
+ * those have to be pre-defined because they all have different default values.
+ * So we need to validate the break types to prevent GSettings complaining about
+ * non-installed schemas.
+ *
+ * So this needs to mirror the child schemas defined in
+ * `schemas/org.gnome.desktop.break-reminders.gschema.xml.in` in
+ * gsettings-desktop-schemas. */
+const SUPPORTED_BREAK_TYPES = [
+    'eyesight',
+    'movement',
+];
+
 /**
  * Return a string form of `breakState`.
  *
@@ -154,6 +168,11 @@ export const BreakManager = GObject.registerClass({
         const currentTime = this.getCurrentTime();
 
         for (const breakType of selectedBreaks) {
+            if (!SUPPORTED_BREAK_TYPES.includes(breakType)) {
+                console.debug(`Ignoring unknown break type ${breakType}`);
+                continue;
+            }
+
             this._breakTypeSettings.set(breakType, this._settingsFactory.new_with_path(
                 `org.gnome.desktop.break-reminders.${breakType}`,
                 `${this._breakSettings.path}${breakType}/`));
