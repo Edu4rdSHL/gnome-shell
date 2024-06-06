@@ -29,7 +29,7 @@ import GLib from 'gi://GLib';
 import * as BreakManager from 'resource:///org/gnome/shell/misc/breakManager.js';
 
 // Convenience alias
-const BreakState = BreakManager.BreakState;
+const {BreakState} = BreakManager;
 
 // A harness for testing the BreakManager class. It simulates the passage of
 // time, maintaining an internal ordered queue of events, and providing three
