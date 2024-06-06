@@ -112,8 +112,8 @@ export const BreakManager = GObject.registerClass({
         'take-break': {},
     },
 }, class BreakManager extends GObject.Object {
-    _init(clock, idleMonitor, settingsFactory) {
-        super._init();
+    constructor(clock, idleMonitor, settingsFactory) {
+        super();
 
         // Allow these two bits of global state to be overridden for unit testing
         this._idleMonitor = idleMonitor ?? global.backend.get_core_idle_monitor();
@@ -601,8 +601,8 @@ export const BreakManager = GObject.registerClass({
 // when to take breaks. It factors the user’s UI preferences into account.
 export const BreakDispatcher = GObject.registerClass(
 class BreakDispatcher extends GObject.Object {
-    _init(manager) {
-        super._init();
+    constructor(manager) {
+        super();
 
         this._manager = manager;
         this._previousState = BreakState.DISABLED;
@@ -1237,8 +1237,8 @@ const BreakNotification = GObject.registerClass({
 
 const OsdBreakCountdownLabel = GObject.registerClass(
 class OsdBreakCountdownLabel extends St.Widget {
-    _init(manager) {
-        super._init({x_expand: true, y_expand: true});
+    constructor(manager) {
+        super({x_expand: true, y_expand: true});
 
         this._manager = manager;
         this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, () => {
