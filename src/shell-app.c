@@ -1233,23 +1233,6 @@ shell_app_request_quit (ShellApp   *app)
 }
 
 static void
-child_context_setup (gpointer user_data)
-{
-  ShellGlobal *shell_global = user_data;
-  MetaContext *meta_context = shell_global_get_context (shell_global);
-
-  meta_context_restore_rlimit_nofile (meta_context, NULL);
-}
-
-static void
-wait_pid (GDesktopAppInfo *appinfo,
-          GPid             pid,
-          gpointer         user_data)
-{
-  g_child_watch_add (pid, (GChildWatchFunc) g_spawn_close_pid, NULL);
-}
-
-static void
 apply_discrete_gpu_env (GAppLaunchContext *context,
                         ShellGlobal       *global)
 {
@@ -1322,7 +1305,6 @@ shell_app_launch (ShellApp           *app,
   gboolean ret;
   GSpawnFlags flags;
   gboolean discrete_gpu = FALSE;
-  ShellGlobal *shell_global = shell_global_get ();
 
   if (app->info == NULL)
     {
@@ -1362,15 +1344,13 @@ shell_app_launch (ShellApp           *app,
     journalfd = sd_journal_stream_fd (shell_app_get_id (app), LOG_INFO, FALSE);
 #endif /* HAVE_SYSTEMD */
 
-    ret = g_desktop_app_info_launch_uris_as_manager_with_fds (app->info, NULL,
-                                                              context,
-                                                              flags,
-                                                              child_context_setup, shell_global,
-                                                              wait_pid, NULL,
-                                                              -1,
-                                                              journalfd,
-                                                              journalfd,
-                                                              error);
+    ret = shell_util_spawn_app_info_with_fds (G_APP_INFO (app->info),
+                                              context,
+                                              flags,
+                                              -1, /* stdin */
+                                              journalfd,
+                                              journalfd,
+                                              error);
 
     if (journalfd >= 0)
       (void) close (journalfd);
