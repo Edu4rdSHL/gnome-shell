@@ -132,8 +132,8 @@ export const BreakManager = GObject.registerClass({
         this._breakSettings.connect('changed', () => this._updateSettings());
 
         this._state = BreakState.DISABLED;
-        this._breakTypeSettings = {};  // map of breakType to GSettings
-        this._breakLastEnd = {};  // map of breakType to wall clock time (in seconds)
+        this._breakTypeSettings = new Map();  // map of breakType to GSettings
+        this._breakLastEnd = new Map();  // map of breakType to wall clock time (in seconds)
         this._idleWatchId = 0;
         this._activeWatchId = 0;
         this._timerId = 0;
@@ -154,11 +154,11 @@ export const BreakManager = GObject.registerClass({
         const currentTime = this.getCurrentTime();
 
         for (const breakType of selectedBreaks) {
-            this._breakTypeSettings[breakType] = this._settingsFactory.new_with_path(
+            this._breakTypeSettings.set(breakType, this._settingsFactory.new_with_path(
                 `org.gnome.desktop.break-reminders.${breakType}`,
-                `${this._breakSettings.path}${breakType}/`);
-            this._breakTypeSettings[breakType].connect('changed', () => this._updateState(this.getCurrentTime()));
-            this._breakLastEnd[breakType] = currentTime;
+                `${this._breakSettings.path}${breakType}/`));
+            this._breakTypeSettings.get(breakType).connect('changed', () => this._updateState(this.getCurrentTime()));
+            this._breakLastEnd.set(breakType, currentTime);
         }
 
         this.notify('next-break-due-time');
@@ -194,8 +194,8 @@ export const BreakManager = GObject.registerClass({
             this._clock.source_remove(this._timerId);
         this._timerId = 0;
 
-        this._breakTypeSettings = {};
-        this._breakLastEnd = {};
+        this._breakTypeSettings = new Map();
+        this._breakLastEnd = new Map();
 
         this._state = BreakState.DISABLED;
         this._currentBreakType = null;
@@ -253,7 +253,7 @@ export const BreakManager = GObject.registerClass({
             let dueBreakStartTime = 0;
 
             if (dueBreakType != null && nextDueTime <= currentTime) {
-                const dueBreakTypeDuration = this._breakTypeSettings[dueBreakType].get_uint('duration-seconds');
+                const dueBreakTypeDuration = this._breakTypeSettings.get(dueBreakType).get_uint('duration-seconds');
 
                 // Has the break been finished?
                 if (nextDueTime + dueBreakTypeDuration <= currentTime) {
@@ -295,11 +295,11 @@ export const BreakManager = GObject.registerClass({
             console.debug(`idleStartTime: ${this._idleStartTime}s`);
 
             if (this._idleStartTime > 0) {
-                for (const [breakType, breakTypeSettings] of Object.entries(this._breakTypeSettings)) {
+                for (const [breakType, breakTypeSettings] of this._breakTypeSettings) {
                     const breakTypeDuration = breakTypeSettings.get_uint('duration-seconds');
 
                     if (idleTimeSeconds >= breakTypeDuration)
-                        this._breakLastEnd[breakType] = currentTime;
+                        this._breakLastEnd.set(breakType, currentTime);
                 }
 
                 this.notify('next-break-due-time');
@@ -378,12 +378,12 @@ export const BreakManager = GObject.registerClass({
 
         console.debug(`Current time: ${currentTime}s`);
 
-        for (const [breakType, breakTypeSettings] of Object.entries(this._breakTypeSettings)) {
+        for (const [breakType, breakTypeSettings] of this._breakTypeSettings) {
             const breakTypeInterval = breakTypeSettings.get_uint('interval-seconds');
             const breakTypeDuration = breakTypeSettings.get_uint('duration-seconds');
 
             // Work out which break types are now due.
-            const breakTypeWouldBeDueAt = this._breakLastEnd[breakType] + breakTypeInterval;
+            const breakTypeWouldBeDueAt = this._breakLastEnd.get(breakType) + breakTypeInterval;
             const breakTypeIsDue = breakTypeWouldBeDueAt <= currentTime;
 
             console.debug(`Break type ${breakType}: would be due at ${breakTypeWouldBeDueAt}`);
@@ -442,14 +442,7 @@ export const BreakManager = GObject.registerClass({
         if (this.state === BreakState.IN_BREAK)
             return 0;
 
-        let maxBreakLastEnd = 0;
-
-        for (const breakType in this._breakLastEnd) {
-            if (this._breakLastEnd[breakType] > maxBreakLastEnd)
-                maxBreakLastEnd = this._breakLastEnd[breakType];
-        }
-
-        return maxBreakLastEnd;
+        return Math.max(0, ...this._breakLastEnd.values());
     }
 
     // Get the time when the next break is due. If a break is currently due,
@@ -481,12 +474,12 @@ export const BreakManager = GObject.registerClass({
         // than just the current break type, because multiple break types might
         // be due at the same time, and it would be a bit annoying to delay one
         // only for another break type to immediately become due.
-        for (const [breakType, breakTypeSettings] of Object.entries(this._breakTypeSettings)) {
+        for (const [breakType, breakTypeSettings] of this._breakTypeSettings) {
             const breakTypeInterval = breakTypeSettings.get_uint('interval-seconds');
             const delaySecs = breakTypeSettings.get_uint('delay-seconds');
 
-            if (this._breakLastEnd[breakType] + breakTypeInterval <= currentTime)
-                this._breakLastEnd[breakType] += delaySecs;
+            if (this._breakLastEnd.get(breakType) + breakTypeInterval <= currentTime)
+                this._breakLastEnd.set(breakType, this._breakLastEnd.get(breakType) + delaySecs);
         }
 
         this.freeze_notify();
@@ -513,11 +506,11 @@ export const BreakManager = GObject.registerClass({
         // just the current break type, because multiple break types might be
         // due at the same time, and it would be a bit annoying to skip one only
         // for another break type to immediately become due.
-        for (const [breakType, breakTypeSettings] of Object.entries(this._breakTypeSettings)) {
+        for (const [breakType, breakTypeSettings] of this._breakTypeSettings) {
             const breakTypeInterval = breakTypeSettings.get_uint('interval-seconds');
 
-            if (this._breakLastEnd[breakType] + breakTypeInterval <= currentTime)
-                this._breakLastEnd[breakType] = currentTime;
+            if (this._breakLastEnd.get(breakType) + breakTypeInterval <= currentTime)
+                this._breakLastEnd.set(breakType, currentTime);
         }
 
         this.freeze_notify();
@@ -538,61 +531,61 @@ export const BreakManager = GObject.registerClass({
 
     // Whether the given breakType should emit notification popups to the user.
     breakTypeShouldNotify(breakType) {
-        if (!(breakType in this._breakTypeSettings))
+        if (!this._breakTypeSettings.has(breakType))
             return false;
-        return this._breakTypeSettings[breakType].get_boolean('notify');
+        return this._breakTypeSettings.get(breakType).get_boolean('notify');
     }
 
     // Whether the given breakType should emit notification popups to the user
     // when it’s upcoming.
     breakTypeShouldNotifyUpcoming(breakType) {
-        if (!(breakType in this._breakTypeSettings))
+        if (!this._breakTypeSettings.has(breakType))
             return false;
-        return this._breakTypeSettings[breakType].get_boolean('notify-upcoming');
+        return this._breakTypeSettings.get(breakType).get_boolean('notify-upcoming');
     }
 
     // Whether the given breakType should emit notification popups to the user
     // if it’s overdue.
     breakTypeShouldNotifyOverdue(breakType) {
-        if (!(breakType in this._breakTypeSettings))
+        if (!this._breakTypeSettings.has(breakType))
             return false;
-        return this._breakTypeSettings[breakType].get_boolean('notify-overdue');
+        return this._breakTypeSettings.get(breakType).get_boolean('notify-overdue');
     }
 
     // Whether the given breakType should show a prominent countdown for the
     // last 60s before it’s due.
     breakTypeShouldCountdown(breakType) {
-        if (!(breakType in this._breakTypeSettings))
+        if (!this._breakTypeSettings.has(breakType))
             return false;
-        return this._breakTypeSettings[breakType].get_boolean('countdown');
+        return this._breakTypeSettings.get(breakType).get_boolean('countdown');
     }
 
     // Whether the given breakType should play sounds to notify the user.
     breakTypeShouldPlaySound(breakType) {
-        if (!(breakType in this._breakTypeSettings))
+        if (!this._breakTypeSettings.has(breakType))
             return false;
-        return this._breakTypeSettings[breakType].get_boolean('play-sound');
+        return this._breakTypeSettings.get(breakType).get_boolean('play-sound');
     }
 
     // Whether the given breakType should fade the screen during breaks.
     breakTypeShouldFadeScreen(breakType) {
-        if (!(breakType in this._breakTypeSettings))
+        if (!this._breakTypeSettings.has(breakType))
             return false;
-        return this._breakTypeSettings[breakType].get_boolean('fade-screen');
+        return this._breakTypeSettings.get(breakType).get_boolean('fade-screen');
     }
 
     // Whether the given breakType should lock the screen during breaks.
     breakTypeShouldLockScreen(breakType) {
-        if (!(breakType in this._breakTypeSettings))
+        if (!this._breakTypeSettings.has(breakType))
             return false;
-        return this._breakTypeSettings[breakType].get_boolean('lock-screen');
+        return this._breakTypeSettings.get(breakType).get_boolean('lock-screen');
     }
 
     // Duration (in seconds) of the given breakType.
     getDurationForBreakType(breakType) {
-        if (!(breakType in this._breakTypeSettings))
+        if (!this._breakTypeSettings.has(breakType))
             return 0;
-        return this._breakTypeSettings[breakType].get_uint('duration-seconds');
+        return this._breakTypeSettings.get(breakType).get_uint('duration-seconds');
     }
 });
 
