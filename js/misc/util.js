@@ -98,12 +98,7 @@ export function spawnCommandLine(commandLine) {
  */
 export function spawnApp(argv) {
     try {
-        const app = Gio.AppInfo.create_from_commandline(argv.join(' '),
-            null,
-            Gio.AppInfoCreateFlags.SUPPORTS_STARTUP_NOTIFICATION);
-
-        let context = global.create_app_launch_context(0, -1);
-        app.launch([], context);
+        trySpawnApp(argv);
     } catch (err) {
         _handleSpawnError(argv[0], err);
     }
@@ -174,6 +169,24 @@ export function trySpawnCommandLine(commandLine) {
     }
 
     trySpawn(argv);
+}
+
+/**
+ * trySpawnApp:
+ *
+ * @param {readonly string[]} argv an argv array
+ * @throws
+ *
+ * Runs argv as if it was an application, handling startup notification.
+ * If launching the command fails, this will throw an error.
+ */
+export function trySpawnApp(argv) {
+    const app = Gio.AppInfo.create_from_commandline(argv.join(' '),
+        null,
+        Gio.AppInfoCreateFlags.SUPPORTS_STARTUP_NOTIFICATION);
+
+    const context = global.create_app_launch_context(0, -1);
+    app.launch([], context);
 }
 
 function _handleSpawnError(command, err) {
