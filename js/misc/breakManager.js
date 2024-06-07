@@ -42,6 +42,7 @@ const BREAK_UPCOMING_NOTIFICATION_TIME_SECONDS = [2 * 60];  // notify the user 2
 const BREAK_COUNTDOWN_TIME_SECONDS = 60;
 
 const LIGHTBOX_FADE_TIME_SECONDS = 3;
+const LIGHTBOX_FADE_FACTOR = 0.6;
 
 /** @enum {number} */
 const IdleState = {
@@ -680,7 +681,7 @@ class BreakDispatcher extends GObject.Object {
 
         this._lightbox = new Lightbox.Lightbox(Main.uiGroup, {
             inhibitEvents: false,
-            fadeFactor: 0.6,
+            fadeFactor: LIGHTBOX_FADE_FACTOR,
         });
 
         this._countdownOsd = null;
