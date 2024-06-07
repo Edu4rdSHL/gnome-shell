@@ -691,12 +691,10 @@ class BreakDispatcher extends GObject.Object {
     }
 
     destroy() {
-        if (this._notificationSource != null)
-            this._notificationSource.destroy();
+        this._notificationSource?.destroy();
         this._notificationSource = null;
 
-        if (this._lightbox != null)
-            this._lightbox.destroy();
+        this._lightbox?.destroy();
         this._lightbox = null;
 
         this._removeCountdown();
@@ -721,8 +719,7 @@ class BreakDispatcher extends GObject.Object {
             GLib.source_remove(this._countdownTimerId);
         this._countdownTimerId = 0;
 
-        if (this._countdownOsd != null)
-            this._countdownOsd.destroy();
+        this._countdownOsd?.destroy();
         this._countdownOsd = null;
     }
 
@@ -736,8 +733,7 @@ class BreakDispatcher extends GObject.Object {
             if (this._previousState === BreakState.IN_BREAK)
                 this._maybePlayCompleteSound();
 
-            if (this._lightbox != null)
-                this._lightbox.lightOff();
+            this._lightbox?.lightOff();
 
             // Work out when the next break is due, and schedule a countdown.
             const currentTime = this._manager.getCurrentTime();
@@ -766,8 +762,7 @@ class BreakDispatcher extends GObject.Object {
             if (this._previousState === BreakState.IN_BREAK)
                 this._maybePlayCompleteSound();
 
-            if (this._lightbox != null)
-                this._lightbox.lightOff();
+            this._lightbox?.lightOff();
 
             break;
         }
