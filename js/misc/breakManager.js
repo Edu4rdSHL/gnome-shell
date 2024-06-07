@@ -740,12 +740,12 @@ class BreakDispatcher extends GObject.Object {
             const [nextBreakType, nextBreakDueTime] = this._manager.getNextBreakDue(currentTime);
 
             if (this._manager.breakTypeShouldCountdown(nextBreakType)) {
-                const countdownStart = (nextBreakDueTime - currentTime) - BREAK_COUNTDOWN_TIME_SECONDS;
+                const countdownStart = Math.max((nextBreakDueTime - currentTime) - BREAK_COUNTDOWN_TIME_SECONDS, 0);
                 console.debug(`BreakDispatcher: Scheduling break countdown to start in ${countdownStart}s`);
 
                 if (this._countdownTimerId !== 0)
                     GLib.source_remove(this._countdownTimerId);
-                this._countdownTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, countdownStart > 0 ? countdownStart : 0, () => {
+                this._countdownTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, countdownStart, () => {
                     if (this._countdownOsd == null) {
                         this._countdownOsd = new OsdBreakCountdownLabel(this._manager);
                         this._countdownOsd.connect('destroy', () => (this._countdownOsd = null));
