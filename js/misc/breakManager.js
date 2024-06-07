@@ -772,7 +772,8 @@ class BreakDispatcher extends GObject.Object {
         }
 
         case BreakState.IN_BREAK: {
-            if (this._manager.breakTypeShouldLockScreen(this._manager.currentBreakType)) {
+            if (this._manager.breakTypeShouldLockScreen(this._manager.currentBreakType) &&
+                this._previousState !== BreakState.IN_BREAK) {
                 this._systemActions.activateLockScreen();
             } else if (this._manager.breakTypeShouldFadeScreen(this._manager.currentBreakType)) {
                 Main.uiGroup.set_child_above_sibling(this._lightbox, null);
