@@ -855,7 +855,8 @@ class BreakNotificationSource extends MessageTray.Source {
             this._notification.connect('destroy', () => (this._notification = null));
         }
 
-        this._notification.set(params);
+        // Unacknowledge the notification when it’s updated, by default.
+        this._notification.set({acknowledged: false, ...params});
     }
 
     /**
@@ -1000,7 +1001,6 @@ class BreakNotificationSource extends MessageTray.Source {
                                 title: titleText,
                                 body: bodyText,
                                 sound: null,
-                                acknowledged: false,
                                 allowDelay: true,
                                 allowSkip: true,
                                 allowTake: false,
@@ -1070,7 +1070,6 @@ class BreakNotificationSource extends MessageTray.Source {
                     body: bodyText,
                     sound: null,
                     urgency: this._urgencyForBreakType(this._manager.currentBreakType),
-                    acknowledged: false,
                     allowDelay: false,
                     allowSkip: false,
                     allowTake: false,
@@ -1130,7 +1129,6 @@ class BreakNotificationSource extends MessageTray.Source {
                     title: titleText,
                     body: bodyText,
                     sound: null,
-                    acknowledged: false,
                     allowDelay: true,
                     allowSkip: false,
                     allowTake: true,
@@ -1151,7 +1149,6 @@ class BreakNotificationSource extends MessageTray.Source {
                     title: _('Break Overdue'),
                     body: bodyText,
                     sound: null,
-                    acknowledged: false,
                     allowDelay: false,
                     allowSkip: false,
                     allowTake: false,
@@ -1172,7 +1169,6 @@ class BreakNotificationSource extends MessageTray.Source {
                     title: _('Break Interrupted'),
                     body: bodyText,
                     sound: null,
-                    acknowledged: false,
                     allowDelay: false,
                     allowSkip: false,
                     allowTake: false,
