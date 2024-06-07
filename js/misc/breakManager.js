@@ -147,6 +147,7 @@ export const BreakManager = GObject.registerClass({
 
         this._state = BreakState.DISABLED;
         this._breakTypeSettings = new Map();  // map of breakType to GSettings
+        this._breakTypeSettingsChangedId = new Map();
         this._breakLastEnd = new Map();  // map of breakType to wall clock time (in seconds)
         this._idleWatchId = 0;
         this._activeWatchId = 0;
@@ -167,17 +168,26 @@ export const BreakManager = GObject.registerClass({
 
         const currentTime = this.getCurrentTime();
 
-        for (const breakType of selectedBreaks) {
-            if (!SUPPORTED_BREAK_TYPES.includes(breakType)) {
-                console.debug(`Ignoring unknown break type ${breakType}`);
-                continue;
+        for (const breakType of SUPPORTED_BREAK_TYPES) {
+            if (selectedBreaks.includes(breakType) &&
+                !this._breakTypeSettings.has(breakType)) {
+                // Enabling a previously disabled break
+                const breakSettings = this._settingsFactory.new_with_path(
+                    `org.gnome.desktop.break-reminders.${breakType}`,
+                    `${this._breakSettings.path}${breakType}/`);
+                this._breakTypeSettings.set(breakType, breakSettings);
+                this._breakTypeSettingsChangedId.set(breakType,
+                    breakSettings.connect('changed', () => this._updateState(this.getCurrentTime())));
+                this._breakLastEnd.set(breakType, currentTime);
+            } else if (!selectedBreaks.includes(breakType) &&
+                       this._breakTypeSettings.has(breakType)) {
+                // Disabling a previously enabled break
+                const breakSettings = this._breakTypeSettings.get(breakType);
+                breakSettings.disconnect(this._breakTypeSettingsChangedId.get(breakType));
+                this._breakTypeSettings.delete(breakType);
+                this._breakTypeSettingsChangedId.delete(breakType);
+                this._breakLastEnd.delete(breakType);
             }
-
-            this._breakTypeSettings.set(breakType, this._settingsFactory.new_with_path(
-                `org.gnome.desktop.break-reminders.${breakType}`,
-                `${this._breakSettings.path}${breakType}/`));
-            this._breakTypeSettings.get(breakType).connect('changed', () => this._updateState(this.getCurrentTime()));
-            this._breakLastEnd.set(breakType, currentTime);
         }
 
         this.notify('next-break-due-time');
@@ -213,7 +223,10 @@ export const BreakManager = GObject.registerClass({
             this._clock.source_remove(this._timerId);
         this._timerId = 0;
 
+        for (const [breakType, breakSettings] of this._breakTypeSettings)
+            breakSettings.disconnect(this._breakTypeSettingsChangedId.get(breakType));
         this._breakTypeSettings = new Map();
+        this._breakTypeSettingsChangedId = new Map();
         this._breakLastEnd = new Map();
 
         this._state = BreakState.DISABLED;
