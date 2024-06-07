@@ -103,8 +103,10 @@ export function getDefault() {
     return _singleton;
 }
 
-// A manager class which tracks total active/inactive time and signals when the
-// user needs to take a break (according to their break reminder preferences).
+/**
+ * A manager class which tracks total active/inactive time and signals when the
+ * user needs to take a break (according to their break reminder preferences).
+ */
 export const BreakManager = GObject.registerClass({
     Properties: {
         'state': GObject.ParamSpec.int(
@@ -270,7 +272,7 @@ export const BreakManager = GObject.registerClass({
         this._updateState(currentTime);
     }
 
-    // Get the current real time, in seconds since the Unix epoch.
+    /** Get the current real time, in seconds since the Unix epoch. */
     getCurrentTime() {
         return this._clock.get_real_time_secs();
     }
@@ -395,13 +397,15 @@ export const BreakManager = GObject.registerClass({
         });
     }
 
-    // Get a tuple of information about the break type which is currently due or
-    // which will be due next.
-    //  1. The type of break which is currently due or which will be due next,
-    //     or `null` if no break is due.
-    //  2. The time when the next break is due; if the first member of the tuple
-    //     is non-null, then this is the time when that break was due. This is
-    //     zero if no break types are enabled.
+    /**
+     * Get a tuple of information about the break type which is currently due or
+     * which will be due next.
+     *  1. The type of break which is currently due or which will be due next,
+     *     or `null` if no break is due.
+     *  2. The time when the next break is due; if the first member of the tuple
+     *     is non-null, then this is the time when that break was due. This is
+     *     zero if no break types are enabled.
+     */
     getNextBreakDue(currentTime) {
         let maxDuration = 0;
         let maxDurationType = null;
@@ -443,24 +447,36 @@ export const BreakManager = GObject.registerClass({
         return [maxDurationType, nextDueTime];
     }
 
-    // Current state machine state (a BreakState).
+    /**
+     * Current state machine state.
+     *
+     * @type {BreakState}
+     */
     get state() {
         return this._state;
     }
 
-    // String identifier for the break type which is currently in progress or
-    // due.
-    //
-    // Returns `null` if no break is currently due or happening.
+    /**
+     * String identifier for the break type which is currently in progress or
+     * due.
+     *
+     * Returns `null` if no break is currently due or happening.
+     *
+     * @type {?string}
+     */
     get currentBreakType() {
         return this._currentBreakType;
     }
 
-    // Start time for the break which is currently in progress , or `0` if no
-    // break is in progress.
-    //
-    // If the user was idle before the break started, the start time will be
-    // during the idle period, not the start of the idle period.
+    /**
+     * Start time for the break which is currently in progress , or `0` if no
+     * break is in progress.
+     *
+     * If the user was idle before the break started, the start time will be
+     * during the idle period, not the start of the idle period.
+     *
+     * @type {number}
+     */
     get currentBreakStartTime() {
         if (this.state !== BreakState.IN_BREAK)
             return 0;
@@ -468,8 +484,12 @@ export const BreakManager = GObject.registerClass({
         return this._currentBreakStartTime;
     }
 
-    // End time for the most recent break, or `0` if a break is currently in
-    // progress or no breaks have happened yet.
+    /**
+     * End time for the most recent break, or `0` if a break is currently in
+     * progress or no breaks have happened yet.
+     *
+     * @type {number}
+     */
     get lastBreakEndTime() {
         if (this.state === BreakState.IN_BREAK)
             return 0;
@@ -477,9 +497,11 @@ export const BreakManager = GObject.registerClass({
         return Math.max(0, ...this._breakLastEnd.values());
     }
 
-    // Get the time when the next break is due. If a break is currently due,
-    // then this is the time when that break was due. This is zero if no break
-    // types are enabled.
+    /**
+     * Get the time when the next break is due. If a break is currently due,
+     * then this is the time when that break was due. This is zero if no break
+     * types are enabled.
+     */
     getNextBreakDueTime(currentTime) {
         const [_, nextDueTime] = this.getNextBreakDue(currentTime);
         return nextDueTime;
@@ -490,9 +512,11 @@ export const BreakManager = GObject.registerClass({
         return this.getNextBreakDueTime(currentTime);
     }
 
-    // Delays the currently upcoming, due or in-progress break.
-    //
-    // This is a no-op if no break is currently due or in progress.
+    /**
+     * Delays the currently upcoming, due or in-progress break.
+     *
+     * This is a no-op if no break is currently due or in progress.
+     */
     delayBreak() {
         if (this.state === BreakState.DISABLED)
             return;
@@ -522,9 +546,11 @@ export const BreakManager = GObject.registerClass({
         this.thaw_notify();
     }
 
-    // Skips the currently upcoming, due or in-progress break.
-    //
-    // This is a no-op if no break is currently due or in progress.
+    /**
+     * Skips the currently upcoming, due or in-progress break.
+     *
+     * This is a no-op if no break is currently due or in progress.
+     */
     skipBreak() {
         if (this.state === BreakState.DISABLED)
             return;
@@ -553,67 +579,75 @@ export const BreakManager = GObject.registerClass({
         this.thaw_notify();
     }
 
-    // Signals that the user explicitly wants to start taking a break now, even
-    // if they are technically still active.
+    /**
+     * Signals that the user explicitly wants to start taking a break now, even
+     * if they are technically still active.
+     */
     takeBreak() {
         // We can’t force the user to be idle, but we can indicate to the break
         // dispatcher that it should try and make the user be idle.
         this.emit('take-break');
     }
 
-    // Whether the given breakType should emit notification popups to the user.
+    /** Whether the given breakType should emit notification popups to the user. */
     breakTypeShouldNotify(breakType) {
         if (!this._breakTypeSettings.has(breakType))
             return false;
         return this._breakTypeSettings.get(breakType).get_boolean('notify');
     }
 
-    // Whether the given breakType should emit notification popups to the user
-    // when it’s upcoming.
+    /**
+     * Whether the given breakType should emit notification popups to the user
+     * when it’s upcoming.
+     */
     breakTypeShouldNotifyUpcoming(breakType) {
         if (!this._breakTypeSettings.has(breakType))
             return false;
         return this._breakTypeSettings.get(breakType).get_boolean('notify-upcoming');
     }
 
-    // Whether the given breakType should emit notification popups to the user
-    // if it’s overdue.
+    /**
+     * Whether the given breakType should emit notification popups to the user
+     * if it’s overdue.
+     */
     breakTypeShouldNotifyOverdue(breakType) {
         if (!this._breakTypeSettings.has(breakType))
             return false;
         return this._breakTypeSettings.get(breakType).get_boolean('notify-overdue');
     }
 
-    // Whether the given breakType should show a prominent countdown for the
-    // last 60s before it’s due.
+    /**
+     * Whether the given breakType should show a prominent countdown for the
+     * last 60s before it’s due.
+     */
     breakTypeShouldCountdown(breakType) {
         if (!this._breakTypeSettings.has(breakType))
             return false;
         return this._breakTypeSettings.get(breakType).get_boolean('countdown');
     }
 
-    // Whether the given breakType should play sounds to notify the user.
+    /** Whether the given breakType should play sounds to notify the user. */
     breakTypeShouldPlaySound(breakType) {
         if (!this._breakTypeSettings.has(breakType))
             return false;
         return this._breakTypeSettings.get(breakType).get_boolean('play-sound');
     }
 
-    // Whether the given breakType should fade the screen during breaks.
+    /** Whether the given breakType should fade the screen during breaks. */
     breakTypeShouldFadeScreen(breakType) {
         if (!this._breakTypeSettings.has(breakType))
             return false;
         return this._breakTypeSettings.get(breakType).get_boolean('fade-screen');
     }
 
-    // Whether the given breakType should lock the screen during breaks.
+    /** Whether the given breakType should lock the screen during breaks. */
     breakTypeShouldLockScreen(breakType) {
         if (!this._breakTypeSettings.has(breakType))
             return false;
         return this._breakTypeSettings.get(breakType).get_boolean('lock-screen');
     }
 
-    // Duration (in seconds) of the given breakType.
+    /** Duration (in seconds) of the given breakType. */
     getDurationForBreakType(breakType) {
         if (!this._breakTypeSettings.has(breakType))
             return 0;
@@ -621,9 +655,11 @@ export const BreakManager = GObject.registerClass({
     }
 });
 
-// Glue class which takes the state-based output from BreakManager and converts
-// it to event-based notifications/sounds/screen fades for the user to tell them
-// when to take breaks. It factors the user’s UI preferences into account.
+/**
+ * Glue class which takes the state-based output from BreakManager and converts
+ * it to event-based notifications/sounds/screen fades for the user to tell them
+ * when to take breaks. It factors the user’s UI preferences into account.
+ */
 export const BreakDispatcher = GObject.registerClass(
 class BreakDispatcher extends GObject.Object {
     constructor(manager) {
@@ -820,14 +856,18 @@ class BreakNotificationSource extends MessageTray.Source {
         this._notification.set(params);
     }
 
-    // Formats the given time span as a translated string including units.
-    // Returns a tuple of:
-    //  1. The translated string
-    //  2. The number which determines whether the string is plural, for use
-    //     with `ngettext()` calls to embed the returned string into (as they
-    //     will need plural handling).
-    //  3. The number of seconds until the string would change if re-generated,
-    //     for use in setting a timer to update a notification.
+    /**
+     * Formats the given time span as a translated string including units.
+     * Returns a tuple of:
+     *  1. The translated string
+     *  2. The number which determines whether the string is plural, for use
+     *     with `ngettext()` calls to embed the returned string into (as they
+     *     will need plural handling).
+     *  3. The number of seconds until the string would change if re-generated,
+     *     for use in setting a timer to update a notification.
+     *
+     * @returns {Array}
+     */
     _formatTimeSpan(secondsAgo) {
         const minutesAgo = secondsAgo / 60;
         const hoursAgo = minutesAgo / 60;
