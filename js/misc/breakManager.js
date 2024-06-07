@@ -241,9 +241,9 @@ export const BreakManager = GObject.registerClass({
     _onIdleWatch() {
         console.assert(this._state !== BreakState.DISABLED, 'Idle received when manager is disabled');
 
-        console.debug(`_onIdleWatch at ${this.getCurrentTime()}s`);
-
         const currentTime = this.getCurrentTime();
+
+        console.debug(`BreakManager: _onIdleWatch at ${currentTime}s`);
 
         // Start watching to see if the user becomes active again.
         if (this._activeWatchId === 0)
@@ -257,9 +257,9 @@ export const BreakManager = GObject.registerClass({
     _onUserActiveWatch() {
         console.assert(this._state !== BreakState.DISABLED, 'Active received when manager is disabled');
 
-        console.debug(`_onUserActiveWatch at ${this.getCurrentTime()}s`);
-
         const currentTime = this.getCurrentTime();
+
+        console.debug(`BreakManager: _onUserActiveWatch at ${currentTime}s`);
 
         // Tidy up after the active watch, which is one-shot.
         // (The idle watch stays installed until explicitly removed.)
@@ -308,7 +308,7 @@ export const BreakManager = GObject.registerClass({
 
             const newState = inBreak ? BreakState.IN_BREAK : BreakState.IDLE;
             if (this._state !== newState) {
-                console.debug(`Changing state to ${breakStateToString(newState)}`);
+                console.debug(`BreakManager: Changing state to ${breakStateToString(newState)}`);
                 this._state = newState;
                 this._currentBreakType = dueBreakType;
                 this._currentBreakStartTime = dueBreakStartTime;
@@ -324,7 +324,7 @@ export const BreakManager = GObject.registerClass({
             // the user to start a break a little early, or take an unexpected break,
             // and avoid their computer pestering them to take a break on schedule
             // shortly after they get back.
-            console.debug(`idleStartTime: ${this._idleStartTime}s`);
+            console.debug(`BreakManager: idleStartTime: ${this._idleStartTime}s`);
 
             if (this._idleStartTime > 0) {
                 for (const [breakType, breakTypeSettings] of this._breakTypeSettings) {
@@ -345,7 +345,7 @@ export const BreakManager = GObject.registerClass({
             const [dueBreakType, nextDueTime] = this.getNextBreakDue(currentTime);
             const isBreakDue = dueBreakType != null && nextDueTime <= currentTime;
 
-            console.debug(`nextDueTime: ${nextDueTime}s, currentTime: ${currentTime}s, dueBreakType: ${dueBreakType}`);
+            console.debug(`BreakManager: nextDueTime: ${nextDueTime}s, currentTime: ${currentTime}s, dueBreakType: ${dueBreakType}`);
 
             if (isBreakDue) {
                 // Notify that a break is due if we haven’t done so already.
@@ -364,7 +364,7 @@ export const BreakManager = GObject.registerClass({
                 }
 
                 if (this._state !== BreakState.ACTIVE) {
-                    console.debug('Changing state to ACTIVE');
+                    console.debug('BreakManager: Changing state to ACTIVE');
                     this._state = BreakState.ACTIVE;
                     this._currentBreakType = null;
                     this._currentBreakStartTime = 0;
@@ -385,11 +385,11 @@ export const BreakManager = GObject.registerClass({
         // Round up to avoid spinning
         const timeoutSeconds = Math.ceil(timeout);
 
-        console.debug(`Scheduling state update in ${timeoutSeconds}s`);
+        console.debug(`BreakManager: Scheduling state update in ${timeoutSeconds}s`);
 
         this._timerId = this._clock.timeout_add_seconds(GLib.PRIORITY_DEFAULT, timeoutSeconds, () => {
             this._timerId = 0;
-            console.debug('Scheduled state update');
+            console.debug('BreakManager: Scheduled state update');
             this._updateState(this.getCurrentTime());
             return GLib.SOURCE_REMOVE;
         });
@@ -408,7 +408,7 @@ export const BreakManager = GObject.registerClass({
         let dueBreakTypes = [];
         let nextDueTime = 0;
 
-        console.debug(`Current time: ${currentTime}s`);
+        console.debug(`BreakManager: Current time: ${currentTime}s`);
 
         for (const [breakType, breakTypeSettings] of this._breakTypeSettings) {
             const breakTypeInterval = breakTypeSettings.get_uint('interval-seconds');
@@ -418,7 +418,7 @@ export const BreakManager = GObject.registerClass({
             const breakTypeWouldBeDueAt = this._breakLastEnd.get(breakType) + breakTypeInterval;
             const breakTypeIsDue = breakTypeWouldBeDueAt <= currentTime;
 
-            console.debug(`Break type ${breakType}: would be due at ${breakTypeWouldBeDueAt}`);
+            console.debug(`BreakManager: Break type ${breakType}: would be due at ${breakTypeWouldBeDueAt}`);
 
             if (breakTypeIsDue) {
                 dueBreakTypes += breakType;
@@ -437,7 +437,7 @@ export const BreakManager = GObject.registerClass({
             }
         }
 
-        console.debug(`Due break types: ${dueBreakTypes.length ? dueBreakTypes : '(none)'}, max duration type: ${maxDurationType}, next due time: ${nextDueTime}`);
+        console.debug(`BreakManager: Due break types: ${dueBreakTypes.length ? dueBreakTypes : '(none)'}, max duration type: ${maxDurationType}, next due time: ${nextDueTime}`);
 
         // maxDurationType is null and nextDueTime is zero if no break types are enabled
         return [maxDurationType, nextDueTime];
@@ -499,7 +499,7 @@ export const BreakManager = GObject.registerClass({
 
         const currentTime = this.getCurrentTime();
 
-        console.debug('Delaying current break');
+        console.debug('BreakManager: Delaying current break');
 
         // Increment all the last break end times for any break types which are
         // currently due by the delay. We do this over all break types, rather
@@ -531,7 +531,7 @@ export const BreakManager = GObject.registerClass({
 
         const currentTime = this.getCurrentTime();
 
-        console.debug('Skipping current break');
+        console.debug('BreakManager: Skipping current break');
 
         // Set all the last break end times for any break types which are
         // currently due to now. We do this over all break types, rather than
@@ -703,7 +703,7 @@ class BreakDispatcher extends GObject.Object {
 
             if (this._manager.breakTypeShouldCountdown(nextBreakType)) {
                 const countdownStart = (nextBreakDueTime - currentTime) - BREAK_COUNTDOWN_TIME_SECONDS;
-                console.debug(`Scheduling break countdown to start in ${countdownStart}s`);
+                console.debug(`BreakDispatcher: Scheduling break countdown to start in ${countdownStart}s`);
 
                 if (this._countdownTimerId !== 0)
                     GLib.source_remove(this._countdownTimerId);
@@ -891,11 +891,11 @@ class BreakNotificationSource extends MessageTray.Source {
         // Round up to avoid spinning
         const timeoutSeconds = Math.ceil(timeout);
 
-        console.debug(`Scheduling notification state update in ${timeoutSeconds}s`);
+        console.debug(`BreakNotificationSource: Scheduling notification state update in ${timeoutSeconds}s`);
 
         this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, timeoutSeconds, () => {
             this._timerId = 0;
-            console.debug('Scheduled notification state update');
+            console.debug('BreakNotificationSource: Scheduled notification state update');
             this._updateState();
             return GLib.SOURCE_REMOVE;
         });
@@ -904,7 +904,7 @@ class BreakNotificationSource extends MessageTray.Source {
     _updateState() {
         const currentTime = this._manager.getCurrentTime();
 
-        console.debug(`Break notification source state changed from ${breakStateToString(this._previousState)} to ${breakStateToString(this._manager.state)}`);
+        console.debug(`BreakNotificationSource: Break notification source state changed from ${breakStateToString(this._previousState)} to ${breakStateToString(this._manager.state)}`);
 
         switch (this._manager.state) {
         case BreakState.DISABLED:
@@ -921,11 +921,11 @@ class BreakNotificationSource extends MessageTray.Source {
                 // that it’s impending.
                 const [nextBreakType, nextBreakDueTime] = this._manager.getNextBreakDue(currentTime);
                 const remainingSecs = nextBreakDueTime - currentTime;
-                console.debug(`${remainingSecs}s left before next break`);
+                console.debug(`BreakNotificationSource: ${remainingSecs}s left before next break`);
 
                 if (this._manager.breakTypeShouldNotifyUpcoming(nextBreakType)) {
                     for (const notificationTime of BREAK_UPCOMING_NOTIFICATION_TIME_SECONDS) {
-                        console.debug(`Considering upcoming notification ${notificationTime}s`);
+                        console.debug(`BreakNotificationSource: Considering upcoming notification ${notificationTime}s`);
 
                         if (remainingSecs > notificationTime) {
                             // Schedule to show the first (longest) notification
@@ -1300,7 +1300,7 @@ class OsdBreakCountdownLabel extends St.Widget {
         const currentTime = this._manager.getCurrentTime();
         const nextDueTime = this._manager.getNextBreakDueTime(currentTime);
         const breakDueInSecs = nextDueTime - currentTime;
-        console.debug(`breakDueInSecs ${breakDueInSecs} nextDueTime ${nextDueTime} currentTime ${currentTime}`);
+        console.debug(`OsdBreakCountdownLabel: breakDueInSecs ${breakDueInSecs} nextDueTime ${nextDueTime} currentTime ${currentTime}`);
 
         if (breakDueInSecs < 1) {
             this.destroy();
