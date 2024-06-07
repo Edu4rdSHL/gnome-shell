@@ -826,8 +826,10 @@ class BreakNotificationSource extends MessageTray.Source {
         this._notification = null;
         this._timerId = 0;
         this._manager = manager;
-        this._notifyStateId = this._manager.connect('notify::state', this._onStateChanged.bind(this));
-        this._notifyNextId = this._manager.connect('notify::next-break-due-time', this._onStateChanged.bind(this));
+        this._manager.connectObject(
+            'notify::state', this._onStateChanged.bind(this),
+            'notify::next-break-due-time', this._onStateChanged.bind(this),
+            this);
         this.connect('destroy', this._onDestroy.bind(this));
 
         this._previousState = BreakState.DISABLED;
@@ -844,12 +846,7 @@ class BreakNotificationSource extends MessageTray.Source {
             GLib.source_remove(this._timerId);
         this._timerId = 0;
 
-        if (this._manager != null && this._notifyStateId !== 0)
-            this._manager.disconnect(this._notifyStateId);
-        this._notifyStateId = 0;
-        if (this._manager != null && this._notifyNextId !== 0)
-            this._manager.disconnect(this._notifyNextId);
-        this._notifyNextId = 0;
+        this._manager?.disconnectObject(this);
         this._manager = null;
     }
 
