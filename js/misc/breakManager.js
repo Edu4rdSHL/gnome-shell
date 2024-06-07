@@ -503,7 +503,7 @@ export const BreakManager = GObject.registerClass({
      * types are enabled.
      */
     getNextBreakDueTime(currentTime) {
-        const [_, nextDueTime] = this.getNextBreakDue(currentTime);
+        const [, nextDueTime] = this.getNextBreakDue(currentTime);
         return nextDueTime;
     }
 
