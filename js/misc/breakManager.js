@@ -425,7 +425,7 @@ export const BreakManager = GObject.registerClass({
             console.debug(`BreakManager: Break type ${breakType}: would be due at ${breakTypeWouldBeDueAt}`);
 
             if (breakTypeIsDue) {
-                dueBreakTypes += breakType;
+                dueBreakTypes.push(breakType);
                 nextDueTime = breakTypeWouldBeDueAt;
 
                 // Of the break types which are now due, which has the longest
