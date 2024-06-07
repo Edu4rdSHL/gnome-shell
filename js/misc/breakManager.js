@@ -677,20 +677,40 @@ class BreakDispatcher extends GObject.Object {
 
         this._systemActions = SystemActions.getDefault();
 
-        this._notificationSource = new BreakNotificationSource(this._manager);
-        this._notificationSource.connect('destroy', () => (this._notificationSource = null));
-        Main.messageTray.add(this._notificationSource);
-
-        this._lightbox = new Lightbox.Lightbox(Main.uiGroup, {
-            inhibitEvents: false,
-            fadeFactor: LIGHTBOX_FADE_FACTOR,
-        });
-
+        this._notificationSource = null;
+        this._lightbox = null;
         this._countdownOsd = null;
         this._countdownTimerId = 0;
+
+        if (this._manager.state === BreakState.DISABLED)
+            this._ensureDisabled();
+        else
+            this._ensureEnabled();
     }
 
     destroy() {
+        this._ensureDisabled();
+
+        this._manager.disconnectObject(this);
+        this._manager = null;
+    }
+
+    _ensureEnabled() {
+        if (this._notificationSource === null) {
+            this._notificationSource = new BreakNotificationSource(this._manager);
+            this._notificationSource.connect('destroy', () => (this._notificationSource = null));
+            Main.messageTray.add(this._notificationSource);
+        }
+
+        if (this._lightbox === null) {
+            this._lightbox = new Lightbox.Lightbox(Main.uiGroup, {
+                inhibitEvents: false,
+                fadeFactor: LIGHTBOX_FADE_FACTOR,
+            });
+        }
+    }
+
+    _ensureDisabled() {
         this._notificationSource?.destroy();
         this._notificationSource = null;
 
@@ -701,9 +721,6 @@ class BreakDispatcher extends GObject.Object {
 
         this._previousState = BreakState.DISABLED;
         this._previousBreakType = null;
-
-        this._manager.disconnectObject(this);
-        this._manager = null;
     }
 
     _maybePlayCompleteSound() {
@@ -726,10 +743,12 @@ class BreakDispatcher extends GObject.Object {
     _onStateChanged() {
         switch (this._manager.state) {
         case BreakState.DISABLED:
-            this.destroy();
+            this._ensureDisabled();
             break;
 
         case BreakState.ACTIVE: {
+            this._ensureEnabled();
+
             if (this._previousState === BreakState.IN_BREAK)
                 this._maybePlayCompleteSound();
 
@@ -763,6 +782,8 @@ class BreakDispatcher extends GObject.Object {
         }
 
         case BreakState.IDLE: {
+            this._ensureEnabled();
+
             if (this._previousState === BreakState.IN_BREAK)
                 this._maybePlayCompleteSound();
 
@@ -772,6 +793,8 @@ class BreakDispatcher extends GObject.Object {
         }
 
         case BreakState.IN_BREAK: {
+            this._ensureEnabled();
+
             if (this._manager.breakTypeShouldLockScreen(this._manager.currentBreakType) &&
                 this._previousState !== BreakState.IN_BREAK) {
                 this._systemActions.activateLockScreen();
@@ -786,6 +809,7 @@ class BreakDispatcher extends GObject.Object {
         }
 
         case BreakState.BREAK_DUE: {
+            this._ensureEnabled();
             this._removeCountdown();
 
             break;
