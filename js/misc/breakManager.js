@@ -669,9 +669,11 @@ class BreakDispatcher extends GObject.Object {
         this._manager = manager;
         this._previousState = BreakState.DISABLED;
         this._previousBreakType = null;
-        this._manager.connect('take-break', this._onTakeBreak.bind(this));
-        this._manager.connect('notify::state', this._onStateChanged.bind(this));
-        this._manager.connect('notify::next-break-due-time', this._onStateChanged.bind(this));
+        this._manager.connectObject(
+            'take-break', this._onTakeBreak.bind(this),
+            'notify::state', this._onStateChanged.bind(this),
+            'notify::next-break-due-time', this._onStateChanged.bind(this),
+            this);
 
         this._systemActions = SystemActions.getDefault();
 
@@ -701,6 +703,9 @@ class BreakDispatcher extends GObject.Object {
 
         this._previousState = BreakState.DISABLED;
         this._previousBreakType = null;
+
+        this._manager.disconnectObject(this);
+        this._manager = null;
     }
 
     _maybePlayCompleteSound() {
