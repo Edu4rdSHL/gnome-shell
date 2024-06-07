@@ -838,8 +838,7 @@ class BreakNotificationSource extends MessageTray.Source {
     }
 
     _onDestroy() {
-        if (this._notification !== null)
-            this._notification.destroy();
+        this._notification?.destroy();
         this._notification = null;
 
         if (this._timerId !== 0)
@@ -957,8 +956,7 @@ class BreakNotificationSource extends MessageTray.Source {
         case BreakState.ACTIVE: {
             if (this._previousState === BreakState.IN_BREAK) {
                 // Break is complete.
-                if (this._notification !== null)
-                    this._notification.destroy(MessageTray.NotificationDestroyedReason.SOURCE_CLOSED);
+                this._notification?.destroy(MessageTray.NotificationDestroyedReason.SOURCE_CLOSED);
             } else {
                 // Work out when the next break is due, and display some warnings
                 // that it’s impending.
@@ -1082,8 +1080,8 @@ class BreakNotificationSource extends MessageTray.Source {
                 this.addNotification(this._notification);
 
                 this._scheduleUpdateState(updateTimeoutSeconds);
-            } else if (this._notification !== null) {
-                this._notification.destroy(MessageTray.NotificationDestroyedReason.SOURCE_CLOSED);
+            } else {
+                this._notification?.destroy(MessageTray.NotificationDestroyedReason.SOURCE_CLOSED);
             }
             break;
         }
