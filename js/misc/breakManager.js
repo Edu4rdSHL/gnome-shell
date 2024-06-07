@@ -999,7 +999,6 @@ class BreakNotificationSource extends MessageTray.Source {
                             this._ensureNotification({
                                 title: titleText,
                                 body: bodyText,
-                                iconName: 'wellbeing-symbolic',
                                 sound: null,
                                 acknowledged: false,
                                 allowDelay: true,
@@ -1069,7 +1068,6 @@ class BreakNotificationSource extends MessageTray.Source {
                 this._ensureNotification({
                     title: titleText,
                     body: bodyText,
-                    iconName: 'wellbeing-symbolic',
                     sound: null,
                     urgency: this._urgencyForBreakType(this._manager.currentBreakType),
                     acknowledged: false,
@@ -1131,7 +1129,6 @@ class BreakNotificationSource extends MessageTray.Source {
                 this._ensureNotification({
                     title: titleText,
                     body: bodyText,
-                    iconName: 'wellbeing-symbolic',
                     sound: null,
                     acknowledged: false,
                     allowDelay: true,
@@ -1153,7 +1150,6 @@ class BreakNotificationSource extends MessageTray.Source {
                 this._ensureNotification({
                     title: _('Break Overdue'),
                     body: bodyText,
-                    iconName: 'wellbeing-symbolic',
                     sound: null,
                     acknowledged: false,
                     allowDelay: false,
@@ -1175,7 +1171,6 @@ class BreakNotificationSource extends MessageTray.Source {
                 this._ensureNotification({
                     title: _('Break Interrupted'),
                     body: bodyText,
-                    iconName: 'wellbeing-symbolic',
                     sound: null,
                     acknowledged: false,
                     allowDelay: false,
