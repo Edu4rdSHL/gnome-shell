@@ -733,8 +733,6 @@ export const MessageTray = GObject.registerClass({
 
         this.idleMonitor = global.backend.get_core_idle_monitor();
 
-        this._useLongerNotificationLeftTimeout = false;
-
         // pointerInNotification is sort of a misnomer -- it tracks whether
         // a message tray notification should expand. The value is
         // partially driven by the hover state of the notification, but has
@@ -780,7 +778,7 @@ export const MessageTray = GObject.registerClass({
             new Gio.Settings({schema_id: SHELL_KEYBINDINGS_SCHEMA}),
             Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
-            this._expandActiveNotification.bind(this));
+            () => this._notificationFocusGrabber.grabFocus());
 
         this._sources = new Set();
 
@@ -937,7 +935,6 @@ export const MessageTray = GObject.registerClass({
     }
 
     _resetNotificationLeftTimeout() {
-        this._useLongerNotificationLeftTimeout = false;
         if (this._notificationLeftTimeoutId) {
             GLib.source_remove(this._notificationLeftTimeoutId);
             this._notificationLeftTimeoutId = 0;
@@ -959,15 +956,6 @@ export const MessageTray = GObject.registerClass({
                     global.stage.get_actor_at_pos(Clutter.PickMode.ALL, this._showNotificationMouseX, this._showNotificationMouseY);
                 this._showNotificationMouseX = -1;
                 this._showNotificationMouseY = -1;
-                // Don't set this._pointerInNotification to true if the pointer was initially in the area where the notification
-                // popped up. That way we will not be expanding notifications that happen to pop up over the pointer
-                // automatically. Instead, the user is able to expand the notification by mousing away from it and then
-                // mousing back in. Because this is an expected action, we set the boolean flag that indicates that a longer
-                // timeout should be used before popping down the notification.
-                if (this._bannerBin.contains(actorAtShowNotificationPosition)) {
-                    this._useLongerNotificationLeftTimeout = true;
-                    return;
-                }
             }
 
             this._pointerInNotification = true;
@@ -982,10 +970,7 @@ export const MessageTray = GObject.registerClass({
             this._notificationLeftMouseY = y;
 
             // We wait just a little before hiding the message tray in case the user quickly moves the mouse back into it.
-            // We wait for a longer period if the notification popped up where the mouse pointer was already positioned.
-            // That gives the user more time to mouse away from the notification and mouse back in in order to expand it.
-            let timeout = this._useLongerNotificationLeftTimeout ? LONGER_HIDE_TIMEOUT : HIDE_TIMEOUT;
-            this._notificationLeftTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, timeout, this._onNotificationLeftTimeout.bind(this));
+            this._notificationLeftTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, HIDE_TIMEOUT, this._onNotificationLeftTimeout.bind(this));
             GLib.Source.set_name_by_id(this._notificationLeftTimeoutId, '[gnome-shell] this._onNotificationLeftTimeout');
         }
     }
@@ -1021,7 +1006,6 @@ export const MessageTray = GObject.registerClass({
             GLib.Source.set_name_by_id(this._notificationLeftTimeoutId, '[gnome-shell] this._onNotificationLeftTimeout');
         } else {
             this._notificationLeftTimeoutId = 0;
-            this._useLongerNotificationLeftTimeout = false;
             this._pointerInNotification = false;
             this._updateNotificationTimeout(0);
             this._updateState();
@@ -1080,10 +1064,7 @@ export const MessageTray = GObject.registerClass({
                 this._hideNotification(animate);
             } else if (this._notificationState === State.SHOWN &&
                        this._pointerInNotification) {
-                if (!this._banner.expanded)
-                    this._expandBanner(false);
-                else
-                    this._ensureBannerFocused();
+                this._notificationFocusGrabber.grabFocus();
             }
         }
 
@@ -1113,7 +1094,6 @@ export const MessageTray = GObject.registerClass({
 
         this._banner = new Calendar.NotificationMessage(this._notification);
         this._banner.can_focus = false;
-        this._banner._header.expandButton.visible = false;
         this._banner.add_style_class_name('notification-banner');
 
         this._bannerBin.add_child(this._banner);
@@ -1150,7 +1130,7 @@ export const MessageTray = GObject.registerClass({
         // is on in the control center.
         if (this._notification.urgency === Urgency.CRITICAL ||
             this._notification.source.policy.forceExpanded)
-            this._expandBanner(true);
+            this._banner.expand(false);
 
         // We tween all notifications to full opacity. This ensures that both new notifications and
         // notifications that might have been in the process of hiding get full opacity.
@@ -1208,7 +1188,7 @@ export const MessageTray = GObject.registerClass({
             // the old one) each time because the bookkeeping is
             // simpler.)
             this._updateNotificationTimeout(1000);
-        } else if (this._useLongerNotificationLeftTimeout && !this._notificationLeftTimeoutId &&
+        } else if (!this._notificationLeftTimeoutId &&
                   (x !== this._lastSeenMouseX || y !== this._lastSeenMouseY)) {
             // Refresh the timeout if the notification originally
             // popped up under the pointer, and the pointer is hovering
@@ -1264,26 +1244,6 @@ export const MessageTray = GObject.registerClass({
         this._banner.destroy();
         this._banner = null;
         this.hide();
-    }
-
-    _expandActiveNotification() {
-        if (!this._banner)
-            return;
-
-        this._expandBanner(false);
-    }
-
-    _expandBanner(autoExpanding) {
-        // Don't animate changes in notifications that are auto-expanding.
-        this._banner.expand(!autoExpanding);
-
-        // Don't focus notifications that are auto-expanding.
-        if (!autoExpanding)
-            this._ensureBannerFocused();
-    }
-
-    _ensureBannerFocused() {
-        this._notificationFocusGrabber.grabFocus();
     }
 });
 
