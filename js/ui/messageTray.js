@@ -19,17 +19,10 @@ const SHELL_KEYBINDINGS_SCHEMA = 'org.gnome.shell.keybindings';
 
 export const ANIMATION_TIME = 200;
 
-const NOTIFICATION_TIMEOUT = 4000;
-
-const HIDE_TIMEOUT = 200;
-const LONGER_HIDE_TIMEOUT = 600;
+const NOTIFICATION_TIMEOUT = 1500;
 
 const MAX_NOTIFICATIONS_IN_QUEUE = 3;
 const MAX_NOTIFICATIONS_PER_SOURCE = 3;
-
-// We delay hiding of the tray if the mouse is within MOUSE_LEFT_ACTOR_THRESHOLD
-// range from the point where it left the tray.
-const MOUSE_LEFT_ACTOR_THRESHOLD = 20;
 
 const IDLE_TIME = 1000;
 
@@ -702,7 +695,7 @@ export const MessageTray = GObject.registerClass({
             this._onStatusChanged(status);
         });
 
-        let constraint = new Layout.MonitorConstraint({primary: true});
+        const constraint = new Layout.MonitorConstraint({primary: true});
         Main.layoutManager.panelBox.bind_property('visible',
             constraint, 'work-area',
             GObject.BindingFlags.SYNC_CREATE);
@@ -722,38 +715,23 @@ export const MessageTray = GObject.registerClass({
             this._onNotificationKeyRelease.bind(this));
         this._bannerBin.connect('notify::hover',
             this._onNotificationHoverChanged.bind(this));
+
         this.add_child(this._bannerBin);
 
         this._notificationFocusGrabber = new FocusGrabber(this._bannerBin);
         this._notificationQueue = [];
         this._notification = null;
         this._banner = null;
-
-        this._userActiveWhileNotificationShown = false;
+        this._notificationTimeoutId = 0;
 
         this.idleMonitor = global.backend.get_core_idle_monitor();
-
-        // pointerInNotification is sort of a misnomer -- it tracks whether
-        // a message tray notification should expand. The value is
-        // partially driven by the hover state of the notification, but has
-        // a lot of complex state related to timeouts and the current
-        // state of the pointer when a notification pops up.
-        this._pointerInNotification = false;
-
-        // This tracks this._bannerBin.hover and is used to fizzle
-        // out non-changing hover notifications in onNotificationHoverChanged.
-        this._notificationHovered = false;
-
-        this._notificationState = State.HIDDEN;
-        this._notificationTimeoutId = 0;
-        this._notificationRemoved = false;
 
         Main.layoutManager.addChrome(this, {affectsInputRegion: false});
         Main.layoutManager.trackChrome(this._bannerBin, {affectsInputRegion: true});
 
-        global.display.connect('in-fullscreen-changed', this._updateState.bind(this));
+        global.display.connect('in-fullscreen-changed', this._updateShowBanners.bind(this));
 
-        Main.sessionMode.connect('updated', this._sessionUpdated.bind(this));
+        Main.sessionMode.connect('updated', this._updateShowBanners.bind(this));
 
         Main.overview.connect('window-drag-begin',
             this._onDragBegin.bind(this));
@@ -782,11 +760,7 @@ export const MessageTray = GObject.registerClass({
 
         this._sources = new Set();
 
-        this._sessionUpdated();
-    }
-
-    _sessionUpdated() {
-        this._updateState();
+        this._updateShowBanners();
     }
 
     _onDragBegin() {
@@ -807,16 +781,12 @@ export const MessageTray = GObject.registerClass({
 
     _onNotificationKeyRelease(actor, event) {
         if (event.get_key_symbol() === Clutter.KEY_Escape && event.get_state() === 0) {
-            this._expireNotification();
+            // TODO: this should be handled by the NotificationMessage itself not here
+            this._notification?.destroy();
             return Clutter.EVENT_STOP;
         }
 
         return Clutter.EVENT_PROPAGATE;
-    }
-
-    _expireNotification() {
-        this._notificationExpired = true;
-        this._updateState();
     }
 
     get queueCount() {
@@ -827,7 +797,7 @@ export const MessageTray = GObject.registerClass({
         if (this._bannerBlocked === v)
             return;
         this._bannerBlocked = v;
-        this._updateState();
+        this._updateShowBanners();
     }
 
     contains(source) {
@@ -846,7 +816,6 @@ export const MessageTray = GObject.registerClass({
         source.policy.connect('notify::enable', () => {
             this._onSourceEnableChanged(source.policy, source);
         });
-        source.policy.connect('notify', this._updateState.bind(this));
         this._onSourceEnableChanged(source.policy, source);
     }
 
@@ -872,8 +841,8 @@ export const MessageTray = GObject.registerClass({
     }
 
     _onSourceEnableChanged(policy, source) {
-        let wasEnabled = this.contains(source);
-        let shouldBeEnabled = policy.enable;
+        const wasEnabled = this.contains(source);
+        const shouldBeEnabled = policy.enable;
 
         if (wasEnabled !== shouldBeEnabled) {
             if (shouldBeEnabled)
@@ -883,15 +852,9 @@ export const MessageTray = GObject.registerClass({
         }
     }
 
-    _onNotificationRemoved(source, notification) {
+    _onNotificationRemoved(source_, notification) {
         if (this._notification === notification) {
-            this._notificationRemoved = true;
-            if (this._notificationState === State.SHOWN ||
-                this._notificationState === State.SHOWING) {
-                this._pointerInNotification = false;
-                this._updateNotificationTimeout(0);
-                this._updateState();
-            }
+            this.showNextNotification();
         } else {
             const index = this._notificationQueue.indexOf(notification);
             if (index !== -1) {
@@ -917,11 +880,10 @@ export const MessageTray = GObject.registerClass({
             // how it is shown and extend the time until it auto-hides.
             // If a new notification is updated while it is being hidden,
             // we stop hiding it and show it again.
-            this._updateShowingNotification();
+            this._showNotification(notification);
         } else if (!this._notificationQueue.includes(notification)) {
             // If the queue is "full", we skip banner mode and just show a small
-            // indicator in the panel; however do make an exception for CRITICAL
-            // notifications, as only banner mode allows expansion.
+            // indicator in the panel
             let bannerCount = this._notification ? 1 : 0;
             let full = this.queueCount + bannerCount >= MAX_NOTIFICATIONS_IN_QUEUE;
             if (!full || notification.urgency === Urgency.CRITICAL) {
@@ -931,206 +893,108 @@ export const MessageTray = GObject.registerClass({
                 this.emit('queue-changed');
             }
         }
-        this._updateState();
-    }
-
-    _resetNotificationLeftTimeout() {
-        if (this._notificationLeftTimeoutId) {
-            GLib.source_remove(this._notificationLeftTimeoutId);
-            this._notificationLeftTimeoutId = 0;
-            this._notificationLeftMouseX = -1;
-            this._notificationLeftMouseY = -1;
-        }
+        this._updateShowBanners();
     }
 
     _onNotificationHoverChanged() {
-        if (this._bannerBin.hover === this._notificationHovered)
+        if (!this._notification)
             return;
 
-        this._notificationHovered = this._bannerBin.hover;
-        if (this._notificationHovered) {
-            this._resetNotificationLeftTimeout();
-
-            if (this._showNotificationMouseX >= 0) {
-                let actorAtShowNotificationPosition =
-                    global.stage.get_actor_at_pos(Clutter.PickMode.ALL, this._showNotificationMouseX, this._showNotificationMouseY);
-                this._showNotificationMouseX = -1;
-                this._showNotificationMouseY = -1;
-            }
-
-            this._pointerInNotification = true;
-            this._updateState();
-        } else {
-            // We record the position of the mouse the moment it leaves the tray. These coordinates are used in
-            // this._onNotificationLeftTimeout() to determine if the mouse has moved far enough during the initial timeout for us
-            // to consider that the user intended to leave the tray and therefore hide the tray. If the mouse is still
-            // close to its previous position, we extend the timeout once.
-            let [x, y] = global.get_pointer();
-            this._notificationLeftMouseX = x;
-            this._notificationLeftMouseY = y;
-
-            // We wait just a little before hiding the message tray in case the user quickly moves the mouse back into it.
-            this._notificationLeftTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, HIDE_TIMEOUT, this._onNotificationLeftTimeout.bind(this));
-            GLib.Source.set_name_by_id(this._notificationLeftTimeoutId, '[gnome-shell] this._onNotificationLeftTimeout');
-        }
+        // TODO: the banner should take focus if the mouse moves into the banner but not when the banner popped up under the notification
+        if (this._bannerBin.hover)
+            this._clearNotificationTimeout();
+        else
+            this._showNextNotification();
     }
 
     _onStatusChanged(status) {
         if (status === GnomeSession.PresenceStatus.BUSY) {
-            // remove notification and allow the summary to be closed now
-            this._updateNotificationTimeout(0);
             this._busy = true;
+            // Hide current notification and go to the next notification
+            // if there is a notification we want to show even when busy
+            this._showNextNotification();
         } else if (status !== GnomeSession.PresenceStatus.IDLE) {
             // We preserve the previous value of this._busy if the status turns to IDLE
             // so that we don't start showing notifications queued during the BUSY state
             // as the screensaver gets activated.
             this._busy = false;
         }
-
-        this._updateState();
     }
 
-    _onNotificationLeftTimeout() {
-        let [x, y] = global.get_pointer();
-        // We extend the timeout once if the mouse moved no further than MOUSE_LEFT_ACTOR_THRESHOLD to either side.
-        if (this._notificationLeftMouseX > -1 &&
-            y < this._notificationLeftMouseY + MOUSE_LEFT_ACTOR_THRESHOLD &&
-            y > this._notificationLeftMouseY - MOUSE_LEFT_ACTOR_THRESHOLD &&
-            x < this._notificationLeftMouseX + MOUSE_LEFT_ACTOR_THRESHOLD &&
-            x > this._notificationLeftMouseX - MOUSE_LEFT_ACTOR_THRESHOLD) {
-            this._notificationLeftMouseX = -1;
-            this._notificationLeftTimeoutId = GLib.timeout_add(
-                GLib.PRIORITY_DEFAULT,
-                LONGER_HIDE_TIMEOUT,
-                this._onNotificationLeftTimeout.bind(this));
-            GLib.Source.set_name_by_id(this._notificationLeftTimeoutId, '[gnome-shell] this._onNotificationLeftTimeout');
-        } else {
-            this._notificationLeftTimeoutId = 0;
-            this._pointerInNotification = false;
-            this._updateNotificationTimeout(0);
-            this._updateState();
+    _updateShowBanners() {
+        if (this._bannerBlocked || !Main.layoutManager.primaryMonitor || !Main.sessionMode.hasNotifications) {
+            if (this._notification)
+                this._hideNotification(this._notification);
+        } else if (!this._notification) {
+            this._showNextNotification();
         }
-        return GLib.SOURCE_REMOVE;
     }
 
-    // All of the logic for what happens when occurs here; the various
-    // event handlers merely update variables such as
-    // 'this._pointerInNotification', 'this._traySummoned', etc, and
-    // _updateState() figures out what (if anything) needs to be done
-    // at the present time.
-    _updateState() {
-        let hasMonitor = Main.layoutManager.primaryMonitor != null;
-        this.visible = !this._bannerBlocked && hasMonitor && this._banner != null;
-        if (this._bannerBlocked || !hasMonitor)
-            return;
+    _showNextNotification() {
+        const busy = this._busy || Main.layoutManager.primaryMonitor.inFullscreen;
+        const prevQueueLength = this._notificationQueue.length;
 
-        // If our state changes caused _updateState to be called,
-        // just exit now to prevent reentrancy issues.
-        if (this._updatingState)
-            return;
-
-        this._updatingState = true;
-
-        // Filter out acknowledged notifications.
-        let changed = false;
+        // Filter out acknowledged notification and notification's policy doesn't allow banners.
         this._notificationQueue = this._notificationQueue.filter(n => {
-            changed ||= n.acknowledged;
-            return !n.acknowledged;
+            return !n.acknowledged && n.source.policy.showBanners;
         });
 
-        if (changed)
+        const nextIndex = this._notificationQueue.findIndex(n => {
+            return !(busy && !(n.forFeedback || n.urgency === Urgency.CRITICAL));
+        });
+        const nextNotification = this._notificationQueue[nextIndex];
+
+        if (nextIndex > -1)
+            this._notificationQueue.splice(nextIndex, 1);
+
+        this._showNotification(nextNotification);
+
+        if (prevQueueLength !== this._notificationQueue)
             this.emit('queue-changed');
-
-        let hasNotifications = Main.sessionMode.hasNotifications;
-
-        if (this._notificationState === State.HIDDEN) {
-            let nextNotification = this._notificationQueue[0] || null;
-            if (hasNotifications && nextNotification) {
-                let limited = this._busy || Main.layoutManager.primaryMonitor.inFullscreen;
-                let showNextNotification = !limited || nextNotification.forFeedback || nextNotification.urgency === Urgency.CRITICAL;
-                if (showNextNotification)
-                    this._showNotification();
-            }
-        } else if (this._notificationState === State.SHOWING ||
-                   this._notificationState === State.SHOWN) {
-            let expired = (this._userActiveWhileNotificationShown &&
-                           this._notificationTimeoutId === 0 &&
-                           this._notification.urgency !== Urgency.CRITICAL &&
-                           !this._pointerInNotification) || this._notificationExpired;
-            let mustClose = this._notificationRemoved || !hasNotifications || expired;
-
-            if (mustClose) {
-                let animate = hasNotifications && !this._notificationRemoved;
-                this._hideNotification(animate);
-            } else if (this._notificationState === State.SHOWN &&
-                       this._pointerInNotification) {
-                this._notificationFocusGrabber.grabFocus();
-            }
-        }
-
-        this._updatingState = false;
-
-        // Clean transient variables that are used to communicate actions
-        // to updateState()
-        this._notificationExpired = false;
     }
 
-    _onIdleMonitorBecameActive() {
-        this._userActiveWhileNotificationShown = true;
-        this._updateNotificationTimeout(2000);
-        this._updateState();
-    }
+    _showNotification(notification) {
+        if (this._notification && this._notification !== notification)
+            this._hideNotification(this._notification);
 
-    _showNotification() {
-        this._notification = this._notificationQueue.shift();
-        this.emit('queue-changed');
+        if (!notification)
+            return;
 
-        this._userActiveWhileNotificationShown = this.idleMonitor.get_idletime() <= IDLE_TIME;
-        if (!this._userActiveWhileNotificationShown) {
-            // If the user isn't active, set up a watch to let us know
-            // when the user becomes active.
-            this.idleMonitor.add_user_active_watch(this._onIdleMonitorBecameActive.bind(this));
+        const updatingNotification = !!this._notification;
+        if (!updatingNotification) {
+            this._banner = new Calendar.NotificationMessage(notification);
+            this._banner.can_focus = false;
+            this._banner.add_style_class_name('notification-banner');
+            this._bannerBin.add_child(this._banner);
+            this._bannerBin.opacity = 0;
+            this._bannerBin.y = -this._banner.height;
+            this._notification = notification;
+
+            notification.source.policy.connectObject('notify::show-banners', () => {
+                if (notification.source.policy.showBanners)
+                    this.showNotification(notification);
+                else
+                    this._hideNotfication(notification);
+            }, this);
+        } else {
+            // If the notification was shown already reset the timeout
+            this._clearNotificationTimeout();
         }
 
-        this._banner = new Calendar.NotificationMessage(this._notification);
-        this._banner.can_focus = false;
-        this._banner.add_style_class_name('notification-banner');
-
-        this._bannerBin.add_child(this._banner);
-
-        this._bannerBin.opacity = 0;
-        this._bannerBin.y = -this._banner.height;
         this.show();
 
         Meta.disable_unredirect_for_display(global.display);
-        this._updateShowingNotification();
 
-        let [x, y] = global.get_pointer();
-        // We save the position of the mouse at the time when we started showing the notification
-        // in order to determine if the notification popped up under it. We make that check if
-        // the user starts moving the mouse and _onNotificationHoverChanged() gets called. We don't
-        // expand the notification if it just happened to pop up under the mouse unless the user
-        // explicitly mouses away from it and then mouses back in.
-        this._showNotificationMouseX = x;
-        this._showNotificationMouseY = y;
-        // We save the coordinates of the mouse at the time when we started showing the notification
-        // and then we update it in _notificationTimeout(). We don't pop down the notification if
-        // the mouse is moving towards it or within it.
-        this._lastSeenMouseX = x;
-        this._lastSeenMouseY = y;
-
-        this._resetNotificationLeftTimeout();
-    }
-
-    _updateShowingNotification() {
-        this._notification.acknowledged = true;
-        this._notification.playSound();
+        notification.acknowledged = true;
+        notification.playSound();
 
         // We auto-expand notifications with CRITICAL urgency, or for which the relevant setting
         // is on in the control center.
-        if (this._notification.urgency === Urgency.CRITICAL ||
-            this._notification.source.policy.forceExpanded)
+        if (notification.urgency === Urgency.CRITICAL ||
+            notification.source.policy.forceExpanded)
             this._banner.expand(false);
+        else
+            this._banner.unexpand(false);
 
         // We tween all notifications to full opacity. This ensures that both new notifications and
         // notifications that might have been in the process of hiding get full opacity.
@@ -1139,11 +1003,7 @@ export const MessageTray = GObject.registerClass({
         // (which is banner height or expanded height, depending on the notification state)
         // This ensures that both new notifications and notifications in the banner mode that might
         // have been in the process of hiding are shown with the correct height.
-        //
-        // We use this._showNotificationCompleted() onComplete callback to extend the time the updated
-        // notification is being shown.
 
-        this._notificationState = State.SHOWING;
         this._bannerBin.remove_all_transitions();
         this._bannerBin.ease({
             opacity: 255,
@@ -1155,65 +1015,52 @@ export const MessageTray = GObject.registerClass({
             duration: ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_BACK,
             onComplete: () => {
-                this._notificationState = State.SHOWN;
-                this._showNotificationCompleted();
-                this._updateState();
+                this._showNotificationCompleted(notification);
             },
         });
     }
 
-    _showNotificationCompleted() {
-        if (this._notification.urgency !== Urgency.CRITICAL)
-            this._updateNotificationTimeout(NOTIFICATION_TIMEOUT);
+    _showNotificationCompleted(notification) {
+        if (notification.urgency === Urgency.CRITICAL)
+            return;
+
+        const userIdle = this.idleMonitor.get_idletime() > IDLE_TIME;
+        if (userIdle) {
+            this.idleMonitor.add_user_active_watch(() => {
+                this._showNotificationCompleted(notification);
+            });
+            return;
+        }
+
+        this._startNotificationTimeout();
     }
 
-    _updateNotificationTimeout(timeout) {
+    _clearNotificationTimeout() {
         if (this._notificationTimeoutId) {
             GLib.source_remove(this._notificationTimeoutId);
             this._notificationTimeoutId = 0;
         }
-        if (timeout > 0) {
-            this._notificationTimeoutId =
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, timeout,
-                    this._notificationTimeout.bind(this));
-            GLib.Source.set_name_by_id(this._notificationTimeoutId, '[gnome-shell] this._notificationTimeout');
-        }
     }
 
-    _notificationTimeout() {
-        let [x, y] = global.get_pointer();
-        if (y < this._lastSeenMouseY - 10 && !this._notificationHovered) {
-            // The mouse is moving towards the notification, so don't
-            // hide it yet. (We just create a new timeout (and destroy
-            // the old one) each time because the bookkeeping is
-            // simpler.)
-            this._updateNotificationTimeout(1000);
-        } else if (!this._notificationLeftTimeoutId &&
-                  (x !== this._lastSeenMouseX || y !== this._lastSeenMouseY)) {
-            // Refresh the timeout if the notification originally
-            // popped up under the pointer, and the pointer is hovering
-            // inside it.
-            this._updateNotificationTimeout(1000);
-        } else {
-            this._notificationTimeoutId = 0;
-            this._updateState();
-        }
-
-        this._lastSeenMouseX = x;
-        this._lastSeenMouseY = y;
-        return GLib.SOURCE_REMOVE;
+    _startNotificationTimeout() {
+        this._notificationTimeoutId =
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, NOTIFICATION_TIMEOUT, () => {
+                this._showNextNotification();
+                return GLib.SOURCE_REMOVE;
+            });
+        GLib.Source.set_name_by_id(this._notificationTimeoutId, '[gnome-shell] this._notificationTimeout');
     }
 
-    _hideNotification(animate) {
+    _hideNotification(notification) {
+        // Don't do anything if the notification that should be hidden isn't shown
+        if (!this._notification || this._notification !== notification)
+            return;
+
         this._notificationFocusGrabber.ungrabFocus();
-
-        this._banner.disconnectObject(this);
-
-        this._resetNotificationLeftTimeout();
         this._bannerBin.remove_all_transitions();
+        this._clearNotificationTimeout();
 
-        const duration = animate ? ANIMATION_TIME : 0;
-        this._notificationState = State.HIDING;
+        const duration = ANIMATION_TIME;
         this._bannerBin.ease({
             opacity: 0,
             duration,
@@ -1224,26 +1071,25 @@ export const MessageTray = GObject.registerClass({
             duration,
             mode: Clutter.AnimationMode.EASE_OUT_BACK,
             onComplete: () => {
-                this._notificationState = State.HIDDEN;
-                this._hideNotificationCompleted();
-                this._updateState();
+                this._hideNotificationCompleted(notification);
             },
         });
     }
 
-    _hideNotificationCompleted() {
-        let notification = this._notification;
-        this._notification = null;
-        if (!this._notificationRemoved && notification.isTransient)
-            notification.destroy(NotificationDestroyedReason.EXPIRED);
-
-        this._pointerInNotification = false;
-        this._notificationRemoved = false;
+    _hideNotificationCompleted(notification) {
         Meta.enable_unredirect_for_display(global.display);
 
-        this._banner.destroy();
-        this._banner = null;
-        this.hide();
+        if (this._notification === notification) {
+            notification.disconnectObject(this);
+            notification.source.policy.disconnectObject(this);
+            this.hide();
+            this._banner?.destroy();
+            this._banner = null;
+            this._notification = null;
+        }
+
+        if (notification.isTransient)
+            notification.destroy(NotificationDestroyedReason.EXPIRED);
     }
 });
 
