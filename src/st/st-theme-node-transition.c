@@ -395,6 +395,57 @@ st_theme_node_transition_paint (StThemeNodeTransition *transition,
                                                  tex_coords, 8);
 }
 
+void
+st_theme_node_transition_snapshot (StThemeNodeTransition *transition,
+                                   ClutterSnapshot       *snapshot,
+                                   ClutterActorBox       *allocation,
+                                   guint8                 paint_opacity,
+                                   float                  resource_scale)
+{
+  StThemeNodeTransitionPrivate *priv = transition->priv;
+
+  CoglColor constant, pipeline_color;
+  float tex_coords[] = {
+    0.0, 0.0, 1.0, 1.0,
+    0.0, 0.0, 1.0, 1.0,
+  };
+
+  g_return_if_fail (ST_IS_THEME_NODE (priv->old_theme_node));
+  g_return_if_fail (ST_IS_THEME_NODE (priv->new_theme_node));
+
+  if (!clutter_actor_box_equal (allocation, &priv->last_allocation))
+    priv->needs_setup = TRUE;
+
+  if (priv->needs_setup)
+    {
+      priv->last_allocation = *allocation;
+
+      calculate_offscreen_box (transition, allocation);
+      priv->needs_setup = clutter_actor_box_get_area (&priv->offscreen_box) == 0 ||
+                          !setup_framebuffers (transition, allocation,
+                                               resource_scale);
+
+      if (priv->needs_setup) /* setting up framebuffers failed */
+        return;
+    }
+
+  cogl_color_init_from_4f (&constant, 0., 0., 0.,
+                           clutter_timeline_get_progress (priv->timeline));
+  cogl_pipeline_set_layer_combine_constant (priv->material, 1, &constant);
+
+  cogl_color_init_from_4f (&pipeline_color,
+                           paint_opacity / 255.0, paint_opacity / 255.0,
+                           paint_opacity / 255.0, paint_opacity / 255.0);
+  cogl_pipeline_set_color (priv->material, &pipeline_color);
+
+  clutter_snapshot_push_pipeline (snapshot, priv->material);
+  clutter_snapshot_add_multitexture_rectangle (snapshot,
+                                               &priv->offscreen_box,
+                                               tex_coords, 8);
+  clutter_snapshot_pop (snapshot);
+}
+
+
 static void
 st_theme_node_transition_dispose (GObject *object)
 {
