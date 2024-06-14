@@ -257,6 +257,54 @@ st_label_paint (ClutterActor        *actor,
 }
 
 static void
+st_label_snapshot (ClutterActor    *actor,
+                   ClutterSnapshot *snapshot)
+{
+  StLabelPrivate *priv = ST_LABEL (actor)->priv;
+
+  st_widget_snapshot_background (ST_WIDGET (actor), snapshot);
+
+  if (priv->shadow_spec)
+    {
+      ClutterActorBox allocation;
+      float width, height;
+      float resource_scale;
+
+      clutter_actor_get_allocation_box (priv->label, &allocation);
+      clutter_actor_box_get_size (&allocation, &width, &height);
+
+      resource_scale = clutter_actor_get_resource_scale (priv->label);
+
+      width *= resource_scale;
+      height *= resource_scale;
+
+      if (priv->text_shadow_pipeline == NULL ||
+          width != priv->shadow_width ||
+          height != priv->shadow_height)
+        {
+          g_clear_object (&priv->text_shadow_pipeline);
+
+          priv->shadow_width = width;
+          priv->shadow_height = height;
+          priv->text_shadow_pipeline =
+            _st_create_shadow_pipeline_from_actor (priv->shadow_spec,
+                                                   priv->label);
+        }
+
+      if (priv->text_shadow_pipeline != NULL)
+        {
+          _st_snapshot_shadow_with_opacity (priv->shadow_spec,
+                                            snapshot,
+                                            priv->text_shadow_pipeline,
+                                            &allocation,
+                                            clutter_actor_get_paint_opacity (priv->label));
+        }
+    }
+
+  clutter_actor_snapshot_child (actor, priv->label, snapshot);
+}
+
+static void
 st_label_resource_scale_changed (ClutterActor *actor)
 {
   StLabelPrivate *priv = ST_LABEL (actor)->priv;
@@ -279,6 +327,7 @@ st_label_class_init (StLabelClass *klass)
   gobject_class->dispose = st_label_dispose;
 
   actor_class->paint = st_label_paint;
+  actor_class->snapshot = st_label_snapshot;
   actor_class->allocate = st_label_allocate;
   actor_class->get_preferred_width = st_label_get_preferred_width;
   actor_class->get_preferred_height = st_label_get_preferred_height;
