@@ -145,6 +145,8 @@ StThemeNode *         st_widget_peek_theme_node           (StWidget        *widg
 GList *               st_widget_get_focus_chain           (StWidget        *widget);
 void                  st_widget_paint_background          (StWidget            *widget,
                                                            ClutterPaintContext *paint_context);
+void                  st_widget_snapshot_background       (StWidget        *widget,
+                                                           ClutterSnapshot *snapshot);
 
 /* debug methods */
 char  *st_describe_actor       (ClutterActor *actor);
