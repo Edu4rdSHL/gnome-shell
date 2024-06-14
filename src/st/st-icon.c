@@ -231,6 +231,36 @@ st_icon_paint (ClutterActor        *actor,
 }
 
 static void
+st_icon_snapshot (ClutterActor    *actor,
+                  ClutterSnapshot *snapshot)
+{
+  StIcon *icon = ST_ICON (actor);
+  StIconPrivate *priv = icon->priv;
+
+  st_widget_snapshot_background (ST_WIDGET (actor), snapshot);
+
+  if (priv->icon_texture)
+    {
+      st_icon_update_shadow_pipeline (icon);
+
+      if (priv->shadow_pipeline)
+        {
+          ClutterActorBox allocation;
+
+          clutter_actor_get_allocation_box (priv->icon_texture, &allocation);
+
+          _st_snapshot_shadow_with_opacity (priv->shadow_spec,
+                                            snapshot,
+                                            priv->shadow_pipeline,
+                                            &allocation,
+                                            clutter_actor_get_paint_opacity (priv->icon_texture));
+        }
+
+      clutter_actor_snapshot_child (actor, priv->icon_texture, snapshot);
+    }
+}
+
+static void
 st_icon_style_changed (StWidget *widget)
 {
   StIcon *self = ST_ICON (widget);
@@ -301,6 +331,7 @@ st_icon_class_init (StIconClass *klass)
   object_class->dispose = st_icon_dispose;
 
   actor_class->paint = st_icon_paint;
+  actor_class->snapshot = st_icon_snapshot;
 
   widget_class->style_changed = st_icon_style_changed;
   actor_class->resource_scale_changed = st_icon_resource_scale_changed;
