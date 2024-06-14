@@ -347,6 +347,16 @@ void st_theme_node_paint (StThemeNode            *node,
                           guint8                  paint_opacity,
                           float                   resource_scale);
 
+/**
+ * st_theme_node_snapshot: (skip)
+ */
+void st_theme_node_snapshot (StThemeNode           *node,
+                             StThemeNodePaintState *state,
+                             ClutterSnapshot       *snapshot,
+                             const ClutterActorBox *box,
+                             guint8                 paint_opacity,
+                             float                  resource_scale);
+
 void st_theme_node_invalidate_background_image (StThemeNode *node);
 void st_theme_node_invalidate_border_image (StThemeNode *node);
 

@@ -141,6 +141,7 @@ st_sources = [
   'st-theme-context.c',
   'st-theme-node.c',
   'st-theme-node-drawing.c',
+  'st-theme-node-snapshot.c',
   'st-theme-node-transition.c',
   'st-viewport.c',
   'st-widget.c'
