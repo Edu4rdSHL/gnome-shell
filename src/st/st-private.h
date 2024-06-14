@@ -72,4 +72,10 @@ void _st_paint_shadow_with_opacity (StShadow        *shadow_spec,
                                     ClutterActorBox *box,
                                     guint8           paint_opacity);
 
+void _st_snapshot_shadow_with_opacity (StShadow        *shadow_spec,
+                                       ClutterSnapshot *snapshot,
+                                       CoglPipeline    *shadow_pipeline,
+                                       ClutterActorBox *box,
+                                       guint8           paint_opacity);
+
 #endif /* __ST_PRIVATE_H__ */

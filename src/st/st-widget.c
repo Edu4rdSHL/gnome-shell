@@ -452,6 +452,48 @@ st_widget_paint_background (StWidget            *widget,
                          resource_scale);
 }
 
+/**
+ * st_widget_snapshot_background:
+ * @widget: The #StWidget
+ * @snapshot: a #ClutterSnapshot
+ *
+ * Snapshots the background of the widget. This is meant to be called
+ * by subclasses of StWidget that need to paint the background without
+ * painting children.
+ */
+void
+st_widget_snapshot_background (StWidget        *widget,
+                               ClutterSnapshot *snapshot)
+{
+  StWidgetPrivate *priv = st_widget_get_instance_private (widget);
+  StThemeNode *theme_node;
+  ClutterActorBox allocation;
+  float resource_scale;
+  guint8 opacity;
+
+  resource_scale = clutter_actor_get_resource_scale (CLUTTER_ACTOR (widget));
+
+  theme_node = st_widget_get_theme_node (widget);
+
+  clutter_actor_get_allocation_box (CLUTTER_ACTOR (widget), &allocation);
+
+  opacity = clutter_actor_get_paint_opacity (CLUTTER_ACTOR (widget));
+
+  if (priv->transition_animation)
+    st_theme_node_transition_snapshot (priv->transition_animation,
+                                       snapshot,
+                                       &allocation,
+                                       opacity,
+                                       resource_scale);
+  else
+    st_theme_node_snapshot (theme_node,
+                            current_paint_state (widget),
+                            snapshot,
+                            &allocation,
+                            opacity,
+                            resource_scale);
+}
+
 static void
 st_widget_paint (ClutterActor        *actor,
                  ClutterPaintContext *paint_context)
@@ -460,6 +502,16 @@ st_widget_paint (ClutterActor        *actor,
 
   /* Chain up so we paint children. */
   CLUTTER_ACTOR_CLASS (st_widget_parent_class)->paint (actor, paint_context);
+}
+
+static void
+st_widget_snapshot (ClutterActor    *actor,
+                    ClutterSnapshot *snapshot)
+{
+  st_widget_snapshot_background (ST_WIDGET (actor), snapshot);
+
+  /* Chain up so we paint children. */
+  CLUTTER_ACTOR_CLASS (st_widget_parent_class)->snapshot (actor, snapshot);
 }
 
 static void
@@ -893,6 +945,7 @@ st_widget_class_init (StWidgetClass *klass)
   actor_class->get_preferred_height = st_widget_get_preferred_height;
   actor_class->allocate = st_widget_allocate;
   actor_class->paint = st_widget_paint;
+  actor_class->snapshot = st_widget_snapshot;
   actor_class->get_paint_volume = st_widget_get_paint_volume;
   actor_class->parent_set = st_widget_parent_set;
   actor_class->map = st_widget_map;

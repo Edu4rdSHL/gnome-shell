@@ -157,6 +157,10 @@ class UserWidgetLabel extends St.Widget {
         this._currentLabel.paint(paintContext);
     }
 
+    vfunc_snapshot(snapshot) {
+        this.snapshot_child(this._currentLabel, snapshot);
+    }
+
     _updateUser() {
         if (this._user.is_loaded) {
             this._realNameLabel.text = this._user.get_real_name();

@@ -871,6 +871,57 @@ st_entry_paint (ClutterActor        *actor,
 }
 
 static void
+st_entry_snapshot (ClutterActor    *actor,
+                   ClutterSnapshot *snapshot)
+{
+  StEntryPrivate *priv = ST_ENTRY_PRIV (actor);
+  ClutterActorClass *parent_class;
+
+  st_widget_snapshot_background (ST_WIDGET (actor), snapshot);
+
+  if (priv->shadow_spec)
+    {
+      ClutterActorBox allocation;
+      float width, height;
+
+      clutter_actor_get_allocation_box (priv->entry, &allocation);
+      clutter_actor_box_get_size (&allocation, &width, &height);
+
+      if (priv->text_shadow_material == NULL ||
+          width != priv->shadow_width ||
+          height != priv->shadow_height)
+        {
+          CoglPipeline *material;
+
+          g_clear_object (&priv->text_shadow_material);
+
+          material = _st_create_shadow_pipeline_from_actor (priv->shadow_spec,
+                                                            priv->entry);
+
+          priv->shadow_width = width;
+          priv->shadow_height = height;
+          priv->text_shadow_material = material;
+        }
+
+      if (priv->text_shadow_material != NULL)
+        {
+          _st_snapshot_shadow_with_opacity (priv->shadow_spec,
+                                            snapshot,
+                                            priv->text_shadow_material,
+                                            &allocation,
+                                            clutter_actor_get_paint_opacity (priv->entry));
+        }
+    }
+
+  /* Since we paint the background ourselves, chain to the parent class
+   * of StWidget, to avoid painting it twice.
+   * This is needed as we still want to paint children.
+   */
+  parent_class = g_type_class_peek_parent (st_entry_parent_class);
+  parent_class->snapshot (actor, snapshot);
+}
+
+static void
 st_entry_unmap (ClutterActor *actor)
 {
   StEntryPrivate *priv = ST_ENTRY_PRIV (actor);
@@ -902,6 +953,7 @@ st_entry_class_init (StEntryClass *klass)
   actor_class->get_preferred_height = st_entry_get_preferred_height;
   actor_class->allocate = st_entry_allocate;
   actor_class->paint = st_entry_paint;
+  actor_class->snapshot = st_entry_snapshot;
   actor_class->unmap = st_entry_unmap;
   actor_class->get_paint_volume = st_entry_get_paint_volume;
 

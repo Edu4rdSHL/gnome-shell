@@ -799,3 +799,31 @@ _st_paint_shadow_with_opacity (StShadow        *shadow_spec,
                                    shadow_box.x1, shadow_box.y1,
                                    shadow_box.x2, shadow_box.y2);
 }
+
+void
+_st_snapshot_shadow_with_opacity (StShadow        *shadow_spec,
+                                  ClutterSnapshot *snapshot,
+                                  CoglPipeline    *shadow_pipeline,
+                                  ClutterActorBox *box,
+                                  guint8           paint_opacity)
+{
+  ClutterActorBox shadow_box;
+  CoglColor color;
+
+  g_return_if_fail (shadow_spec != NULL);
+  g_return_if_fail (shadow_pipeline != NULL);
+
+  st_shadow_get_box (shadow_spec, box, &shadow_box);
+
+  cogl_color_init_from_4f (&color,
+                           shadow_spec->color.red / 255.0   * paint_opacity / 255.0,
+                           shadow_spec->color.green / 255.0 * paint_opacity / 255.0,
+                           shadow_spec->color.blue / 255.0  * paint_opacity / 255.0,
+                           shadow_spec->color.alpha / 255.0 * paint_opacity / 255.0);
+  cogl_color_premultiply (&color);
+  cogl_pipeline_set_layer_combine_constant (shadow_pipeline, 0, &color);
+
+  clutter_snapshot_push_pipeline (snapshot, shadow_pipeline);
+  clutter_snapshot_add_rectangle (snapshot, &shadow_box);
+  clutter_snapshot_pop (snapshot);
+}

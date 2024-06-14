@@ -75,6 +75,17 @@ const MouseSpriteContent = GObject.registerClass({
         textureNode.add_rectangle(actor.get_content_box());
     }
 
+    vfunc_snapshot(actor, snapshot) {
+        if (!this._texture)
+            return;
+
+        let [minFilter, magFilter] = actor.get_content_scaling_filters();
+
+        snapshot.push_texture_full(this._texture, null, minFilter, magFilter);
+        snapshot.add_rectangle(actor.get_content_box());
+        snapshot.pop();
+    }
+
     get texture() {
         return this._texture;
     }
