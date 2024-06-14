@@ -456,6 +456,56 @@ st_viewport_paint (ClutterActor        *actor,
 }
 
 static void
+st_viewport_snapshot (ClutterActor    *actor,
+                      ClutterSnapshot *snapshot)
+{
+  StViewport *viewport = ST_VIEWPORT (actor);
+  StViewportPrivate *priv = st_viewport_get_instance_private (viewport);
+  StThemeNode *theme_node = st_widget_get_theme_node (ST_WIDGET (actor));
+  int x, y;
+  ClutterActorBox allocation_box;
+  ClutterActorBox content_box;
+  ClutterActor *child;
+
+  get_border_paint_offsets (viewport, &x, &y);
+  if (x != 0 || y != 0)
+    clutter_snapshot_push_translate (snapshot, &GRAPHENE_POINT_INIT (x, y));
+
+  st_widget_snapshot_background (ST_WIDGET (actor), snapshot);
+
+  if (x != 0 || y != 0)
+    clutter_snapshot_pop (snapshot);
+
+  if (clutter_actor_get_n_children (actor) == 0)
+    return;
+
+  clutter_actor_get_allocation_box (actor, &allocation_box);
+  st_theme_node_get_content_box (theme_node, &allocation_box, &content_box);
+
+  content_box.x1 += x;
+  content_box.y1 += y;
+  content_box.x2 += x;
+  content_box.y2 += y;
+
+  /* The content area forms the viewport into the scrolled contents, while
+   * the borders and background stay in place; after drawing the borders and
+   * background, we clip to the content area */
+  if (priv->clip_to_view && (priv->hadjustment || priv->vadjustment))
+    {
+      clutter_snapshot_push_clip (snapshot);
+      clutter_snapshot_add_rectangle (snapshot, &content_box);
+    }
+
+  for (child = clutter_actor_get_first_child (actor);
+       child != NULL;
+       child = clutter_actor_get_next_sibling (child))
+    clutter_actor_snapshot_child (actor, child, snapshot);
+
+  if (priv->clip_to_view && (priv->hadjustment || priv->vadjustment))
+    clutter_snapshot_pop (snapshot);
+}
+
+static void
 st_viewport_pick (ClutterActor       *actor,
                   ClutterPickContext *pick_context)
 {
@@ -565,6 +615,7 @@ st_viewport_class_init (StViewportClass *klass)
   actor_class->apply_transform = st_viewport_apply_transform;
 
   actor_class->paint = st_viewport_paint;
+  actor_class->snapshot = st_viewport_snapshot;
   actor_class->get_paint_volume = st_viewport_get_paint_volume;
   actor_class->pick = st_viewport_pick;
 
