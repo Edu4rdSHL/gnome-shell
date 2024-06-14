@@ -571,6 +571,34 @@ class RedBorderEffect extends Clutter.Effect {
         box.set_size(width, alloc.get_height() - width * 2);
         pipelineNode.add_rectangle(box);
     }
+
+    vfunc_snapshot(snapshot, flags) {
+        super.vfunc_snapshot(snapshot, flags);
+
+        const color = new Cogl.Color();
+        color.init_from_4f(1.0, 0.0, 0.0, 196.0 / 255.0);
+
+        snapshot.push_color(color);
+
+        // clockwise order
+        box.set_origin(0, 0);
+        box.set_size(alloc.get_width(), width);
+        snapshot.add_rectangle(box);
+
+        box.set_origin(alloc.get_width() - width, width);
+        box.set_size(width, alloc.get_height() - width);
+        snapshot.add_rectangle(box);
+
+        box.set_origin(0, alloc.get_height() - width);
+        box.set_size(alloc.get_width() - width, width);
+        snapshot.add_rectangle(box);
+
+        box.set_origin(0, width);
+        box.set_size(width, alloc.get_height() - width * 2);
+        snapshot.add_rectangle(box);
+
+        snapshot.pop();
+    }
 });
 
 export const Inspector = GObject.registerClass({
