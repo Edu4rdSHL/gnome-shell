@@ -441,6 +441,16 @@ export class Notification extends GObject.Object {
         });
         this._actions.push(action);
         this.emit('action-added', action);
+        return action;
+    }
+
+    removeAction(action) {
+        const index = this._actions.indexOf(action);
+        if (index < 0)
+            throw new Error('Action was already removed previously');
+
+        this._actions.splice(index, 1);
+        this.emit('action-removed', action);
     }
 
     clearActions() {
@@ -494,6 +504,10 @@ export const Source = GObject.registerClass({
             'policy', 'policy', 'policy',
             GObject.ParamFlags.READWRITE,
             NotificationPolicy.$gtype),
+        'allow-empty': GObject.ParamSpec.boolean(
+            'allow-empty', 'allow-empty', 'allow-empty',
+            GObject.ParamFlags.READWRITE | GObject.ParamFlags.CONSTRUCT_ONLY,
+            false),
     },
     Signals: {
         'destroy': {param_types: [GObject.TYPE_UINT]},
@@ -552,7 +566,7 @@ export const Source = GObject.registerClass({
         this.emit('notification-removed', notification);
         this.countUpdated();
 
-        if (!this._inDestruction && this.notifications.length === 0)
+        if (!this._inDestruction && this.notifications.length === 0 && !this.allowEmpty)
             this.destroy();
     }
 
