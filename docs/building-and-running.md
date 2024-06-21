@@ -131,3 +131,44 @@ $ systemctl --user revert org.gnome.Shell@wayland.service
 ```
 
 For X11 sessions use `org.gnome.Shell@x11.service` in these commands instead.
+
+## Developing in a Fedora Atomic Desktop
+
+For most situations, you can develop GNOME Shell in a Fedora Atomic Desktop
+(e.g. Fedora Silverblue) using the methods described above. However, if you
+need to run your own build of GNOME Shell to test out your contribution, you
+will need to take the following steps.
+
+1. Install the build tools on the host. Although you won't build GNOME Shell
+   with system libraries, you will need meson to install it in your host (see
+   step 4). Run the command below and reboot your computer:
+
+   ```bash
+   rpm-ostree install meson ninja-build
+   ```
+
+2. Build GNOME Shell inside a toolbox that has the same operating system in the
+   same version as your host. For that, refer to the instructions in the
+   [Toolbox](#toolbox) section.
+
+3. Temporarily unlock the system's immutability. From now on, `/usr` will be
+   writable, but all changes made to it will be discarded upon reboot, so
+   there's little risk of permanent damage. Run:
+
+   ```bash
+   sudo rpm-ostree usroverlay
+   ```
+
+4. Finally, install GNOME Shell on the host with meson. The `--no-rebuild`
+   option is important because, without it, meson would attempt to rebuild
+   GNOME Shell using the system's libraries, which we do not want (these
+   libraries are most likely not installed on the host and the gnome-shell
+   binary has already been built in the second step). To do that, run:
+
+   ```bash
+   sudo meson install -C build-gnome-shell-devel/ --no-rebuild
+   ```
+
+5. Log out and log in again. You should be running your own build of GNOME
+   Shell now. To go back to the GNOME Shell version provided by your
+   distribution, simply reboot your computer.
