@@ -607,6 +607,12 @@ class BackgroundSource {
                         : PICTURE_URI_KEY);
 
                 file = Gio.File.new_for_commandline_arg(uri);
+
+                // Fall back to default wallpaper if the file doesn't exist
+                if (!file.query_exists(null)) {
+                    uri = this._settings.get_default_value(PICTURE_URI_KEY).unpack();
+                    file = Gio.File.new_for_commandline_arg(uri);
+                }
             }
         }
 
