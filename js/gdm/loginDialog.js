@@ -1344,6 +1344,12 @@ export const LoginDialog = GObject.registerClass({
         this._sessionMenuButton.close();
         this._sessionMenuButton.hide();
         this._setUserListExpanded(true);
+        this._userSelectionBox.opacity = 0;
+        this._userSelectionBox.ease({
+            opacity: 255,
+            duration: _FADE_ANIMATION_TIME,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
         this._notListedButton.show();
         this._userList.grab_key_focus();
     }
