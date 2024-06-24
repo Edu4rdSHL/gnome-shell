@@ -153,8 +153,11 @@ class BackgroundCache extends Signals.EventEmitter {
 
     monitorFile(file) {
         let key = file.hash();
-        if (this._fileMonitors[key])
+        const data = this._fileMonitors[key];
+        if (data) {
+            data.count++;
             return;
+        }
 
         let monitor = file.monitor(Gio.FileMonitorFlags.NONE, null);
         monitor.connect('changed',
@@ -166,7 +169,15 @@ class BackgroundCache extends Signals.EventEmitter {
                     this.emit('file-changed', file);
             });
 
-        this._fileMonitors[key] = monitor;
+        this._fileMonitors[key] = {monitor, count: 1};
+    }
+
+    unmonitorFile(file) {
+        const key = file.hash();
+        const data = this._fileMonitors[key];
+        data.count--;
+        if (data.count === 0)
+            delete this._fileMonitors[key];
     }
 
     getAnimation(params) {
@@ -257,7 +268,7 @@ const Background = GObject.registerClass({
         this._style = params.style;
         this._monitorIndex = params.monitorIndex;
         this._layoutManager = params.layoutManager;
-        this._fileWatches = {};
+        this._fileWatches = new Map();
         this._cancellable = new Gio.Cancellable();
         this.isLoaded = false;
 
@@ -291,10 +302,10 @@ const Background = GObject.registerClass({
         this._cancellable.cancel();
         this._removeAnimationTimeout();
 
-        let i;
-        let keys = Object.keys(this._fileWatches);
-        for (i = 0; i < keys.length; i++)
-            this._cache.disconnect(this._fileWatches[keys[i]]);
+        for (const {signalId, file} of this._fileWatches.values()) {
+            this._cache.disconnect(signalId);
+            this._cache.unmonitorFile(file);
+        }
 
         this._fileWatches = null;
 
@@ -370,7 +381,7 @@ const Background = GObject.registerClass({
 
     _watchFile(file) {
         let key = file.hash();
-        if (this._fileWatches[key])
+        if (this._fileWatches.has(key))
             return;
 
         this._cache.monitorFile(file);
@@ -382,7 +393,7 @@ const Background = GObject.registerClass({
                     this._emitChangedSignal();
                 }
             });
-        this._fileWatches[key] = signalId;
+        this._fileWatches.set(key, {signalId, file});
     }
 
     _removeAnimationTimeout() {
