@@ -251,6 +251,10 @@ export const QuickSlider = GObject.registerClass({
             'menu-enabled', '', '',
             GObject.ParamFlags.READWRITE,
             false),
+        'menu-button-accessible-name': GObject.ParamSpec.string(
+            'menu-button-accessible-name', '', '',
+            GObject.ParamFlags.READWRITE,
+            ''),
     },
     Signals: {
         'icon-clicked': {},
@@ -339,6 +343,9 @@ export const QuickSlider = GObject.registerClass({
 
         this.bind_property('menu-enabled',
             this._menuButton, 'visible',
+            GObject.BindingFlags.SYNC_CREATE);
+        this.bind_property('menu-button-accessible-name',
+            this._menuButton, 'accessible-name',
             GObject.BindingFlags.SYNC_CREATE);
         this._menuButton.connect('clicked', () => this.menu.open());
         this.slider.connect('popup-menu', () => {
