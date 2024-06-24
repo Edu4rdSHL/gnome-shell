@@ -238,7 +238,7 @@ function getBackgroundCache() {
     return _backgroundCache;
 }
 
-const Background = GObject.registerClass({
+export const Background = GObject.registerClass({
     Signals: {'loaded': {}, 'bg-changed': {}},
 }, class Background extends Meta.Background {
     _init(params) {
@@ -260,6 +260,8 @@ const Background = GObject.registerClass({
         this._fileWatches = {};
         this._cancellable = new Gio.Cancellable();
         this.isLoaded = false;
+        this._animationOpacityStepIncrement = ANIMATION_OPACITY_STEP_INCREMENT;
+        this._animationMinWakeupInterval = ANIMATION_MIN_WAKEUP_INTERVAL;
 
         this._interfaceSettings = new Gio.Settings({schema_id: INTERFACE_SCHEMA});
 
@@ -285,6 +287,22 @@ const Background = GObject.registerClass({
             this._emitChangedSignal.bind(this), this);
 
         this._load();
+    }
+
+    get animationOpacityStepIncrement() {
+        return this._animationOpacityStepIncrement;
+    }
+
+    set animationOpacityStepIncrement(value) {
+        this._animationOpacityStepIncrement = value;
+    }
+
+    get animationMinWakeupInterval() {
+        return this._animationMinWakeupInterval;
+    }
+
+    set animationMinWakeupInterval(value) {
+        this._animationMinWakeupInterval = value;
     }
 
     destroy() {
@@ -443,11 +461,11 @@ const Background = GObject.registerClass({
         if (!this._animation.transitionDuration)
             return;
 
-        let nSteps = 255 / ANIMATION_OPACITY_STEP_INCREMENT;
+        let nSteps = 255 / this._animationOpacityStepIncrement;
         let timePerStep = (this._animation.transitionDuration * 1000) / nSteps;
 
         let interval = Math.max(
-            ANIMATION_MIN_WAKEUP_INTERVAL * 1000,
+            this._animationMinWakeupInterval * 1000,
             timePerStep);
 
         if (interval > GLib.MAXUINT32)
