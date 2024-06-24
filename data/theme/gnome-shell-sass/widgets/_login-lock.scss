@@ -16,6 +16,16 @@ $_gdm_dialog_width: 25em;
     width: $_gdm_dialog_width;
     spacing: $base_padding * 1.5;
   }
+
+  .login-dialog-prompt-entry {
+    border-radius: $forced_circular_radius;
+    padding-left: $base_padding * 2;
+    padding-right: $base_padding * 2;
+
+    .peek-password {
+      padding-right: 0;
+    }
+  }
 }
 
 // GDM Login Dialog
