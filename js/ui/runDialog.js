@@ -92,12 +92,12 @@ class RunDialog extends ModalDialog.ModalDialog {
             entry: this._entryText,
         });
         this._entryText.connect('activate', o => {
-            this.popModal();
             this._run(o.get_text(),
                 Clutter.get_current_event().get_state() & Clutter.ModifierType.CONTROL_MASK);
-            if (!this._commandError ||
-                !this.pushModal())
+            if (!this._commandError) {
+                this.popModal();
                 this.close();
+            }
         });
         this._entryText.connect('key-press-event', (o, e) => {
             let symbol = e.get_key_symbol();
