@@ -8,9 +8,14 @@ fetch() {
 }
 
 mutter_target=
+mutter_repo="https://gitlab.gnome.org/GNOME/mutter.git"
 
-echo -n Cloning into mutter ...
-if git clone --quiet --depth=1 https://gitlab.gnome.org/GNOME/mutter.git; then
+if [[ "$CI_SERVER_URL" && "$CI_PROJECT_ROOT_NAMESPACE" ]]; then
+  mutter_repo="$CI_SERVER_URL/$CI_PROJECT_ROOT_NAMESPACE/mutter.git"
+fi
+
+echo -n Cloning into mutter from $mutter_repo...
+if git clone --quiet --depth=1 $mutter_repo; then
   echo \ done
 else
   echo \ failed
