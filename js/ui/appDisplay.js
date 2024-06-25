@@ -606,17 +606,13 @@ var BaseAppView = GObject.registerClass({
         this._prevPageArrow.connect('clicked',
             () => this.goToPage(this._grid.currentPage - 1));
 
-        const scrollContainer = new St.Widget({
-            clip_to_allocation: true,
-            y_expand: true,
-        });
-        scrollContainer.add_child(this._scrollView);
-        scrollContainer.add_child(this._prevPageIndicator);
-        scrollContainer.add_child(this._nextPageIndicator);
-        scrollContainer.add_child(this._nextPageArrow);
-        scrollContainer.add_child(this._prevPageArrow);
-        scrollContainer.add_child(this._pageIndicators);
-        scrollContainer.layoutManager = new BaseAppViewGridLayout(
+        this.add_child(this._scrollView);
+        this.add_child(this._prevPageIndicator);
+        this.add_child(this._nextPageIndicator);
+        this.add_child(this._nextPageArrow);
+        this.add_child(this._prevPageArrow);
+        this.add_child(this._pageIndicators);
+        this.layoutManager = new BaseAppViewGridLayout(
             this._grid,
             this._scrollView,
             this._nextPageIndicator,
@@ -624,15 +620,10 @@ var BaseAppView = GObject.registerClass({
             this._prevPageIndicator,
             this._prevPageArrow,
             this._pageIndicators);
-        this._appGridLayout = scrollContainer.layoutManager;
-        scrollContainer._delegate = this;
+        this._appGridLayout = this.layoutManager;
+        //scrollContainer._delegate = this;
 
-        this._box = new St.BoxLayout({
-            vertical: true,
-            x_expand: true,
-            y_expand: true,
-        });
-        this._box.add_child(scrollContainer);
+       // this.add_child(scrollContainer);
 
         // Swipe
         this._swipeTracker = new SwipeTracker.SwipeTracker(this._scrollView,
@@ -1362,15 +1353,13 @@ export const AppDisplay = GObject.registerClass(
 class AppDisplay extends BaseAppView {
     _init() {
         super._init({
-            layout_manager: new Clutter.BinLayout(),
+            clip_to_allocation: true,
             x_expand: true,
             y_expand: true,
         });
 
         this._pageManager = new PageManager();
         this._pageManager.connect('layout-changed', () => this._redisplay());
-
-        this.add_child(this._box);
 
         this._folderIcons = [];
 
@@ -2136,7 +2125,7 @@ export const FolderView = GObject.registerClass(
 class FolderView extends BaseAppView {
     _init(folder, id, parentView) {
         super._init({
-            layout_manager: new Clutter.BinLayout(),
+            clip_to_allocation: true,
             x_expand: true,
             y_expand: true,
             gesture_modes: Shell.ActionMode.POPUP,
@@ -2149,8 +2138,6 @@ class FolderView extends BaseAppView {
         this._folder = folder;
         this._parentView = parentView;
         this._grid._delegate = this;
-
-        this.add_child(this._box);
 
         this._deletingFolder = false;
         this._apps = [];
