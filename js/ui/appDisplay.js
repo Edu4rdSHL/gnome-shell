@@ -1356,6 +1356,7 @@ class AppDisplay extends BaseAppView {
             clip_to_allocation: true,
             x_expand: true,
             y_expand: true,
+            name: 'appDisplay',
         });
 
         this._pageManager = new PageManager();
