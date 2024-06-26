@@ -54,6 +54,9 @@ class SearchResult extends St.Button {
     }
 
     vfunc_clicked() {
+        if (Main.overview.animationInProgress) {
+            return;
+        }
         this.activate();
     }
 

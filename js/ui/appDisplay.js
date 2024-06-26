@@ -3112,6 +3112,9 @@ export const AppIcon = GObject.registerClass({
 
     vfunc_clicked(button) {
         this._removeMenuTimeout();
+        if (Main.overview.animationInProgress) {
+            return;
+        }
         this.activate(button);
     }
 
