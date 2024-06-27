@@ -521,10 +521,20 @@ export const LayoutManager = GObject.registerClass({
     }
 
     _waitLoaded(bgManager) {
-        return new Promise(resolve => {
+        return new Promise((resolve, reject) => {
+            let monitorsChangedId;
             const id = bgManager.connect('loaded', () => {
+                this.disconnect(monitorsChangedId);
                 bgManager.disconnect(id);
                 resolve();
+            });
+
+            monitorsChangedId = this.connect('monitors-changed', () => {
+                bgManager.disconnect(id);
+                this.disconnect(monitorsChangedId);
+
+                reject(new GLib.Error(Gio.IOErrorEnum,
+                    Gio.IOErrorEnum.CANCELLED, 'Loading was cancelled'));
             });
         });
     }
@@ -536,7 +546,7 @@ export const LayoutManager = GObject.registerClass({
         this._bgManagers = [];
 
         if (Main.sessionMode.isGreeter)
-            return Promise.resolve();
+            return;
 
         for (let i = 0; i < this.monitors.length; i++) {
             let bgManager = this._createBackgroundManager(i);
@@ -545,8 +555,14 @@ export const LayoutManager = GObject.registerClass({
             if (i !== this.primaryIndex && this._startingUp)
                 bgManager.backgroundActor.hide();
         }
+    }
 
-        return Promise.all(this._bgManagers.map(this._waitLoaded));
+    _waitBackgroundsLoaded() {
+        if (this._bgManagers.every(bgManager => bgManager.isLoaded))
+            return Promise.resolve();
+
+        return Promise.all(this._bgManagers.map(bgManager =>
+            this._waitLoaded(bgManager)));
     }
 
     _updateKeyboardBox() {
@@ -739,22 +755,48 @@ export const LayoutManager = GObject.registerClass({
         } else {
             this.keyboardBox.hide();
 
-            let monitor = this.primaryMonitor;
+            const prepareMonitor = monitor => {
+                if (!Main.sessionMode.hasOverview) {
+                    const x = monitor.x + monitor.width / 2.0;
+                    const y = monitor.y + monitor.height / 2.0;
 
-            if (!Main.sessionMode.hasOverview) {
-                const x = monitor.x + monitor.width / 2.0;
-                const y = monitor.y + monitor.height / 2.0;
+                    this.uiGroup.set_pivot_point(
+                        x / global.screen_width,
+                        y / global.screen_height);
+                    this.uiGroup.scale_x = this.uiGroup.scale_y = 0.75;
+                    this.uiGroup.opacity = 0;
+                }
 
-                this.uiGroup.set_pivot_point(
-                    x / global.screen_width,
-                    y / global.screen_height);
-                this.uiGroup.scale_x = this.uiGroup.scale_y = 0.75;
-                this.uiGroup.opacity = 0;
+                global.window_group.set_clip(monitor.x, monitor.y,
+                    monitor.width, monitor.height);
+            };
+
+            prepareMonitor(this.primaryMonitor);
+
+            this._startupMonitorsChangedId = this.connect('monitors-changed', () => {
+                this._coverPane.set({
+                    width: global.screen_width,
+                    height: global.screen_height,
+                });
+                prepareMonitor(this.primaryMonitor);
+            });
+
+            this._updateBackgrounds();
+
+            while (true) {
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    await this._waitBackgroundsLoaded();
+                    break;
+                } catch (e) {
+                    if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
+                        logError(e);
+                        this.disconnect(this._startupMonitorsChangedId);
+                        this._startupMonitorsChangedId = 0;
+                        return;
+                    }
+                }
             }
-
-            global.window_group.set_clip(monitor.x, monitor.y, monitor.width, monitor.height);
-
-            await this._updateBackgrounds();
         }
 
         // Hack: Work around grab issue when testing greeter UI in nested
@@ -810,6 +852,11 @@ export const LayoutManager = GObject.registerClass({
         this._startingUp = false;
 
         this.keyboardBox.show();
+
+        if (this._startupMonitorsChangedId) {
+            this.disconnect(this._startupMonitorsChangedId);
+            this._startupMonitorsChangedId = 0;
+        }
 
         if (!Main.sessionMode.isGreeter) {
             this._showSecondaryBackgrounds();
