@@ -1118,6 +1118,11 @@ class Workspace extends St.Widget {
         return overviewState > OverviewControls.ControlsState.WINDOW_PICKER;
     }
 
+    _shouldChangeWindow() {
+        const overviewState = this._overviewAdjustment.value;
+        return overviewState === OverviewControls.ControlsState.WINDOW_PICKER;
+    }
+
     vfunc_get_focus_chain() {
         return this._container.layout_manager.getFocusChain();
     }
@@ -1399,10 +1404,14 @@ class Workspace extends St.Widget {
     _onCloneSelected(clone, time) {
         const wsIndex = this.metaWorkspace?.index();
 
-        if (this._shouldLeaveOverview())
-            Main.activateWindow(clone.metaWindow, time, wsIndex);
-        else
+        if (!this._shouldLeaveOverview()) {
             this.metaWorkspace?.activate(time);
+        } else if (this._shouldChangeWindow()) {
+            Main.activateWindow(clone.metaWindow, time, wsIndex);
+        } else {
+            this.metaWorkspace?.activate(time);
+            Main.overview.hide();
+        }
     }
 
     // Draggable target interface
