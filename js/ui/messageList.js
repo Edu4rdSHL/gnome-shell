@@ -473,6 +473,8 @@ export const Message = GObject.registerClass({
             style_class: 'message-title',
             y_align: Clutter.ActorAlign.END,
         });
+        this.titleLabel.clutter_text.line_wrap = true;
+        this.titleLabel.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
         contentBox.add_child(this.titleLabel);
 
         this._bodyLabel = new URLHighlighter('', true, this._useBodyMarkup);
