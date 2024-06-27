@@ -647,6 +647,11 @@ export const SwipeTracker = GObject.registerClass({
         return [this._snapPoints[lowerIndex], this._snapPoints[upperIndex]];
     }
 
+    _getBoundsWithBumpRange(pos) {
+        const bounds = this._getBounds(pos);
+        return [bounds[0] - this._bumpRange, bounds[1] + this._bumpRange];
+    }
+
     _updateGesture(gesture, time, delta, distance) {
         if (this._state !== State.SCROLLING)
             return;
@@ -663,7 +668,7 @@ export const SwipeTracker = GObject.registerClass({
         this._progress += delta / distance;
         this._history.append(time, delta);
 
-        this._progress = Math.clamp(this._progress, ...this._getBounds(this._initialProgress));
+        this._progress = Math.clamp(this._progress, ...this._getBoundsWithBumpRange(this._initialProgress));
 
         this.emit('update', this._progress);
     }
@@ -758,13 +763,16 @@ export const SwipeTracker = GObject.registerClass({
      * @param {number[]} snapPoints - An array of snap points, sorted in ascending order
      * @param {number} currentProgress - initial progress value
      * @param {number} cancelProgress - the value to be used on cancelling
+     * @param {number} bumpRange - how much the user can stretch beyond the first or
+     *                             the latest snap point
      */
-    confirmSwipe(distance, snapPoints, currentProgress, cancelProgress) {
+    confirmSwipe(distance, snapPoints, currentProgress, cancelProgress, bumpRange = 0) {
         this.distance = distance;
         this._snapPoints = snapPoints;
         this._initialProgress = currentProgress;
         this._progress = currentProgress;
         this._cancelProgress = cancelProgress;
+        this._bumpRange = bumpRange;
 
         this._state = State.SCROLLING;
     }
