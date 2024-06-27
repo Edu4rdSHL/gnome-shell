@@ -178,7 +178,7 @@ export class ScreenShield extends Signals.EventEmitter {
 
     _activateDialog() {
         if (this._isLocked) {
-            this._ensureUnlockDialog(true /* allowCancel */);
+            this._ensureUnlockDialog();
             this._dialog.activate();
         } else {
             this.deactivate(true /* animate */);
@@ -357,7 +357,8 @@ export class ScreenShield extends Signals.EventEmitter {
         this.actor.show();
         this._isGreeter = Main.sessionMode.isGreeter;
         this._isLocked = true;
-        this._ensureUnlockDialog(true);
+        this._lockScreenState = MessageTray.State.SHOWN;
+        this._ensureUnlockDialog();
     }
 
     _hideLockScreenComplete() {
@@ -416,7 +417,7 @@ export class ScreenShield extends Signals.EventEmitter {
         this._showPointer();
     }
 
-    _ensureUnlockDialog(allowCancel) {
+    _ensureUnlockDialog() {
         if (!this._dialog) {
             let constructor = Main.sessionMode.unlockDialog;
             if (!constructor) {
@@ -440,7 +441,6 @@ export class ScreenShield extends Signals.EventEmitter {
                 'wake-up-screen', this._wakeUpScreen.bind(this));
         }
 
-        this._dialog.allowCancel = allowCancel;
         this._dialog.grab_key_focus();
         return true;
     }
@@ -605,7 +605,7 @@ export class ScreenShield extends Signals.EventEmitter {
         if (this._activationTime === 0)
             this._activationTime = GLib.get_monotonic_time();
 
-        if (!this._ensureUnlockDialog(true))
+        if (!this._ensureUnlockDialog())
             return;
 
         this.actor.show();
@@ -620,6 +620,7 @@ export class ScreenShield extends Signals.EventEmitter {
             animateLockScreen: animate,
             fadeToBlack: true,
         });
+
         // On wayland, a crash brings down the entire session, so we don't
         // need to defend against being restarted unlocked
         if (!Meta.is_wayland_compositor())
