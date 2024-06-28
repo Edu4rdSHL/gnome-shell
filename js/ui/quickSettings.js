@@ -230,6 +230,19 @@ export const QuickMenuToggle = GObject.registerClass({
             if (this.menuEnabled)
                 this.menu.open();
         });
+
+        const clickAction = new Clutter.ClickAction();
+        clickAction.connect('clicked', action => this.emit('clicked', action.get_button()));
+        clickAction.connect('long-press', (action, actor, state) => {
+            if (state === Clutter.LongPressState.ACTIVATE) {
+                const [item] = Object.values(this.menu._settingsActions);
+                if (item?.visible)
+                    item.activate(Clutter.get_current_event());
+            }
+
+            return true;
+        });
+        contents.add_action(clickAction);
     }
 });
 
