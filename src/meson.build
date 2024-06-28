@@ -131,7 +131,9 @@ libshell_public_headers = [
   'shell-window-preview-layout.h',
   'shell-window-tracker.h',
   'shell-wm.h',
-  'shell-workspace-background.h'
+  'shell-workspace-background.h',
+  'shell-workspace-dot.h',
+  'shell-workspace-indicators.h',
 ]
 
 if have_x11_client
@@ -186,7 +188,9 @@ libshell_sources = [
   'shell-window-preview-layout.c',
   'shell-window-tracker.c',
   'shell-wm.c',
-  'shell-workspace-background.c'
+  'shell-workspace-background.c',
+  'shell-workspace-dot.c',
+  'shell-workspace-indicators.c',
 ]
 
 if have_x11_client
