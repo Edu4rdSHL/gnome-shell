@@ -360,6 +360,8 @@ describe('Break manager', () => {
         harness.expectState(102, breakManager, BreakState.DISABLED);
         harness.addIdleEvent(130);
         harness.expectState(135, breakManager, BreakState.DISABLED);
+
+        harness.run();
     });
 
     // A simple test which simulates the user being active briefly, taking a short
