@@ -23,15 +23,18 @@ function getOption(...names) {
 
 (async function main() {
     const outputOption = getOption('--output-file', '-o');
+    const fixOption = hasOption('--fix');
     const outputPath = outputOption ? path.resolve(outputOption) : null;
 
     const sourceDir = path.dirname(process.argv[1]);
     process.chdir(path.resolve(sourceDir, '..'));
 
     const sources = ['js', 'subprojects/extensions-app/js', 'tests'];
-    const eslint = new ESLint({cache: true});
+    const eslint = new ESLint({cache: true, fix: fixOption});
 
     const results = await eslint.lintFiles(sources);
+    if (fixOption)
+        await ESLint.outputFixes(results);
     const formatter = await eslint.loadFormatter(getOption('--format', '-f'));
     const resultText = formatter.format(results);
 
