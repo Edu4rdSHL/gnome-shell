@@ -50,8 +50,16 @@ class WorkspaceGroup extends Clutter.Actor {
             this._syncStacking.bind(this), this);
     }
 
+    get monitor() {
+        return this._monitor;
+    }
+
     get workspace() {
         return this._workspace;
+    }
+
+    get movingWindow() {
+        return this._movingWindow;
     }
 
     _shouldShowWindow(window) {
@@ -84,6 +92,8 @@ class WorkspaceGroup extends Clutter.Actor {
 
         for (const windowActor of windowActors) {
             const record = this._windowRecords.find(r => r.windowActor === windowActor);
+            if (!record)
+                continue;
 
             this.set_child_above_sibling(record.clone,
                 lastRecord ? lastRecord.clone : bottomActor);
@@ -174,26 +184,86 @@ export const MonitorGroup = GObject.registerClass({
         this.add_child(stickyGroup);
 
         this._workspaceGroups = [];
+        this._workspaceIndices = [];
+        this._movingWindow = movingWindow;
 
         const workspaceManager = global.workspace_manager;
-        const vertical = workspaceManager.layout_rows === -1;
         const activeWorkspace = workspaceManager.get_active_workspace();
+
+        this._updateBaseDistance();
+        St.ThemeContext.get_for_stage(global.stage).connectObject(
+            'notify::scale-factor', () => this._updateBaseDistance(), this);
+        Main.layoutManager.connectObject('monitors-changed',
+            () => this._updateBaseDistance(), this);
+
+        this.setWorkspaceIndices(workspaceIndices);
+
+        this.progress = this.getWorkspaceProgress(activeWorkspace);
+
+        if (monitor.index === Main.layoutManager.primaryIndex) {
+            this._workspacesAdjustment = Main.createWorkspacesAdjustment(this);
+            this.bind_property_full('progress',
+                this._workspacesAdjustment, 'value',
+                GObject.BindingFlags.SYNC_CREATE,
+                (_bind, source) => {
+                    const indices = [
+                        this._workspaceIndices[Math.floor(source)],
+                        this._workspaceIndices[Math.ceil(source)],
+                    ];
+                    return [true, Util.lerp(...indices, source % 1.0)];
+                },
+                null);
+
+            this.connect('destroy', () => {
+                delete this._workspacesAdjustment;
+            });
+        }
+    }
+
+    _updateBaseDistance() {
+        this._baseDistance = global.workspace_manager.layout_rows === -1
+            ? this._monitor.height : this._monitor.width;
+        this._baseDistance += WORKSPACE_SPACING *
+            St.ThemeContext.get_for_stage(global.stage).scaleFactor;
+    }
+
+    setWorkspaceIndices(workspaceIndices) {
+        const {workspaceManager} = global;
+        const vertical = workspaceManager.layout_rows === -1;
 
         let x = 0;
         let y = 0;
 
+        let oldFirstGroup;
+        const oldGroups = this._workspaceGroups;
+        this._workspaceGroups = [];
+        this._container.remove_all_children();
+
         for (const i of workspaceIndices) {
             const ws = workspaceManager.get_workspace_by_index(i);
-            const fullscreen = ws.list_windows().some(w => w.get_monitor() === monitor.index && w.is_fullscreen());
+            const fullscreen = ws.list_windows().some(w =>
+                w.get_monitor() === this._monitor.index && w.is_fullscreen());
 
-            if (i > 0 && vertical && !fullscreen && monitor.index === Main.layoutManager.primaryIndex) {
+            if (i > 0 && vertical && !fullscreen &&
+                this._monitor.index === Main.layoutManager.primaryIndex) {
                 // We have to shift windows up or down by the height of the panel to prevent having a
                 // visible gap between the windows while switching workspaces. Since fullscreen windows
                 // hide the panel, they don't need to be shifted up or down.
                 y -= Main.panel.height;
             }
 
-            const group = new WorkspaceGroup(ws, monitor, movingWindow);
+            let group;
+            let groupIndex = oldGroups.findIndex(g =>
+                g.workspace === ws && g.monitor === this._monitor &&
+                g.movingWindow === this._movingWindow);
+            if (groupIndex === -1) {
+                group = new WorkspaceGroup(ws, this._monitor, this._movingWindow);
+            } else {
+                [group] = oldGroups.splice(groupIndex, 1);
+
+                if (!oldFirstGroup && group.x === 0 && group.y === 0)
+                    oldFirstGroup = group;
+            }
 
             this._workspaceGroups.push(group);
             this._container.add_child(group);
@@ -207,35 +277,40 @@ export const MonitorGroup = GObject.registerClass({
                 x += this.baseDistance;
         }
 
-        this.progress = this.getWorkspaceProgress(activeWorkspace);
-
-        if (monitor.index === Main.layoutManager.primaryIndex) {
-            this._workspacesAdjustment = Main.createWorkspacesAdjustment(this);
-            this.bind_property_full('progress',
-                this._workspacesAdjustment, 'value',
-                GObject.BindingFlags.SYNC_CREATE,
-                (bind, source) => {
-                    const indices = [
-                        workspaceIndices[Math.floor(source)],
-                        workspaceIndices[Math.ceil(source)],
-                    ];
-                    return [true, Util.lerp(...indices, source % 1.0)];
-                },
-                null);
-
-            this.connect('destroy', () => {
-                delete this._workspacesAdjustment;
-            });
+        if (oldFirstGroup) {
+            if (vertical)
+                this._container.y -= oldFirstGroup.y;
+            else
+                this._container.x -= oldFirstGroup.x;
         }
+
+        oldGroups.forEach(g => g.destroy());
+        this._workspaceIndices = workspaceIndices;
+    }
+
+    addWorkspaceIndex(wsIndex) {
+        const indices = new Set([...this._workspaceIndices, wsIndex]);
+        this.setWorkspaceIndices([...indices].sort((a, b) => a - b));
+    }
+
+    get workspaceIndices() {
+        return this._workspaceIndices;
+    }
+
+    set movingWindow(movingWindow) {
+        if (this._movingWindow === movingWindow)
+            return;
+
+        this._movingWindow = movingWindow;
+        this.setWorkspaceIndices(this._workspaceIndices);
+    }
+
+    get movingWindow() {
+        return this._movingWindow;
     }
 
     get baseDistance() {
-        const spacing = WORKSPACE_SPACING * St.ThemeContext.get_for_stage(global.stage).scale_factor;
-
-        if (global.workspace_manager.layout_rows === -1)
-            return this._monitor.height + spacing;
-        else
-            return this._monitor.width + spacing;
+        return this._baseDistance;
     }
 
     get progress() {
@@ -415,19 +490,39 @@ export class WorkspaceAnimationController {
             workspaceIndices.reverse();
 
         this._prepareWorkspaceSwitch(workspaceIndices);
+        const wasInProgress = this._switchData.inProgress;
         this._switchData.inProgress = true;
 
         const fromWs = global.workspace_manager.get_workspace_by_index(from);
         const toWs = global.workspace_manager.get_workspace_by_index(to);
 
         for (const monitorGroup of this._switchData.monitors) {
-            monitorGroup.progress = monitorGroup.getWorkspaceProgress(fromWs);
+            if (wasInProgress) {
+                monitorGroup.movingWindow = this._movingWindow;
+
+                if (!monitorGroup.workspaceIndices.includes(from))
+                    monitorGroup.addWorkspaceIndex(from);
+
+                if (!monitorGroup.workspaceIndices.includes(to))
+                    monitorGroup.addWorkspaceIndex(to);
+            } else {
+                monitorGroup.progress = monitorGroup.getWorkspaceProgress(fromWs);
+            }
+
             const progress = monitorGroup.getWorkspaceProgress(toWs);
 
             const params = {
                 duration: WINDOW_ANIMATION_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
             };
+
+            if (wasInProgress) {
+                const {progress: monitorGroupProgress} = monitorGroup;
+                if (progress > monitorGroupProgress)
+                    params.duration *= progress - monitorGroupProgress;
+                else
+                    params.duration *= monitorGroupProgress;
+            }
 
             if (monitorGroup.index === Main.layoutManager.primaryIndex) {
                 params.onComplete = () => {

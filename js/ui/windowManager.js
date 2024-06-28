@@ -962,7 +962,6 @@ export class WindowManager {
             new WorkspaceAnimation.WorkspaceAnimationController();
 
         this._shellwm.connect('kill-switch-workspace', () => {
-            this._workspaceAnimation.cancelSwitchAnimation();
             this._switchWorkspaceDone();
         });
     }
@@ -1135,6 +1134,9 @@ export class WindowManager {
     }
 
     _shouldAnimate() {
+        if (this._blockAnimations)
+            return false;
+
         const overviewOpen = Main.overview.visible && !Main.overview.closing;
         return !(overviewOpen || this._workspaceAnimation.gestureActive);
     }
