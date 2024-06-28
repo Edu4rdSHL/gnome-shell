@@ -40,6 +40,7 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 G_GNUC_END_IGNORE_DEPRECATIONS
 
 #include "calendar-sources.h"
+#include "reminder-watcher.h"
 
 #define BUS_NAME "org.gnome.Shell.CalendarServer"
 
@@ -70,11 +71,6 @@ static GDBusNodeInfo *introspection_data = NULL;
 struct _App;
 typedef struct _App App;
 
-static gboolean      opt_replace = FALSE;
-static GOptionEntry  opt_entries[] = {
-  {"replace", 0, 0, G_OPTION_ARG_NONE, &opt_replace, "Replace existing daemon", NULL},
-  {NULL }
-};
 static App *_global_app = NULL;
 
 /* ---------------------------------------------------------------------------------------------------- */
@@ -317,6 +313,8 @@ struct _App
   gulong client_appeared_signal_id;
   gulong client_disappeared_signal_id;
 
+  EReminderWatcher *reminder_watcher;
+
   gchar *timezone_location;
 
   GSList *notify_appointments; /* CalendarAppointment *, for EventsAdded */
@@ -340,6 +338,7 @@ app_update_timezone (App *app)
       g_free (app->timezone_location);
       app->timezone_location = g_steal_pointer (&location);
       print_debug ("Using timezone %s", app->timezone_location);
+      e_reminder_watcher_set_default_zone (app->reminder_watcher, app->zone);
     }
 }
 
@@ -820,13 +819,15 @@ on_client_disappeared_cb (CalendarSources *sources,
 }
 
 static App *
-app_new (GDBusConnection *connection)
+app_new (GApplication *application,
+         GDBusConnection *connection)
 {
   App *app;
 
   app = g_new0 (App, 1);
   app->connection = g_object_ref (connection);
   app->sources = calendar_sources_get ();
+  app->reminder_watcher = reminder_watcher_new (application, calendar_sources_get_registry (app->sources));
   app->client_appeared_signal_id = g_signal_connect (app->sources,
                                                      "client-appeared",
                                                      G_CALLBACK (on_client_appeared_cb),
@@ -865,6 +866,7 @@ app_free (App *app)
   g_slist_free_full (app->notify_ids, g_free);
 
   g_object_unref (app->connection);
+  g_object_unref (app->reminder_watcher);
   g_object_unref (app->sources);
 
   g_free (app);
@@ -998,11 +1000,11 @@ on_bus_acquired (GDBusConnection *connection,
                  const gchar     *name,
                  gpointer         user_data)
 {
-  GMainLoop *main_loop = user_data;
+  GApplication *application = user_data;
   guint registration_id;
   g_autoptr (GError) error = NULL;
 
-  _global_app = app_new (connection);
+  _global_app = app_new (application, connection);
 
   registration_id = g_dbus_connection_register_object (connection,
                                                        "/org/gnome/Shell/CalendarServer",
@@ -1017,7 +1019,7 @@ on_bus_acquired (GDBusConnection *connection,
                   error->message,
                   g_quark_to_string (error->domain),
                   error->code);
-      g_main_loop_quit (main_loop);
+      g_application_quit (application);
       return;
     }
 
@@ -1029,11 +1031,11 @@ on_name_lost (GDBusConnection *connection,
               const gchar     *name,
               gpointer         user_data)
 {
-  GMainLoop *main_loop = user_data;
+  GApplication *application = user_data;
 
   g_print ("gnome-shell-calendar-server[%d]: Lost (or failed to acquire) the name " BUS_NAME " - exiting\n",
            (gint) getpid ());
-  g_main_loop_quit (main_loop);
+  g_application_quit (application);
 }
 
 static void
@@ -1049,13 +1051,13 @@ stdin_channel_io_func (GIOChannel *source,
                        GIOCondition condition,
                        gpointer data)
 {
-  GMainLoop *main_loop = data;
+  GApplication *application = data;
 
   if (condition & G_IO_HUP)
     {
       g_debug ("gnome-shell-calendar-server[%d]: Got HUP on stdin - exiting\n",
                (gint) getpid ());
-      g_main_loop_quit (main_loop);
+      g_application_quit (application);
     }
   else
     {
@@ -1064,13 +1066,59 @@ stdin_channel_io_func (GIOChannel *source,
   return FALSE; /* remove source */
 }
 
+static void
+app_snooze_reminder_cb (GSimpleAction *action,
+                        GVariant *parameter,
+                        gpointer user_data)
+{
+  App *app = _global_app;
+
+  g_return_if_fail (app != NULL);
+
+  reminder_watcher_snooze_by_id (app->reminder_watcher, g_variant_get_string (parameter, NULL));
+}
+
+static void
+app_dismiss_reminder_cb (GSimpleAction *action,
+                         GVariant *parameter,
+                         gpointer user_data)
+{
+  App *app = _global_app;
+
+  g_return_if_fail (app != NULL);
+
+  reminder_watcher_dismiss_by_id (app->reminder_watcher, g_variant_get_string (parameter, NULL));
+}
+
+static void
+app_open_in_app_cb (GSimpleAction *action,
+                    GVariant *parameter,
+                    gpointer user_data)
+{
+  App *app = _global_app;
+
+  g_return_if_fail (app != NULL);
+
+  reminder_watcher_open_in_app_by_id (app->reminder_watcher, g_variant_get_string (parameter, NULL));
+}
+
 int
 main (int    argc,
       char **argv)
 {
+  gboolean      opt_replace = FALSE;
+  GOptionEntry  opt_entries[] = {
+    {"replace", 0, 0, G_OPTION_ARG_NONE, &opt_replace, "Replace existing daemon", NULL},
+    {NULL }
+  };
+  const GActionEntry action_entries[] = {
+    { "snooze-reminder", app_snooze_reminder_cb, "s" },
+    { "dismiss-reminder", app_dismiss_reminder_cb, "s" },
+    { "open-in-app", app_open_in_app_cb, "s" }
+  };
+  g_autoptr (GApplication) application = NULL;
   g_autoptr (GError) error = NULL;
   GOptionContext *opt_context;
-  GMainLoop *main_loop;
   gint ret;
   guint name_owner_id;
   GIOChannel *stdin_channel;
@@ -1091,15 +1139,19 @@ main (int    argc,
       goto out;
     }
 
-  main_loop = g_main_loop_new (NULL, FALSE);
+  application = g_application_new (BUS_NAME, G_APPLICATION_NON_UNIQUE);
+  g_action_map_add_action_entries (G_ACTION_MAP (application), action_entries, G_N_ELEMENTS (action_entries), NULL);
+
+  g_signal_connect (application, "activate",
+                    G_CALLBACK (g_application_hold), NULL);
 
   stdin_channel = g_io_channel_unix_new (STDIN_FILENO);
   g_io_add_watch_full (stdin_channel,
                        G_PRIORITY_DEFAULT,
                        G_IO_HUP,
                        stdin_channel_io_func,
-                       g_main_loop_ref (main_loop),
-                       (GDestroyNotify) g_main_loop_unref);
+                       application,
+                       (GDestroyNotify) NULL);
 
   name_owner_id = g_bus_own_name (G_BUS_TYPE_SESSION,
                                   BUS_NAME,
@@ -1108,14 +1160,22 @@ main (int    argc,
                                   on_bus_acquired,
                                   on_name_acquired,
                                   on_name_lost,
-                                  g_main_loop_ref (main_loop),
-                                  (GDestroyNotify) g_main_loop_unref);
+                                  application,
+                                  (GDestroyNotify) NULL);
 
-  g_main_loop_run (main_loop);
+  if (g_application_register (application, NULL, &error))
+    {
+      print_debug ("Registered application");
 
-  g_main_loop_unref (main_loop);
+      ret = g_application_run (application, argc, argv);
 
-  ret = 0;
+      print_debug ("Quit application");
+    }
+   else
+    {
+       g_printerr ("Failed to register application: %s\n", error->message);
+       g_clear_error (&error);
+    }
 
  out:
   if (stdin_channel != NULL)

@@ -6,6 +6,7 @@ data/50-gnome-shell-system.xml
 data/org.gnome.Shell.desktop.in.in
 data/org.gnome.shell.gschema.xml.in
 data/org.gnome.Shell.Extensions.desktop.in.in
+data/org.gnome.Shell.CalendarServer.desktop.in.in
 data/org.gnome.Shell.PortalHelper.desktop.in.in
 js/dbusServices/extensions/ui/extension-error-page.ui
 js/gdm/authPrompt.js
@@ -81,6 +82,7 @@ js/ui/welcomeDialog.js
 js/ui/windowAttentionHandler.js
 js/ui/windowManager.js
 js/ui/windowMenu.js
+src/calendar-server/reminder-watcher.c
 src/main.c
 src/shell-app.c
 src/shell-app-system.c
