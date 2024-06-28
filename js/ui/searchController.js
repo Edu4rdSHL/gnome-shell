@@ -269,6 +269,9 @@ export const SearchController = GObject.registerClass({
     }
 
     _onKeyPress(entry, event) {
+        if (this._text.has_preedit())
+            return Clutter.EVENT_PROPAGATE;
+
         let symbol = event.get_key_symbol();
         if (symbol === Clutter.KEY_Escape) {
             if (this._isActivated()) {
