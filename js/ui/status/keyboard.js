@@ -3,6 +3,7 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GnomeDesktop from 'gi://GnomeDesktop';
 import GObject from 'gi://GObject';
 import IBus from 'gi://IBus';
 import Meta from 'gi://Meta';
@@ -21,6 +22,11 @@ import * as Util from '../../misc/util.js';
 
 export const INPUT_SOURCE_TYPE_XKB = 'xkb';
 export const INPUT_SOURCE_TYPE_IBUS = 'ibus';
+
+const DESKTOP_INPUT_SOURCES_SCHEMA = 'org.gnome.desktop.input-sources';
+const KEY_INPUT_SOURCES = 'sources';
+
+Gio._promisify(GnomeDesktop, 'get_default_input_sources');
 
 export const LayoutMenuItem = GObject.registerClass(
 class LayoutMenuItem extends PopupMenu.PopupBaseMenuItem {
@@ -199,12 +205,14 @@ class InputSourceSystemSettings extends InputSourceSettings {
         this._BUS_IFACE = 'org.freedesktop.locale1';
         this._BUS_PROPS_IFACE = 'org.freedesktop.DBus.Properties';
 
-        this._layouts = '';
-        this._variants = '';
-        this._options = '';
+        this._inputSourceIds = [];
+        this._inputSourceTypes = [];
+        this._options = [];
         this._model = '';
 
-        this._reload();
+        this._reload().catch(error => {
+            logError(error, 'Could not reload system input settings');
+        });
 
         Gio.DBus.system.signal_subscribe(this._BUS_NAME,
             this._BUS_PROPS_IFACE,
@@ -216,30 +224,22 @@ class InputSourceSystemSettings extends InputSourceSettings {
     }
 
     async _reload() {
-        let props;
+        let inputSourceIds;
+        let inputSourceTypes;
+        let options;
+        let model;
         try {
-            const result = await Gio.DBus.system.call(
-                this._BUS_NAME,
-                this._BUS_PATH,
-                this._BUS_PROPS_IFACE,
-                'GetAll',
-                new GLib.Variant('(s)', [this._BUS_IFACE]),
-                null, Gio.DBusCallFlags.NONE, -1, null);
-            [props] = result.deepUnpack();
+            [inputSourceIds, inputSourceTypes, options, model] =
+                await GnomeDesktop.get_default_input_sources(null);
         } catch (e) {
-            log(`Could not get properties from ${this._BUS_NAME}`);
+            logError(e, 'Could not get default input sources');
             return;
         }
 
-        const layouts = props['X11Layout'].unpack();
-        const variants = props['X11Variant'].unpack();
-        const options = props['X11Options'].unpack();
-        const model = props['X11Model'].unpack();
-
-        if (layouts !== this._layouts ||
-            variants !== this._variants) {
-            this._layouts = layouts;
-            this._variants = variants;
+        if (inputSourceIds !== this._inputSourceIds ||
+            inputSourceTypes !== this._inputSourceTypes) {
+            this._inputSourceIds = inputSourceIds;
+            this._inputSourceTypes = inputSourceTypes;
             this._emitInputSourcesChanged();
         }
         if (options !== this._options) {
@@ -253,21 +253,21 @@ class InputSourceSystemSettings extends InputSourceSettings {
     }
 
     get inputSources() {
-        let sourcesList = [];
-        let layouts = this._layouts.split(',');
-        let variants = this._variants.split(',');
+        let sourcesList;
 
-        for (let i = 0; i < layouts.length && !!layouts[i]; i++) {
-            let id = layouts[i];
-            if (variants[i])
-                id += `+${variants[i]}`;
-            sourcesList.push({type: INPUT_SOURCE_TYPE_XKB, id});
+        if (this._inputSourceIds) {
+            sourcesList = this._inputSourceIds.map((id, index) => {
+                return {type: this._inputSourceTypes[index], id};
+            });
+        } else {
+            sourcesList = [];
         }
+
         return sourcesList;
     }
 
     get keyboardOptions() {
-        return this._options.split(',');
+        return this._options;
     }
 
     get keyboardModel() {
@@ -276,18 +276,16 @@ class InputSourceSystemSettings extends InputSourceSettings {
 }
 
 class InputSourceSessionSettings extends InputSourceSettings {
-    constructor() {
+    constructor(settings) {
         super();
 
-        this._DESKTOP_INPUT_SOURCES_SCHEMA = 'org.gnome.desktop.input-sources';
-        this._KEY_INPUT_SOURCES = 'sources';
         this._KEY_MRU_SOURCES = 'mru-sources';
         this._KEY_KEYBOARD_OPTIONS = 'xkb-options';
         this._KEY_KEYBOARD_MODEL = 'xkb-model';
         this._KEY_PER_WINDOW = 'per-window';
 
-        this._settings = new Gio.Settings({schema_id: this._DESKTOP_INPUT_SOURCES_SCHEMA});
-        this._settings.connect(`changed::${this._KEY_INPUT_SOURCES}`, this._emitInputSourcesChanged.bind(this));
+        this._settings = settings;
+        this._settings.connect(`changed::${KEY_INPUT_SOURCES}`, this._emitInputSourcesChanged.bind(this));
         this._settings.connect(`changed::${this._KEY_KEYBOARD_OPTIONS}`, this._emitKeyboardOptionsChanged.bind(this));
         this._settings.connect(`changed::${this._KEY_KEYBOARD_MODEL}`, this._emitKeyboardModelChanged.bind(this));
         this._settings.connect(`changed::${this._KEY_PER_WINDOW}`, this._emitPerWindowChanged.bind(this));
@@ -306,7 +304,7 @@ class InputSourceSessionSettings extends InputSourceSettings {
     }
 
     get inputSources() {
-        return this._getSourcesList(this._KEY_INPUT_SOURCES);
+        return this._getSourcesList(KEY_INPUT_SOURCES);
     }
 
     get mruSources() {
@@ -361,13 +359,6 @@ export class InputSourceManager extends Signals.EventEmitter {
                 Meta.KeyBindingFlags.IS_REVERSED,
                 Shell.ActionMode.ALL,
                 this._switchInputSource.bind(this));
-        if (Main.sessionMode.isGreeter)
-            this._settings = new InputSourceSystemSettings();
-        else
-            this._settings = new InputSourceSessionSettings();
-        this._settings.connect('input-sources-changed', this._inputSourcesChanged.bind(this));
-        this._settings.connect('keyboard-options-changed', this._keyboardOptionsChanged.bind(this));
-        this._settings.connect('keyboard-model-changed', this._keyboardModelChanged.bind(this));
 
         this._xkbInfo = KeyboardManager.getXkbInfo();
         this._keyboardManager = KeyboardManager.getKeyboardManager();
@@ -379,14 +370,54 @@ export class InputSourceManager extends Signals.EventEmitter {
         this._ibusManager.connect('property-updated', this._ibusPropertyUpdated.bind(this));
         this._ibusManager.connect('set-content-type', this._ibusSetContentType.bind(this));
 
+        this._inputSettings = new Gio.Settings({schema_id: DESKTOP_INPUT_SOURCES_SCHEMA});
+        this._setupInputSettings();
+
         global.display.connect('modifiers-accelerator-activated', this._modifiersSwitcher.bind(this));
 
         this._sourcesPerWindow = false;
         this._focusWindowNotifyId = 0;
-        this._settings.connect('per-window-changed', this._sourcesPerWindowChanged.bind(this));
         this._sourcesPerWindowChanged();
         this._disableIBus = false;
         this._reloading = false;
+    }
+
+    _sessionHasNoInputSettings() {
+        return this._inputSettings.get_user_value(KEY_INPUT_SOURCES) === null;
+    }
+
+    _reloadInputSettings() {
+        const hadNoSessionInputSettings = this._hasNoSessionInputSettings;
+
+        if (Main.sessionMode.isGreeter)
+            this._hasNoSessionInputSettings = true;
+        else
+            this._hasNoSessionInputSettings = this._sessionHasNoInputSettings();
+
+        if (this._settings && hadNoSessionInputSettings === this._hasNoSessionInputSettings)
+            return;
+
+        this._settings?.disconnectObject(this);
+
+        if (this._hasNoSessionInputSettings)
+            this._settings = new InputSourceSystemSettings();
+        else
+            this._settings = new InputSourceSessionSettings(this._inputSettings);
+
+        this._settings.connectObject(
+            'input-sources-changed', this._inputSourcesChanged.bind(this),
+            'keyboard-options-changed', this._keyboardOptionsChanged.bind(this),
+            'keyboard-model-changed', this._keyboardModelChanged.bind(this),
+            'per-window-changed', this._sourcesPerWindowChanged.bind(this),
+            this);
+        this.reload();
+    }
+
+    _setupInputSettings() {
+        if (!Main.sessionMode.isGreeter)
+            this._inputSettings.connect(`changed::${KEY_INPUT_SOURCES}`, this._reloadInputSettings.bind(this));
+
+        this._reloadInputSettings();
     }
 
     reload() {
