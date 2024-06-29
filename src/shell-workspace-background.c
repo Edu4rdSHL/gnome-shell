@@ -70,6 +70,7 @@ shell_workspace_background_allocate (ClutterActor          *actor,
   int left_offset, right_offset;
   int top_offset, bottom_offset;
   int scale_factor;
+  float progress;
 
   scale_factor = st_theme_context_get_scale_factor (context);
 
@@ -81,8 +82,9 @@ shell_workspace_background_allocate (ClutterActor          *actor,
   scaled_box.y1 = box->y1 + (height - scaled_height) / 2;
   clutter_actor_box_set_size (&scaled_box, scaled_width, scaled_height);
 
-  clutter_actor_box_interpolate(box, &scaled_box,
-                                self->state_adjustment_value, &my_box);
+  // Map ControlsState {0, 1, 2} to progress {0.0, 1.0, 0.0}
+  progress = 1.f - fabs (1.f - self->state_adjustment_value);
+  clutter_actor_box_interpolate(box, &scaled_box, progress, &my_box);
 
   clutter_actor_set_allocation (actor, &my_box);
 
