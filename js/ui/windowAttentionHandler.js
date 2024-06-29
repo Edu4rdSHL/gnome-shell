@@ -88,6 +88,11 @@ class WindowAttentionSource extends MessageTray.Source {
     }
 
     open() {
+        // Make sure everything is settled before activating the window to
+        // avoid interference from the window object's signal handlers while
+        // the notification is still active.
+        this.destroy();
+
         Main.activateWindow(this._window);
     }
 });
