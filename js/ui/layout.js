@@ -601,6 +601,31 @@ export const LayoutManager = GObject.registerClass({
         }
     }
 
+    _updateMonitorSizeCssClass() {
+        if (!this.primaryMonitor)
+            return;
+
+        const oldMonitorSizeCssClass = this._monitorSizeCssClass;
+        const smallestDimensionSizePx =
+            this.primaryMonitor.width > this.primaryMonitor.height
+                ? this.primaryMonitor.height
+                : this.primaryMonitor.width;
+
+        if (smallestDimensionSizePx < 900)
+            this._monitorSizeCssClass = "small-screen-size";
+        else if (smallestDimensionSizePx < 1200)
+            this._monitorSizeCssClass = "normal-screen-size";
+        else
+            this._monitorSizeCssClass = "large-screen-size";
+
+        if (oldMonitorSizeCssClass === this._monitorSizeCssClass)
+            return;
+
+        if (oldMonitorSizeCssClass)
+            this.uiGroup.remove_style_class_name(oldMonitorSizeCssClass);
+        this.uiGroup.add_style_class_name(this._monitorSizeCssClass);
+    }
+
     _monitorsChanged() {
         this._updateMonitors();
         this._updateBoxes();
@@ -608,6 +633,7 @@ export const LayoutManager = GObject.registerClass({
         this._updateBackgrounds();
         this._updateFullscreen();
         this._updateVisibility();
+        this._updateMonitorSizeCssClass();
         this._queueUpdateRegions();
 
         this.emit('monitors-changed');

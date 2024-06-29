@@ -3,16 +3,60 @@
 $app_icon_size: 96px;
 $app_folder_size: 720px;
 
-// app icons
-.icon-grid {
-  row-spacing: $base_padding * 2;
-  column-spacing: $base_padding * 2;
-  max-row-spacing: $base_padding * 6;
-  max-column-spacing: $base_padding * 6;
-  page-padding-top: $base_padding * 4;
-  page-padding-bottom: $base_padding * 4;
-  page-padding-left: $base_padding * 3;
-  page-padding-right: $base_padding * 3;
+#uiGroup.small-screen-size #appDisplay {
+  margin-top: $base_padding * 2;
+  margin-bottom: $base_padding * 2;
+
+  .icon-grid {
+    row-spacing: 0;
+    column-spacing: $base_padding * 1;
+    max-row-spacing: $base_padding * 6;
+    max-column-spacing: $base_padding * 4;
+    page-padding-left: $base_padding;
+    page-padding-right: $base_padding;
+  }
+
+  StLabel { 
+    font-weight: 400;
+    @include fontsize(10pt);
+  }
+
+  .page-indicators {
+    margin-top: 10px;
+  }
+}
+
+#uiGroup.normal-screen-size #appDisplay {
+  margin-top: $base_padding * 2;
+  margin-bottom: $base_padding * 2;
+
+  .icon-grid {
+    row-spacing: $base_padding * 2;
+    column-spacing: $base_padding * 2;
+    max-row-spacing: $base_padding * 8;
+    max-column-spacing: $base_padding * 4;
+    page-padding-left: $base_padding;
+    page-padding-right: $base_padding;
+  }
+
+  .page-indicators {
+    margin-top: 14px;
+  }
+}
+
+#uiGroup.large-screen-size #appDisplay {
+  .icon-grid {
+    row-spacing: $base_padding * 4;
+    column-spacing: $base_padding * 4;
+    max-row-spacing: $base_padding * 12;
+    max-column-spacing: $base_padding * 8;
+    page-padding-left: $base_padding;
+    page-padding-right: $base_padding;
+  }
+
+  .page-indicators {
+    margin-top: 20px;
+  }
 }
 
 /* App Icons */
@@ -23,7 +67,6 @@ $app_folder_size: 720px;
 
   // override the %tile style
   border-radius: $base_border_radius*3;
-  padding: $base_padding * 2;
 
   // the icon itself
   .overview-icon {
@@ -119,7 +162,7 @@ $app_folder_size: 720px;
 // App Grid pagination indicators
 $page_indicator_size: 10px;
 .page-indicator {
-  padding: $base_padding $base_padding * 2 0;
+  padding: 0 $base_padding 0;
   transition-duration:400ms;
 
   .page-indicator-icon {
