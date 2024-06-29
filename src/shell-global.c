@@ -908,10 +908,11 @@ global_stage_before_paint (gpointer data)
 }
 
 static gboolean
-load_gl_symbol (const char  *name,
+load_gl_symbol (CoglContext *ctx,
+                const char  *name,
                 void       **func)
 {
-  *func = cogl_get_proc_address (name);
+  *func = cogl_get_proc_address (ctx, name);
   if (!*func)
     {
       g_warning ("failed to resolve required GL symbol \"%s\"\n", name);
@@ -928,6 +929,7 @@ global_stage_after_paint (ClutterStage     *stage,
 {
   /* At this point, we've finished all layout and painting, but haven't
    * actually flushed or swapped */
+  CoglContext *cogl_context = GNOME_SHELL_PLUGIN (global->plugin)->cogl_context;
 
   if (global->frame_timestamps && global->frame_finish_timestamp)
     {
@@ -946,9 +948,9 @@ global_stage_after_paint (ClutterStage     *stage,
       static void (*finish) (void);
 
       if (!finish)
-        load_gl_symbol ("glFinish", (void **)&finish);
+        load_gl_symbol (cogl_context, "glFinish", (void **)&finish);
 
-      cogl_flush ();
+      cogl_flush (cogl_context);
       finish ();
 
       shell_perf_log_event (shell_perf_log_get_default (),
