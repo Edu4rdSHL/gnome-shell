@@ -1,7 +1,7 @@
 include:
   - remote: 'https://gitlab.gnome.org/GNOME/citemplates/raw/HEAD/flatpak/flatpak_ci_initiative.yml'
   - remote: 'https://gitlab.freedesktop.org/freedesktop/ci-templates/-/raw/057b052e682d8e5a20c1eb2dd60d5b87d2b56856/templates/fedora.yml'
-  - remote: 'https://gitlab.freedesktop.org/freedesktop/ci-templates/-/raw/34f4ade99434043f88e164933f570301fd18b125/templates/ci-fairy.yml'
+  - remote: 'https://gitlab.freedesktop.org/freedesktop/ci-templates/-/raw/bc70242ffb8402243e934659ecc1a2d1c89eca2b/templates/ci-fairy.yml'
   - project: 'Infrastructure/openshift-images/gnome-release-service'
     file: '/ci-templates/release-module.yml'
 
@@ -43,7 +43,7 @@ workflow:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH'
 
-.pipeline_guard: &pipeline_guard
+.pipeline-guard:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_TAG'
@@ -94,7 +94,8 @@ check_commit_log:
       else
         echo "Not a merge request" ;
       fi
-  <<: *pipeline_guard
+  rules:
+    - !reference [.pipeline-guard, rules]
   artifacts:
     expire_in: 1 week
     paths:
@@ -113,7 +114,8 @@ check-merge-request:
       else
         echo "Not a merge request" ;
       fi
-  <<: *pipeline_guard
+  rules:
+    - !reference [.pipeline-guard, rules]
   artifacts:
     expire_in: 1 week
     paths:
@@ -188,8 +190,6 @@ potfile_js_check:
 build:
   stage: build
   needs: ["check_commit_log"]
-  variables:
-    GIT_SUBMODULE_STRATEGY: normal
   before_script:
     - .gitlab-ci/checkout-mutter.sh
     - meson mutter mutter/build --prefix=/usr
@@ -203,12 +203,12 @@ build:
     paths:
       - mutter
       - build
+      - subprojects/gvc
 
 test:
   stage: test
   needs: ["build"]
   variables:
-    GIT_SUBMODULE_STRATEGY: normal
     XDG_RUNTIME_DIR: "$CI_PROJECT_DIR/runtime-dir"
     NO_AT_BRIDGE: "1"
   before_script:
@@ -232,8 +232,6 @@ test-coverity:
   needs: ["build"]
   stage: analyze
   allow_failure: true
-  variables:
-    GIT_SUBMODULE_STRATEGY: normal
   before_script:
     - sudo meson install -C mutter/build
   script:
@@ -275,9 +273,6 @@ distinfo:
     reports:
       dotenv: dist.env
     paths:
-      - build
-      - mutter
-      - subprojects/jasmine-gjs
       - dist.env
   rules:
     - if: '$CI_COMMIT_TAG'
@@ -286,7 +281,6 @@ dist:
   variables:
     XDG_RUNTIME_DIR: "$CI_PROJECT_DIR/runtime-dir"
     NO_AT_BRIDGE: "1"
-    GIT_SUBMODULE_STRATEGY: normal
   stage: deploy
   needs: ["build"]
   before_script:
@@ -303,6 +297,7 @@ dist:
 dist-tarball:
   extends: dist
   needs:
+    - build
     - distinfo
   artifacts:
     expose_as: 'Get tarball here'

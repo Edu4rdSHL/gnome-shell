@@ -67,12 +67,12 @@ gnome_shell_deps = [
   mtk_dep,
   clutter_dep,
   cogl_pango_dep,
-  startup_dep,
   gi_dep,
   polkit_dep,
   gcr_dep,
   libsystemd_dep,
   libpipewire_dep,
+  x11_dep,
 ]
 
 gnome_shell_deps += nm_deps
