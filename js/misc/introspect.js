@@ -44,7 +44,25 @@ export class IntrospectService {
         });
 
         tracker.connect('tracked-windows-changed',
-            () => this._dbusImpl.emit_signal('WindowsChanged', null));
+            (self, window, app, action) => {
+                if (!this._isEligibleWindow(window))
+                    return;
+                let windowDict = this._getWindowDict(window, app);
+                let windowVariant = new GLib.Variant('(a{sv})', [windowDict]);
+                switch (action) {
+                case Shell.WindowTrackerAction.ADDED:
+                    this._dbusImpl.emit_signal('WindowAdded', windowVariant);
+                    break;
+                case Shell.WindowTrackerAction.CHANGED:
+                    this._dbusImpl.emit_signal('WindowChanged', windowVariant);
+                    break;
+                case Shell.WindowTrackerAction.REMOVED:
+                    this._dbusImpl.emit_signal('WindowRemoved', windowVariant);
+                    break;
+                default:
+                    log(`Incorrect window action ${action}`);
+                }
+            });
 
         this._syncRunningApplications();
 
@@ -121,6 +139,38 @@ export class IntrospectService {
             type === Meta.WindowType.UTILITY;
     }
 
+    _getWindowDict(window, app) {
+        let focusWindow = global.display.get_focus_window();
+        let windowId = window.get_id();
+        let frameRect = window.get_frame_rect();
+        let title = window.get_title();
+        let wmClass = window.get_wm_class();
+        let sandboxedAppId = window.get_sandboxed_app_id();
+        let windowDict = {
+            'app-id': GLib.Variant.new('s', app.get_id()),
+            'client-type': GLib.Variant.new('u', window.get_client_type()),
+            'id': GLib.Variant.new('t', windowId),
+            'is-hidden': GLib.Variant.new('b', window.is_hidden()),
+            'has-focus': GLib.Variant.new('b', window === focusWindow),
+            'width': GLib.Variant.new('u', frameRect.width),
+            'height': GLib.Variant.new('u', frameRect.height),
+        };
+
+        // These properties may not be available for all windows:
+        if (title != null)
+            windowDict['title'] = GLib.Variant.new('s', title);
+
+        if (wmClass != null)
+            windowDict['wm-class'] = GLib.Variant.new('s', wmClass);
+
+        if (sandboxedAppId != null) {
+            windowDict['sandboxed-app-id'] =
+                GLib.Variant.new('s', sandboxedAppId);
+        }
+
+        return windowDict;
+    }
+
     async GetRunningApplicationsAsync(params, invocation) {
         try {
             await this._senderChecker.checkInvocation(invocation);
@@ -133,7 +183,6 @@ export class IntrospectService {
     }
 
     async GetWindowsAsync(params, invocation) {
-        let focusWindow = global.display.get_focus_window();
         let apps = this._appSystem.get_running();
         let windowsList = {};
 
@@ -151,31 +200,8 @@ export class IntrospectService {
                     continue;
 
                 let windowId = window.get_id();
-                let frameRect = window.get_frame_rect();
-                let title = window.get_title();
-                let wmClass = window.get_wm_class();
-                let sandboxedAppId = window.get_sandboxed_app_id();
-
-                windowsList[windowId] = {
-                    'app-id': GLib.Variant.new('s', app.get_id()),
-                    'client-type': GLib.Variant.new('u', window.get_client_type()),
-                    'is-hidden': GLib.Variant.new('b', window.is_hidden()),
-                    'has-focus': GLib.Variant.new('b', window === focusWindow),
-                    'width': GLib.Variant.new('u', frameRect.width),
-                    'height': GLib.Variant.new('u', frameRect.height),
-                };
-
-                // These properties may not be available for all windows:
-                if (title != null)
-                    windowsList[windowId]['title'] = GLib.Variant.new('s', title);
-
-                if (wmClass != null)
-                    windowsList[windowId]['wm-class'] = GLib.Variant.new('s', wmClass);
-
-                if (sandboxedAppId != null) {
-                    windowsList[windowId]['sandboxed-app-id'] =
-                        GLib.Variant.new('s', sandboxedAppId);
-                }
+                let windowDict = this._getWindowVariant(window, app);
+                windowsList[windowId] = new GLib.Variant('a{sv}', windowDict);
             }
         }
         invocation.return_value(new GLib.Variant('(a{ta{sv}})', [windowsList]));
