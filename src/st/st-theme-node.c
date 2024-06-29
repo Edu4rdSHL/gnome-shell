@@ -75,6 +75,10 @@ maybe_free_properties (StThemeNode *node)
       cr_declaration_destroy (node->inline_properties);
       node->inline_properties = NULL;
     }
+
+  g_clear_signal_handler (&node->stylesheets_changed_id, node->theme);
+
+  node->properties_computed = FALSE;
 }
 
 static void
@@ -102,6 +106,7 @@ st_theme_node_dispose (GObject *gobject)
 
   st_theme_node_paint_state_free (&node->cached_state);
 
+  maybe_free_properties (node);
   g_clear_object (&node->theme);
 
   G_OBJECT_CLASS (st_theme_node_parent_class)->dispose (gobject);
@@ -116,8 +121,6 @@ st_theme_node_finalize (GObject *object)
   g_strfreev (node->element_classes);
   g_strfreev (node->pseudo_classes);
   g_free (node->inline_style);
-
-  maybe_free_properties (node);
 
   g_clear_pointer (&node->font_desc, pango_font_description_free);
 
@@ -471,6 +474,16 @@ ensure_properties (StThemeNode *node)
         {
           node->n_properties = properties->len;
           node->properties = (CRDeclaration **)g_ptr_array_free (properties, FALSE);
+        }
+
+      if (!node->stylesheets_changed_id)
+        {
+          node->stylesheets_changed_id =
+            g_signal_connect_object (node->theme,
+                                     "custom-stylesheets-changed",
+                                     G_CALLBACK (maybe_free_properties),
+                                     G_OBJECT (node),
+                                     G_CONNECT_SWAPPED);
         }
     }
 }
