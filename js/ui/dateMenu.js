@@ -800,7 +800,7 @@ class MessagesIndicator extends St.Icon {
     }
 });
 
-const FreezableBinLayout = GObject.registerClass(
+export const FreezableBinLayout = GObject.registerClass(
 class FreezableBinLayout extends Clutter.BinLayout {
     _init() {
         super._init();
@@ -922,6 +922,11 @@ class DateMenuButton extends PanelMenu.Button {
         this._messageList = new Calendar.CalendarMessageList();
         hbox.add_child(this._messageList);
 
+        // Collapse notification groups when the user clicks outside of the expanded group
+        this.menu.actor.connect('captured-event', (_, event) => {
+            return this._messageList.maybeCollapseForEvent(event);
+        });
+
         // Fill up the second column
         const boxLayout = new CalendarColumnLayout([this._calendar, this._date]);
         const vbox = new St.Widget({
@@ -1002,5 +1007,7 @@ class DateMenuButton extends PanelMenu.Button {
         // but the corresponding app (clocks, weather); however we can consider
         // that display-specific settings, so re-use "allowSettings" here ...
         this._displaysSection.visible = Main.sessionMode.allowSettings;
+
+        this._messageList.visible = Main.sessionMode.hasNotifications && !Main.sessionMode.isGreeter;
     }
 });

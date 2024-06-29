@@ -25,17 +25,18 @@
   }
 }
 
-.message-list-sections {
+.message-view {
   // to account for scrollbar
   &:ltr {margin-right: $base_margin * 3; }
   &:rtl {margin-left: $base_margin * 3;}
 
-  spacing: $base_padding * 2;
-}
+  .message {
+    margin-bottom: $base_padding * 2 !important;
+  }
 
-.message-list-section,
-.message-list-section-list {
-  spacing: $base_padding * 2;
+  > :last-child > .message {
+    margin-bottom: 0 !important;
+  }
 }
 
 // do-not-disturb + clear button
@@ -58,6 +59,30 @@
     &:focus {
       border-color: st-transparentize(-st-accent-color, 0.4);
     }
+  }
+}
+
+// message notification group
+.message-notification-group {
+  spacing: $base_padding * 2;
+
+  .message-group-header {
+    padding: $base_padding;
+    .message-group-title {
+      @extend %title_2;
+      margin: 0 $base_margin;
+    }
+  }
+
+  // close button
+  .message-collapse-button {
+    @extend .icon-button;
+    color: $fg_color;
+    background-color: transparentize($fg_color, 0.8);
+    padding: 4px !important;
+    border: 4px transparent solid;
+    &:hover {background-color: transparentize($fg_color, 0.7);}
+    &:active {background-color: transparentize($fg_color, 0.8);}
   }
 }
 

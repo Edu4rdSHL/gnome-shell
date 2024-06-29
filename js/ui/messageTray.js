@@ -8,7 +8,6 @@ import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 
-import * as Calendar from './calendar.js';
 import * as GnomeSession from '../misc/gnomeSession.js';
 import * as Layout from './layout.js';
 import * as Main from './main.js';
@@ -17,15 +16,13 @@ import * as SignalTracker from '../misc/signalTracker.js';
 
 const SHELL_KEYBINDINGS_SCHEMA = 'org.gnome.shell.keybindings';
 
-export const ANIMATION_TIME = 200;
-
 const NOTIFICATION_TIMEOUT = 4000;
 
 const HIDE_TIMEOUT = 200;
 const LONGER_HIDE_TIMEOUT = 600;
 
 const MAX_NOTIFICATIONS_IN_QUEUE = 3;
-const MAX_NOTIFICATIONS_PER_SOURCE = 3;
+const MAX_NOTIFICATIONS_PER_SOURCE = 10;
 
 // We delay hiding of the tray if the mouse is within MOUSE_LEFT_ACTOR_THRESHOLD
 // range from the point where it left the tray.
@@ -597,13 +594,6 @@ export const Source = GObject.registerClass({
     // To be overridden by subclasses
     open() {
     }
-
-    destroyNonResidentNotifications() {
-        for (let i = this.notifications.length - 1; i >= 0; i--) {
-            if (!this.notifications[i].resident)
-                this.notifications[i].destroy();
-        }
-    }
 });
 SignalTracker.registerDestroyableType(Source);
 
@@ -1111,7 +1101,7 @@ export const MessageTray = GObject.registerClass({
             this.idleMonitor.add_user_active_watch(this._onIdleMonitorBecameActive.bind(this));
         }
 
-        this._banner = new Calendar.NotificationMessage(this._notification);
+        this._banner = new MessageList.NotificationMessage(this._notification);
         this._banner.can_focus = false;
         this._banner._header.expandButton.visible = false;
         this._banner.add_style_class_name('notification-banner');
@@ -1167,12 +1157,12 @@ export const MessageTray = GObject.registerClass({
         this._bannerBin.remove_all_transitions();
         this._bannerBin.ease({
             opacity: 255,
-            duration: ANIMATION_TIME,
+            duration: MessageList.MESSAGE_ANIMATION_TIME,
             mode: Clutter.AnimationMode.LINEAR,
         });
         this._bannerBin.ease({
             y: 0,
-            duration: ANIMATION_TIME,
+            duration: MessageList.MESSAGE_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_BACK,
             onComplete: () => {
                 this._notificationState = State.SHOWN;
@@ -1232,7 +1222,7 @@ export const MessageTray = GObject.registerClass({
         this._resetNotificationLeftTimeout();
         this._bannerBin.remove_all_transitions();
 
-        const duration = animate ? ANIMATION_TIME : 0;
+        const duration = animate ? MessageList.MESSAGE_ANIMATION_TIME : 0;
         this._notificationState = State.HIDING;
         this._bannerBin.ease({
             opacity: 0,
