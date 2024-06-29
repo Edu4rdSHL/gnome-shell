@@ -18,6 +18,18 @@ import {ControlsState} from './overviewControls.js';
 const GnomeShellIface = loadInterfaceXML('org.gnome.Shell');
 const ScreenSaverIface = loadInterfaceXML('org.gnome.ScreenSaver');
 
+
+function dbg_(v) {
+    console.error(v);
+    return v;
+}
+
+
+const eqSet = (xs, ys) =>
+    xs.size === ys.size &&
+    [...xs].every(x => ys.has(x));
+
+
 export class GnomeShell {
     constructor() {
         this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(GnomeShellIface, this);
@@ -34,9 +46,23 @@ export class GnomeShell {
         this._grabbedAccelerators = new Map();
         this._grabbers = new Map();
 
+        /* session: string → [
+         *      sender: string,
+         *      [(
+         *          name: string,
+         *          shortcuts: [trigger: string, action: int],
+         *      )]
+         * ]
+         */
+        this._accelerators = new Map();
+
         global.display.connect('accelerator-activated',
             (display, action, device, timestamp) => {
                 this._emitAcceleratorActivated(action, device, timestamp);
+            });
+        global.display.connect('accelerator-deactivated',
+            (display, action, device, timestamp) => {
+                this._emitAcceleratorDeactivated(action, device, timestamp);
             });
 
         this._cachedOverviewVisible = false;
@@ -194,6 +220,66 @@ export class GnomeShell {
         invocation.return_value(null);
     }
 
+    async BindShortcutsAsync(params, invocation) {
+        try {
+            await this._senderChecker.checkInvocation(invocation);
+        } catch (e) {
+            invocation.return_gerror(e);
+            return;
+        }
+
+        let [groupId, shortcuts] = params;
+
+        let [remainingShortcuts, changed] = this._bindShortcuts(groupId, shortcuts, invocation.get_sender());
+
+        invocation.return_value(GLib.Variant.new(
+            '(a{sv}u)',
+            [
+                {'shortcuts': GLib.Variant.new('a(sa{sv})', remainingShortcuts)},
+                changed,
+            ]
+        ));
+    }
+
+
+    async UnbindShortcutsAsync(params, invocation) {
+        try {
+            await this._senderChecker.checkInvocation(invocation);
+        } catch (e) {
+            invocation.return_gerror(e);
+            return;
+        }
+        let [groupId] = params;
+
+        this._bindShortcuts(groupId, [], invocation.get_sender());
+
+        invocation.return_value(null);
+    }
+
+
+    async ListShortcutsAsync(params, invocation) {
+        try {
+            await this._senderChecker.checkInvocation(invocation);
+        } catch (e) {
+            invocation.return_gerror(e);
+            return;
+        }
+
+        let [groupId] = params;
+        if (this._accelerators.has(groupId)) {
+            invocation.return_value(GLib.Variant.new(
+                '(a{sv})',
+                [{'shortcuts': GLib.Variant.new('a(sa{sv})', this._listShortcuts(groupId))}]
+            ));
+        } else {
+            invocation.return_error_literal(
+                Gio.DBusError,
+                Gio.DBusError.INVALID_ARGS,
+                'No such group'
+            );
+        }
+    }
+
     async GrabAcceleratorAsync(params, invocation) {
         try {
             await this._senderChecker.checkInvocation(invocation);
@@ -272,28 +358,206 @@ export class GnomeShell {
         invocation.return_value(null);
     }
 
-    _emitAcceleratorActivated(action, device, timestamp) {
+    _bindShortcuts(groupId, shortcuts, sender) {
+        let cleanedShortcuts = shortcuts.map(([name, info]) => [
+            name,
+            info['shortcuts'] ? info['shortcuts'].unpack() : [],
+            info['description'] ? info['description'].unpack() : undefined,
+        ]);
+
+        let existing = [];
+
+        if (this._accelerators.has(groupId)) {
+            let [sender_, ex] = this._accelerators.get(groupId);
+            existing = ex;
+        }
+
+        // MDN says the last key is the one preserved in the final Map.
+        let descriptions = new Map([
+            ...existing.map(([name, _, desc]) => [name, desc]),
+            ...cleanedShortcuts.map(([name, _, desc]) => [name, desc]),
+        ]);
+
+        let requested = new Map(cleanedShortcuts);
+        // Shortcuts to (re)bind.
+        let changed = [];
+        // The following 2 mark things to unbind.
+        // Names may get immediately be bound again.
+        let removedNames = [];
+
+        for (let [name, actions, desc_] of existing) {
+            if (requested.has(name)) {
+                let reqTriggers = requested.get(name);
+                let triggers = actions.map(([trigger, _]) => trigger);
+                const unpack = arr => arr.map(t => t.unpack());
+                if (!eqSet(new Set(unpack(reqTriggers)), new Set(unpack(triggers)))) {
+                    changed.push([name, reqTriggers]);
+                    removedNames.push(name);
+                }
+            } else {
+                removedNames.push(name);
+            }
+        }
+
+        let present = new Map(existing);
+        for (let [name, triggers, desc_] of cleanedShortcuts) {
+            if (!present.has(name))
+                changed.push([name, triggers]);
+        }
+
+        let addedShortcuts = changed.map(([name, triggers]) => [name, triggers, descriptions.get(name)]);
+
+        // FIXME: is this a race condition? Can input events be processed between these calls?
+        if (removedNames.length > 0)
+            this._unbindShortcuts(groupId, removedNames);
+
+        this._bindShortcutsForSender(groupId, addedShortcuts, sender);
+
+        let kept = new Map(changed);
+        let removedIds = removedNames.filter(name => !kept.has(name));
+
+        let remainingShortcuts = this._listShortcuts(groupId);
+        if (remainingShortcuts.length === 0)
+            this._accelerators.delete(groupId);
+        return [remainingShortcuts, 0 + (changed.length + removedIds.length > 0)];
+    }
+
+    // Each shortcut is being bound separately and as a whole.
+    // If there's an existing bound shortcut with the same name,
+    // the new one will not take effect.
+    _bindShortcutsForSender(groupId, shortcuts, sender) {
+        let [sender_, existing] = this._accelerators.get(groupId) || [null, []];
+
+        let existingNames = new Set(existing.map(([name, _actions, _desc]) => name));
+
+        let addedShortcuts = [];
+        for (let [name, triggers, description] of shortcuts) {
+            if (existingNames.has(name)) {
+                console.error('Tried to bind over an existing shortcut', name, 'in group', groupId);
+                continue;
+            }
+            let actions = [];
+            for (let trigger of triggers) {
+                let bindingAction = this._grabAcceleratorForSender(
+                    trigger.unpack(),
+                    Shell.ActionMode.ALL,
+                    Meta.KeyBindingFlags.TRIGGER_RELEASE,
+                    sender
+                );
+                actions.push([trigger, bindingAction]);
+            }
+            addedShortcuts.push([name, actions, description]);
+        }
+
+        this._accelerators.set(groupId, [sender, existing.concat(addedShortcuts)]);
+    }
+
+    _listShortcuts(groupId) {
+        let [sender_, rawShortcuts] = this._accelerators.get(groupId);
+
+        function shortcutToDbus(name, triggers, description) {
+            let info = {'trigger_description': GLib.Variant.new('as', triggers.map(t => t.unpack()))};
+            if (description !== undefined)
+                info.description = GLib.Variant.new('s', description);
+
+            return [name, info];
+        }
+
+        return rawShortcuts.map(
+            ([name, shortcuts, description]) => shortcutToDbus(
+                name,
+                shortcuts.map(([trigger, _]) => trigger),
+                description
+            )
+        );
+    }
+
+    _unbindShortcuts(groupId, names) {
+        let namesSet = new Set(names);
+        let [sender, rawShortcuts] = this._accelerators.get(groupId);
+        let ungrabFailed = 0;
+        let newRaw = [];
+
+        for (let [name, shortcuts, desc] of rawShortcuts) {
+            if (namesSet.has(name)) {
+                for (let [trigger_, action] of shortcuts)
+                    ungrabFailed += this._ungrabAcceleratorForSender(action, sender) ? 0 : 1;
+            } else {
+                newRaw.push([name, shortcuts, desc]);
+            }
+        }
+
+        if (ungrabFailed)
+            console.error(`Failed to remove ${ungrabFailed} shortcuts for ${groupId}`);
+
+
+        if (newRaw.length > 0)
+            this._accelerators.set(groupId, [sender, newRaw]);
+        else
+            this._accelerators.delete(groupId);
+
+        console.warn(`Some shortcuts were unbound in group ${groupId}`);
+    }
+
+    _emitAcceleratorTriggered(action, device, timestamp, activated) {
         let destination = this._grabbedAccelerators.get(action);
         if (!destination)
             return;
 
         let connection = this._dbusImpl.get_connection();
         let info = this._dbusImpl.get_info();
-        let params = {
-            'timestamp': GLib.Variant.new('u', timestamp),
-            'action-mode': GLib.Variant.new('u', Main.actionMode),
-        };
+        let shortcutData;
+        for (let [group, data] of this._accelerators) {
+            let [sender, rawShortcuts] = data;
+            if (sender === destination) {
+                for (let [name, shortcuts] of rawShortcuts) {
+                    for (let [_, savedAction] of shortcuts) {
+                        if (action === savedAction) {
+                            shortcutData = [group, name];
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
-        let deviceNode = device.get_device_node();
-        if (deviceNode)
-            params['device-node'] = GLib.Variant.new('s', deviceNode);
+        if (shortcutData === undefined) {
+            if (!activated)
+                return;
 
-        connection.emit_signal(
-            destination,
-            this._dbusImpl.get_object_path(),
-            info?.name ?? null,
-            'AcceleratorActivated',
-            GLib.Variant.new('(ua{sv})', [action, params]));
+            let params = {
+                'timestamp': GLib.Variant.new('u', timestamp),
+                'action-mode': GLib.Variant.new('u', Main.actionMode),
+            };
+
+            let deviceNode = device.get_device_node();
+            if (deviceNode)
+                params['device-node'] = GLib.Variant.new('s', deviceNode);
+
+            connection.emit_signal(
+                destination,
+                this._dbusImpl.get_object_path(),
+                info?.name ?? null,
+                'AcceleratorActivated',
+                GLib.Variant.new('(ua{sv})', [action, params]));
+        } else {
+            let [group, name] = shortcutData;
+
+            connection.emit_signal(
+                destination,
+                this._dbusImpl.get_object_path(),
+                info?.name ?? null,
+                activated ? 'Activated' : 'Deactivated',
+                GLib.Variant.new('(sst)', [group, name, timestamp]));
+        }
+    }
+
+    _emitAcceleratorActivated(action, device, timestamp) {
+        return this._emitAcceleratorTriggered(action, device, timestamp, true);
+    }
+
+    _emitAcceleratorDeactivated(action, device, timestamp) {
+        return this._emitAcceleratorTriggered(action, device, timestamp, false);
     }
 
     _grabAcceleratorForSender(accelerator, modeFlags, grabFlags, sender) {
@@ -336,6 +600,10 @@ export class GnomeShell {
         for (let [action, sender] of grabs) {
             if (sender === name)
                 this._ungrabAccelerator(action);
+        }
+        for (let [session, [sender, data_]] of this._accelerators) {
+            if (sender === name)
+                this._accelerators.delete(session);
         }
         Gio.bus_unwatch_name(this._grabbers.get(name));
         this._grabbers.delete(name);

@@ -17,9 +17,82 @@
       <arg type="s" direction="in" name="id"/>
     </method>
     <method name="ShowApplications"/>
+
+    <!-- START SHORTCUTS
+    Designed to handle shortcuts for the globalshortcuts portal.
+    `group_id` identifies a group of shortcuts meant to be modified together.
+    -->
+
+    <!-- (Re)binds shortcuts according to spec.
+    `shortcuts` is made of pairs:
+    (id: s, {'shortcuts'=Variant(as)})
+    for example:
+    ('sstop', {'description': 'Stop the show', 'shortcuts': <['<alt>C', '<ctrl>Q']>})
+
+    `results['shortcuts']` is the list of shortcuts now in effect:
+    (id: s, {'trigger_description'=Variant(s)})
+    for example:
+    ('sstop', {'description': 'Stop the show', 'trigger_description': <['hold alt and then C', 'the Q key while holding Control']>})
+    'trigger_description's are free-form, human-readable text.
+
+    `changed` is nonzero if registered shortcuts changed because of this call, zero otherwise.
+
+    The 'description' key is optional.
+
+    FIXME: trigger release events when a combo is being pressed while unbinding?
+    -->
+    <method name="BindShortcuts">
+      <arg type="s" name="group_id" direction="in"/>
+      <arg type="a(sa{sv})" name="shortcuts" direction="in"/>
+      <arg type="a{sv}" name="results" direction="out"/>
+      <arg type="u" name="changed" direction="out"/>
+    </method>
+
+    <!-- Unbinds shortcuts in the selected group.
+    Equivalent to calling BindShortcuts with an empty list.
+    -->
+    <method name="UnbindShortcuts">
+      <arg type="s" name="group_id" direction="in"/>
+    </method>
+
+    <!-- Lists all shortcuts of the group, together with their triggers.
+    If the group never bound shortcuts, this returns an error.
+
+    `results['shortcuts']` is a list of pairs:
+    (id: s, {'description'=Variant(s), 'trigger_description'=Variant(as))})
+    for example:
+    ('sstop', {'description': 'Stop the show', 'trigger_description': <['hold alt and then C', 'the Q key while holding Control']>})
+
+    The 'description' key is optional.
+    -->
+    <method name="ListShortcuts">
+      <arg type="s" name="group_id" direction="in"/>
+      <arg type="a{sv}" name="results" direction="out"/>
+    </method>
+
+    <!-- Sent whenever a registered combo becomes pressed.
+    Sent back to the client that registered it. -->
+    <signal name="Activated">
+      <arg type="s" name="group_id" direction="out"/>
+      <arg type="s" name="shortcut_id" direction="out"/>
+      <arg type="t" name="timestamp" direction="out"/>
+    </signal>
+
+    <!-- Sent whenever a registered combo stops being pressed.
+    Sent back to the client that registered it. -->
+    <signal name="Deactivated">
+      <arg type="s" name="group_id" direction="out"/>
+      <arg type="s" name="shortcut_id" direction="out"/>
+      <arg type="t" name="timestamp" direction="out"/>
+    </signal>
+
+    <!-- END SHORTCUTS -->
+
     <method name="GrabAccelerator">
       <arg type="s" direction="in" name="accelerator"/>
+      <!-- Shell.ActionMode -->
       <arg type="u" direction="in" name="modeFlags"/>
+      <!-- Meta.KeyBindingFlags -->
       <arg type="u" direction="in" name="grabFlags"/>
       <arg type="u" direction="out" name="action"/>
     </method>
