@@ -1505,10 +1505,14 @@ export const Keyboard = GObject.registerClass({
                         this._disableAllModifiers();
                         if (layout.mode === 'default' ||
                             (layout.mode === 'latched' && !this._latched)) {
-                            if (this._contentHint !== 0)
+                            if (this._contentHint !== 0) {
+                                if (layout.mode === 'latched' && !this._latched)
+                                    this._setActiveLevel('default');
+
                                 this._updateLevelFromHints();
-                            else
+                            } else {
                                 this._setActiveLevel('default');
+                            }
                         }
                     }).catch(console.error);
                 });
