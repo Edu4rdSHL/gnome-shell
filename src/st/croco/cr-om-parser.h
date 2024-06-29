@@ -42,7 +42,6 @@
 G_BEGIN_DECLS
 
 typedef struct _CROMParser CROMParser ;
-typedef struct _CROMParserPriv CROMParserPriv ;
 
 /**
  *The Object model parser.
@@ -52,7 +51,7 @@ typedef struct _CROMParserPriv CROMParserPriv ;
  */
 struct _CROMParser
 {
-        CROMParserPriv *priv ;
+        gpointer dummy;
 } ;
 
 CROMParser * cr_om_parser_new (CRInput *a_input) ;

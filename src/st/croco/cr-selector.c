@@ -40,13 +40,13 @@ cr_selector_new (CRSimpleSel * a_simple_sel)
 {
         CRSelector *result = NULL;
 
-        result = g_try_malloc (sizeof (CRSelector));
+        result = g_try_malloc0 (sizeof (CRSelector));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRSelector));
         result->simple_sel = a_simple_sel;
+        g_ref_count_init (&result->ref_count);
         return result;
 }
 
@@ -120,7 +120,7 @@ cr_selector_append_simple_sel (CRSelector * a_this,
         selector = cr_selector_new (a_simple_sel);
         g_return_val_if_fail (selector, NULL);
 
-        return cr_selector_append (a_this, selector);
+        return cr_selector_append (a_this, g_steal_pointer (&selector));
 }
 
 guchar *
@@ -200,7 +200,7 @@ cr_selector_ref (CRSelector * a_this)
 {
         g_return_if_fail (a_this);
 
-        a_this->ref_count++;
+        g_ref_count_inc (&a_this->ref_count);
 }
 
 /**
@@ -221,11 +221,7 @@ cr_selector_unref (CRSelector * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        if (a_this->ref_count) {
-                a_this->ref_count--;
-        }
-
-        if (a_this->ref_count == 0) {
+        if (g_ref_count_dec (&a_this->ref_count)) {
                 cr_selector_destroy (a_this);
                 return TRUE;
         }

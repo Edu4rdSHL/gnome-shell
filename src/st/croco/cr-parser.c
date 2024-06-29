@@ -105,7 +105,7 @@ enum CRParserState {
  *The private attributes of
  *#CRParser.
  */
-struct _CRParserPriv {
+typedef struct _CRParserReal {
         /**
          *The tokenizer
          */
@@ -130,9 +130,9 @@ struct _CRParserPriv {
         gboolean resolve_import;
         gboolean is_case_sensitive;
         gboolean use_core_grammar;
-};
+} CRParserReal;
 
-#define PRIVATE(obj) ((obj)->priv)
+#define PRIVATE(obj) ((CRParserReal *) obj)
 
 #define CHARS_TAB_SIZE 12
 
@@ -418,14 +418,12 @@ cr_parser_error_new (const guchar * a_msg, enum CRStatus a_status)
 {
         CRParserError *result = NULL;
 
-        result = g_try_malloc (sizeof (CRParserError));
+        result = g_try_malloc0 (sizeof (CRParserError));
 
         if (result == NULL) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-
-        memset (result, 0, sizeof (CRParserError));
 
         cr_parser_error_set_msg (result, a_msg);
         cr_parser_error_set_status (result, a_status);
@@ -525,8 +523,7 @@ cr_parser_push_error (CRParser * a_this,
         CRParserError *error = NULL;
         CRInputPos pos;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && a_msg, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && a_msg, CR_BAD_PARAM_ERROR);
 
         error = cr_parser_error_new (a_msg, a_status);
 
@@ -568,7 +565,7 @@ cr_parser_dump_err_stack (CRParser * a_this, gboolean a_clear_errs)
 {
         GList *cur = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->err_stack == NULL)
                 return CR_OK;
@@ -594,7 +591,7 @@ cr_parser_clear_errors (CRParser * a_this)
 {
         GList *cur = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         for (cur = PRIVATE (a_this)->err_stack; cur; cur = cur->next) {
                 if (cur->data) {
@@ -626,7 +623,7 @@ cr_parser_try_to_skip_spaces_and_comments (CRParser * a_this)
         enum CRStatus status = CR_ERROR;
         CRToken *token = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && PRIVATE (a_this)->tknzr, CR_BAD_PARAM_ERROR);
         do {
                 if (token) {
@@ -683,7 +680,7 @@ cr_parser_parse_stylesheet_core (CRParser * a_this)
         CRInputPos init_pos;
         enum CRStatus status = CR_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -765,7 +762,7 @@ cr_parser_parse_atrule_core (CRParser * a_this)
         CRInputPos init_pos;
         enum CRStatus status = CR_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -840,7 +837,7 @@ cr_parser_parse_ruleset_core (CRParser * a_this)
         CRInputPos init_pos;
         enum CRStatus status = CR_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
         RECORD_INITIAL_POS (a_this, &init_pos);
 
         status = cr_parser_parse_selector_core (a_this);
@@ -929,7 +926,7 @@ cr_parser_parse_selector_core (CRParser * a_this)
         CRInputPos init_pos;
         enum CRStatus status = CR_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -970,7 +967,7 @@ cr_parser_parse_block_core (CRParser * a_this,
         CRInputPos init_pos;
         enum CRStatus status = CR_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         if (n_calls > RECURSIVE_CALLERS_LIMIT)
                 return CR_ERROR;
@@ -1043,7 +1040,7 @@ cr_parser_parse_declaration_core (CRParser * a_this)
         enum CRStatus status = CR_ERROR;
         CRString *prop = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -1099,7 +1096,7 @@ cr_parser_parse_value_core (CRParser * a_this)
         enum CRStatus status = CR_ERROR;
         glong ref = 0;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
         RECORD_INITIAL_POS (a_this, &init_pos);
 
       continue_parsing:
@@ -1481,8 +1478,7 @@ cr_parser_parse_property (CRParser * a_this,
         enum CRStatus status = CR_OK;
         CRInputPos init_pos;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->tknzr
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->tknzr
                               && a_property, 
                               CR_BAD_PARAM_ERROR);
 
@@ -1617,9 +1613,7 @@ cr_parser_parse_term (CRParser * a_this, CRTerm ** a_term)
         }
         cr_parsing_location_copy (&result->location,
                                   &location) ;
-        *a_term = cr_term_append_term (*a_term, result);
-
-        result = NULL;
+        *a_term = cr_term_append_term (*a_term, g_steal_pointer (&result));
 
         cr_parser_try_to_skip_spaces_and_comments (a_this);
 
@@ -1947,10 +1941,7 @@ cr_parser_parse_simple_sels (CRParser * a_this,
         CRSimpleSel *sel = NULL;
         guint32 cur_char = 0;
 
-        g_return_val_if_fail (a_this                               
-                              && PRIVATE (a_this)
-                              && a_sel,
-                              CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && a_sel, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -2146,7 +2137,7 @@ cr_parser_parse_function (CRParser * a_this,
         CRToken *token = NULL;
         CRTerm *expr = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && a_func_name,
                               CR_BAD_PARAM_ERROR);
 
@@ -2228,7 +2219,7 @@ cr_parser_parse_uri (CRParser * a_this, CRString ** a_str)
 
         enum CRStatus status = CR_PARSING_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && PRIVATE (a_this)->tknzr, CR_BAD_PARAM_ERROR);
 
         status = cr_tknzr_parse_token (PRIVATE (a_this)->tknzr,
@@ -2258,7 +2249,7 @@ cr_parser_parse_string (CRParser * a_this, CRString ** a_str)
 {
         enum CRStatus status = CR_OK;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && PRIVATE (a_this)->tknzr
                               && a_str, CR_BAD_PARAM_ERROR);
 
@@ -2286,7 +2277,7 @@ cr_parser_parse_ident (CRParser * a_this, CRString ** a_str)
 {
         enum CRStatus status = CR_OK;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && PRIVATE (a_this)->tknzr
                               && a_str, CR_BAD_PARAM_ERROR);
 
@@ -2321,7 +2312,7 @@ cr_parser_parse_stylesheet (CRParser * a_this)
         CRToken *token = NULL;
         CRString *charset = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && PRIVATE (a_this)->tknzr, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -2766,9 +2757,7 @@ cr_parser_new (CRTknzr * a_tknzr)
         CRParser *result = NULL;
         enum CRStatus status = CR_OK;
 
-        result = g_malloc0 (sizeof (CRParser));
-
-        PRIVATE (result) = g_malloc0 (sizeof (CRParserPriv));
+        result = g_malloc0 (sizeof (CRParserReal));
 
         if (a_tknzr) {
                 status = cr_parser_set_tknzr (result, a_tknzr);
@@ -2808,11 +2797,11 @@ cr_parser_new_from_buf (guchar * a_buf,
         g_return_val_if_fail (input, NULL);
 
         result = cr_parser_new_from_input (input);
-        if (!result) {
-                cr_input_destroy (input);
-                input = NULL;
+        cr_input_unref (input);
+
+        if (!result)
                 return NULL;
-        }
+
         return result;
 }
 
@@ -2834,6 +2823,7 @@ cr_parser_new_from_input (CRInput * a_input)
         }
 
         result = cr_parser_new (tokenizer);
+        g_clear_pointer (&tokenizer, cr_tknzr_unref);
         g_return_val_if_fail (result, NULL);
 
         return result;
@@ -2859,6 +2849,7 @@ cr_parser_new_from_file (const guchar * a_file_uri, enum CREncoding a_enc)
         }
 
         result = cr_parser_new (tokenizer);
+        cr_tknzr_unref (tokenizer);
         g_return_val_if_fail (result, NULL);
         return result;
 }
@@ -2923,7 +2914,7 @@ cr_parser_set_default_sac_handler (CRParser * a_this)
         CRDocHandler *default_sac_handler = NULL;
         enum CRStatus status = CR_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         default_sac_handler = cr_doc_handler_new ();
 
@@ -2950,7 +2941,7 @@ enum CRStatus
 cr_parser_set_use_core_grammar (CRParser * a_this,
                                 gboolean a_use_core_grammar)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         PRIVATE (a_this)->use_core_grammar = a_use_core_grammar;
 
@@ -2968,7 +2959,7 @@ enum CRStatus
 cr_parser_get_use_core_grammar (CRParser const * a_this,
                                 gboolean * a_use_core_grammar)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         *a_use_core_grammar = PRIVATE (a_this)->use_core_grammar;
 
@@ -2993,7 +2984,7 @@ cr_parser_parse_file (CRParser * a_this,
         enum CRStatus status = CR_ERROR;
         CRTknzr *tknzr = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && a_file_uri, CR_BAD_PARAM_ERROR);
 
         tknzr = cr_tknzr_new_from_uri (a_file_uri, a_enc);
@@ -3001,6 +2992,7 @@ cr_parser_parse_file (CRParser * a_this,
         g_return_val_if_fail (tknzr != NULL, CR_ERROR);
 
         status = cr_parser_set_tknzr (a_this, tknzr);
+        cr_tknzr_unref (tknzr);
         g_return_val_if_fail (status == CR_OK, CR_ERROR);
 
         status = cr_parser_parse (a_this);
@@ -3030,8 +3022,7 @@ cr_parser_parse_expr (CRParser * a_this, CRTerm ** a_expr)
         guchar next_byte = 0;
         gulong nb_terms = 0;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && a_expr, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && a_expr, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -3134,7 +3125,7 @@ cr_parser_parse_prio (CRParser * a_this, CRString ** a_prio)
         CRInputPos init_pos;
         CRToken *token = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && a_prio
                               && *a_prio == NULL, CR_BAD_PARAM_ERROR);
 
@@ -3189,7 +3180,7 @@ cr_parser_parse_declaration (CRParser * a_this,
         CRTerm *expr = NULL;
         CRString *prio = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && a_property && a_expr
                               && a_important, CR_BAD_PARAM_ERROR);
 
@@ -3279,7 +3270,7 @@ cr_parser_parse_statement_core (CRParser * a_this)
         CRInputPos init_pos;
         enum CRStatus status = CR_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -3367,14 +3358,6 @@ cr_parser_parse_ruleset (CRParser * a_this)
 
         if (PRIVATE (a_this)->sac_handler
             && PRIVATE (a_this)->sac_handler->start_selector) {
-                /*
-                 *the selector is ref counted so that the parser's user
-                 *can choose to keep it.
-                 */
-                if (selector) {
-                        cr_selector_ref (selector);
-                }
-
                 PRIVATE (a_this)->sac_handler->start_selector
                         (PRIVATE (a_this)->sac_handler, selector);
                 start_selector = TRUE;
@@ -3387,9 +3370,6 @@ cr_parser_parse_ruleset (CRParser * a_this)
         status = cr_parser_parse_declaration (a_this, &property,
                                               &expr,
                                               &is_important);
-        if (expr) {
-                cr_term_ref (expr);
-        }
         if (status == CR_OK
             && PRIVATE (a_this)->sac_handler
             && PRIVATE (a_this)->sac_handler->property) {
@@ -3442,9 +3422,6 @@ cr_parser_parse_ruleset (CRParser * a_this)
                 status = cr_parser_parse_declaration (a_this, &property,
                                                       &expr, &is_important);
 
-                if (expr) {
-                        cr_term_ref (expr);
-                }
                 if (status == CR_OK
                     && PRIVATE (a_this)->sac_handler
                     && PRIVATE (a_this)->sac_handler->property) {
@@ -3725,9 +3702,7 @@ cr_parser_parse_media (CRParser * a_this)
         GList *media_list = NULL;
         CRParsingLocation location = {0} ;
 
-        g_return_val_if_fail (a_this 
-                              && PRIVATE (a_this), 
-                              CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -3980,9 +3955,6 @@ cr_parser_parse_page (CRParser * a_this)
          */
         if (PRIVATE (a_this)->sac_handler
             && PRIVATE (a_this)->sac_handler->property) {
-                if (css_expression)
-                        cr_term_ref (css_expression);
-
                 PRIVATE (a_this)->sac_handler->property
                         (PRIVATE (a_this)->sac_handler,
                          property, css_expression, important);
@@ -4034,7 +4006,6 @@ cr_parser_parse_page (CRParser * a_this)
                  */
                 if (PRIVATE (a_this)->sac_handler
                     && PRIVATE (a_this)->sac_handler->property) {
-                        cr_term_ref (css_expression);
                         PRIVATE (a_this)->sac_handler->property
                                 (PRIVATE (a_this)->sac_handler,
                                  property, css_expression, important);
@@ -4281,7 +4252,6 @@ cr_parser_parse_font_face (CRParser * a_this)
                 /*
                  *here, call the relevant SAC handler.
                  */
-                cr_term_ref (css_expression);
                 if (PRIVATE (a_this)->sac_handler &&
                     PRIVATE (a_this)->sac_handler->property) {
                         PRIVATE (a_this)->sac_handler->property
@@ -4316,7 +4286,6 @@ cr_parser_parse_font_face (CRParser * a_this)
                 /*
                  *here, call the relevant SAC handler.
                  */
-                cr_term_ref (css_expression);
                 if (PRIVATE (a_this)->sac_handler->property) {
                         PRIVATE (a_this)->sac_handler->property
                                 (PRIVATE (a_this)->sac_handler,
@@ -4387,7 +4356,7 @@ cr_parser_parse (CRParser * a_this)
 {
         enum CRStatus status = CR_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && PRIVATE (a_this)->tknzr, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->use_core_grammar == FALSE) {
@@ -4409,7 +4378,7 @@ cr_parser_parse (CRParser * a_this)
 enum CRStatus
 cr_parser_set_tknzr (CRParser * a_this, CRTknzr * a_tknzr)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->tknzr) {
                 cr_tknzr_unref (PRIVATE (a_this)->tknzr);
@@ -4436,8 +4405,7 @@ cr_parser_set_tknzr (CRParser * a_this, CRTknzr * a_tknzr)
 enum CRStatus
 cr_parser_get_tknzr (CRParser * a_this, CRTknzr ** a_tknzr)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && a_tknzr, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && a_tknzr, CR_BAD_PARAM_ERROR);
 
         *a_tknzr = PRIVATE (a_this)->tknzr;
         return CR_OK;
@@ -4457,9 +4425,7 @@ enum CRStatus
 cr_parser_get_parsing_location (CRParser const *a_this,
                                 CRParsingLocation *a_loc)
 {
-        g_return_val_if_fail (a_this 
-                              && PRIVATE (a_this)
-                              && a_loc, CR_BAD_PARAM_ERROR) ;
+        g_return_val_if_fail (a_this && a_loc, CR_BAD_PARAM_ERROR);
 
         return cr_tknzr_get_parsing_location 
                 (PRIVATE (a_this)->tknzr, a_loc) ;
@@ -4484,14 +4450,14 @@ cr_parser_parse_buf (CRParser * a_this,
         enum CRStatus status = CR_ERROR;
         CRTknzr *tknzr = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && a_buf, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && a_buf, CR_BAD_PARAM_ERROR);
 
         tknzr = cr_tknzr_new_from_buf ((guchar*)a_buf, a_len, a_enc, FALSE);
 
         g_return_val_if_fail (tknzr != NULL, CR_ERROR);
 
         status = cr_parser_set_tknzr (a_this, tknzr);
+        cr_tknzr_unref (tknzr);
         g_return_val_if_fail (status == CR_OK, CR_ERROR);
 
         status = cr_parser_parse (a_this);
@@ -4510,7 +4476,7 @@ cr_parser_parse_buf (CRParser * a_this,
 void
 cr_parser_destroy (CRParser * a_this)
 {
-        g_return_if_fail (a_this && PRIVATE (a_this));
+        g_return_if_fail (a_this);
 
         if (PRIVATE (a_this)->tknzr) {
                 if (cr_tknzr_unref (PRIVATE (a_this)->tknzr) == TRUE)
@@ -4527,13 +4493,5 @@ cr_parser_destroy (CRParser * a_this)
                 PRIVATE (a_this)->err_stack = NULL;
         }
 
-        if (PRIVATE (a_this)) {
-                g_free (PRIVATE (a_this));
-                PRIVATE (a_this) = NULL;
-        }
-
-        if (a_this) {
-                g_free (a_this);
-                a_this = NULL;  /*useless. Just for the sake of coherence */
-        }
+        g_free (a_this);
 }

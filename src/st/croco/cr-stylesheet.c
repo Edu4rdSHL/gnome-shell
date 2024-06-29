@@ -28,6 +28,27 @@
  *The definition of the #CRStyleSheet class
  */
 
+typedef struct {
+        CRStyleSheet stylesheet;
+
+        /**
+         *the reference count of this instance of #CRStyleSheet.
+         *It can be manipulated with cr_stylesheet_ref() and
+         *cr_stylesheet_unref()
+        */
+        grefcount ref_count;
+
+        /**
+         *custom application data pointer
+         *Can be used by applications.
+         *libcroco itself will handle its destruction
+         *if app_data_destroy_func is set via
+         *cr_stylesheet_set_app_data().
+         */
+        gpointer app_data;
+        GDestroyNotify app_data_destroy_func;
+} CRStyleSheetReal;
+
 /**
  *Constructor of the #CRStyleSheet class.
  *@param the initial list of css statements.
@@ -37,14 +58,16 @@ CRStyleSheet *
 cr_stylesheet_new (CRStatement * a_stmts)
 {
         CRStyleSheet *result;
+        CRStyleSheetReal *real;
 
-        result = g_try_malloc (sizeof (CRStyleSheet));
+        result = g_try_malloc0 (sizeof (CRStyleSheetReal));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CRStyleSheet));
+        real = (CRStyleSheetReal *) result;
+        g_ref_count_init (&real->ref_count);
 
         if (a_stmts)
                 result->statements = a_stmts;
@@ -136,28 +159,38 @@ cr_stylesheet_statement_get_from_list (CRStyleSheet * a_this, int itemnr)
         return cr_statement_get_from_list (a_this->statements, itemnr);
 }
 
-void
+CRStyleSheet *
 cr_stylesheet_ref (CRStyleSheet * a_this)
 {
-        g_return_if_fail (a_this);
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
 
-        a_this->ref_count++;
+        g_return_val_if_fail (a_this, NULL);
+
+        g_ref_count_inc (&real->ref_count);
+
+        return a_this;
 }
 
 gboolean
 cr_stylesheet_unref (CRStyleSheet * a_this)
 {
-        g_return_val_if_fail (a_this, FALSE);
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
 
-        if (a_this->ref_count)
-                a_this->ref_count--;
-
-        if (!a_this->ref_count) {
+        if (g_ref_count_dec (&real->ref_count)) {
                 cr_stylesheet_destroy (a_this);
                 return TRUE;
         }
 
         return FALSE;
+}
+
+static void
+cleanup_app_data (CRStyleSheetReal * real)
+{
+        if (real->app_data_destroy_func) {
+                g_clear_pointer (&real->app_data, real->app_data_destroy_func);
+                real->app_data_destroy_func = NULL;
+        }
 }
 
 /**
@@ -167,11 +200,40 @@ cr_stylesheet_unref (CRStyleSheet * a_this)
 void
 cr_stylesheet_destroy (CRStyleSheet * a_this)
 {
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
+
         g_return_if_fail (a_this);
 
         if (a_this->statements) {
                 cr_statement_destroy (a_this->statements);
                 a_this->statements = NULL;
         }
+
+        cleanup_app_data (real);
         g_free (a_this);
+}
+
+void
+cr_stylesheet_set_app_data (CRStyleSheet   * a_this,
+                            gpointer         app_data,
+                            GDestroyNotify   app_data_destroy_func)
+{
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
+
+        g_return_if_fail (a_this);
+
+        cleanup_app_data (real);
+
+        real->app_data = app_data;
+        real->app_data_destroy_func = app_data_destroy_func;
+}
+
+gpointer
+cr_stylesheet_get_app_data (CRStyleSheet *a_this)
+{
+        CRStyleSheetReal *real = (CRStyleSheetReal *) a_this;
+
+        g_return_val_if_fail (a_this, NULL);
+
+        return real->app_data;
 }

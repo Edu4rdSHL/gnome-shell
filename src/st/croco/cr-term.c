@@ -86,12 +86,12 @@ cr_term_new (void)
 {
         CRTerm *result = NULL;
 
-        result = g_try_malloc (sizeof (CRTerm));
+        result = g_try_malloc0 (sizeof (CRTerm));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRTerm));
+        g_ref_count_init (&result->ref_count);
         return result;
 }
 
@@ -735,7 +735,7 @@ cr_term_ref (CRTerm * a_this)
 {
         g_return_if_fail (a_this);
 
-        a_this->ref_count++;
+        g_ref_count_inc (&a_this->ref_count);
 }
 
 /**
@@ -750,11 +750,7 @@ cr_term_unref (CRTerm * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        if (a_this->ref_count) {
-                a_this->ref_count--;
-        }
-
-        if (a_this->ref_count == 0) {
+        if (g_ref_count_dec (&a_this->ref_count)) {
                 cr_term_destroy (a_this);
                 return TRUE;
         }

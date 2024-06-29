@@ -37,12 +37,11 @@ cr_simple_sel_new (void)
 {
         CRSimpleSel *result = NULL;
 
-        result = g_try_malloc (sizeof (CRSimpleSel));
+        result = g_try_malloc0 (sizeof (CRSimpleSel));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRSimpleSel));
 
         return result;
 }

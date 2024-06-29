@@ -204,7 +204,8 @@ parse_page_property_cb (CRDocHandler * a_this,
         g_return_if_fail (decl);
         decl->important = a_important;
         stmt->kind.page_rule->decl_list =
-                cr_declaration_append (stmt->kind.page_rule->decl_list, decl);
+                cr_declaration_append (stmt->kind.page_rule->decl_list,
+                                       g_steal_pointer (&decl));
         g_return_if_fail (stmt->kind.page_rule->decl_list);
 }
 
@@ -235,7 +236,7 @@ parse_at_media_start_media_cb (CRDocHandler * a_this,
         CRStatement *at_media = NULL;
         GList *media_list = NULL;
 
-        g_return_if_fail (a_this && a_this->priv);
+        g_return_if_fail (a_this);
 
         if (a_media_list) {
                 /*duplicate media list */
@@ -287,7 +288,7 @@ parse_at_media_start_selector_cb (CRDocHandler * a_this,
         CRStatement **at_media_ptr = NULL;
 	CRStatement *ruleset = NULL;
 
-        g_return_if_fail (a_this && a_this->priv && a_sellist);
+        g_return_if_fail (a_this && a_sellist);
 
 	at_media_ptr = &at_media;
         status = cr_doc_handler_get_ctxt (a_this, (gpointer *) at_media_ptr);
@@ -367,7 +368,7 @@ parse_at_media_end_media_cb (CRDocHandler * a_this,
         CRStatement *at_media = NULL;
         CRStatement **at_media_ptr = NULL;
 
-        g_return_if_fail (a_this && a_this->priv);
+        g_return_if_fail (a_this);
 
 	at_media_ptr = &at_media;
         status = cr_doc_handler_get_ctxt (a_this, 
@@ -382,7 +383,7 @@ parse_ruleset_start_selector_cb (CRDocHandler * a_this,
 {
         CRStatement *ruleset = NULL;
 
-        g_return_if_fail (a_this && a_this->priv && a_sellist);
+        g_return_if_fail (a_this && a_sellist);
 
         ruleset = cr_statement_new_ruleset (NULL, a_sellist, NULL, NULL);
         g_return_if_fail (ruleset);
@@ -422,7 +423,7 @@ parse_ruleset_property_cb (CRDocHandler * a_this,
         CRDeclaration *decl = NULL;
         CRString *stringue = NULL;
 
-        g_return_if_fail (a_this && a_this->priv && a_name);
+        g_return_if_fail (a_this && a_name);
 
         stringue = cr_string_dup (a_name);
         g_return_if_fail (stringue);
@@ -1124,7 +1125,7 @@ cr_statement_new_ruleset (CRStyleSheet * a_sheet,
                                       NULL);
         }
 
-        result = g_try_malloc (sizeof (CRStatement));
+        result = g_try_malloc0 (sizeof (CRStatement));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
@@ -1133,7 +1134,7 @@ cr_statement_new_ruleset (CRStyleSheet * a_sheet,
 
         memset (result, 0, sizeof (CRStatement));
         result->type = RULESET_STMT;
-        result->kind.ruleset = g_try_malloc (sizeof (CRRuleSet));
+        result->kind.ruleset = g_try_malloc0 (sizeof (CRRuleSet));
 
         if (!result->kind.ruleset) {
                 cr_utils_trace_info ("Out of memory");
@@ -1142,7 +1143,6 @@ cr_statement_new_ruleset (CRStyleSheet * a_sheet,
                 return NULL;
         }
 
-        memset (result->kind.ruleset, 0, sizeof (CRRuleSet));
         result->kind.ruleset->sel_list = a_sel_list;
         if (a_sel_list)
                 cr_selector_ref (a_sel_list);
@@ -1259,23 +1259,21 @@ cr_statement_new_at_media_rule (CRStyleSheet * a_sheet,
         if (a_rulesets)
                 g_return_val_if_fail (a_rulesets->type == RULESET_STMT, NULL);
 
-        result = g_try_malloc (sizeof (CRStatement));
+        result = g_try_malloc0 (sizeof (CRStatement));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CRStatement));
         result->type = AT_MEDIA_RULE_STMT;
 
-        result->kind.media_rule = g_try_malloc (sizeof (CRAtMediaRule));
+        result->kind.media_rule = g_try_malloc0 (sizeof (CRAtMediaRule));
         if (!result->kind.media_rule) {
                 cr_utils_trace_info ("Out of memory");
                 g_free (result);
                 return NULL;
         }
-        memset (result->kind.media_rule, 0, sizeof (CRAtMediaRule));
         result->kind.media_rule->rulesets = a_rulesets;
         for (cur = a_rulesets; cur; cur = cur->next) {
                 if (cur->type != RULESET_STMT || !cur->kind.ruleset) {
@@ -1318,17 +1316,16 @@ cr_statement_new_at_import_rule (CRStyleSheet * a_container_sheet,
 {
         CRStatement *result = NULL;
 
-        result = g_try_malloc (sizeof (CRStatement));
+        result = g_try_malloc0 (sizeof (CRStatement));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CRStatement));
         result->type = AT_IMPORT_RULE_STMT;
 
-        result->kind.import_rule = g_try_malloc (sizeof (CRAtImportRule));
+        result->kind.import_rule = g_try_malloc0 (sizeof (CRAtImportRule));
 
         if (!result->kind.import_rule) {
                 cr_utils_trace_info ("Out of memory");
@@ -1336,7 +1333,6 @@ cr_statement_new_at_import_rule (CRStyleSheet * a_container_sheet,
                 return NULL;
         }
 
-        memset (result->kind.import_rule, 0, sizeof (CRAtImportRule));
         result->kind.import_rule->url = a_url;
         result->kind.import_rule->media_list = a_media_list;
         result->kind.import_rule->sheet = a_imported_sheet;
@@ -1441,17 +1437,16 @@ cr_statement_new_at_page_rule (CRStyleSheet * a_sheet,
 {
         CRStatement *result = NULL;
 
-        result = g_try_malloc (sizeof (CRStatement));
+        result = g_try_malloc0 (sizeof (CRStatement));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CRStatement));
         result->type = AT_PAGE_RULE_STMT;
 
-        result->kind.page_rule = g_try_malloc (sizeof (CRAtPageRule));
+        result->kind.page_rule = g_try_malloc0 (sizeof (CRAtPageRule));
 
         if (!result->kind.page_rule) {
                 cr_utils_trace_info ("Out of memory");
@@ -1459,7 +1454,6 @@ cr_statement_new_at_page_rule (CRStyleSheet * a_sheet,
                 return NULL;
         }
 
-        memset (result->kind.page_rule, 0, sizeof (CRAtPageRule));
         if (a_decl_list) {
                 result->kind.page_rule->decl_list = a_decl_list;
                 cr_declaration_ref (a_decl_list);
@@ -1566,24 +1560,22 @@ cr_statement_new_at_charset_rule (CRStyleSheet * a_sheet,
 
         g_return_val_if_fail (a_charset, NULL);
 
-        result = g_try_malloc (sizeof (CRStatement));
+        result = g_try_malloc0 (sizeof (CRStatement));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CRStatement));
         result->type = AT_CHARSET_RULE_STMT;
 
-        result->kind.charset_rule = g_try_malloc (sizeof (CRAtCharsetRule));
+        result->kind.charset_rule = g_try_malloc0 (sizeof (CRAtCharsetRule));
 
         if (!result->kind.charset_rule) {
                 cr_utils_trace_info ("Out of memory");
                 g_free (result);
                 return NULL;
         }
-        memset (result->kind.charset_rule, 0, sizeof (CRAtCharsetRule));
         result->kind.charset_rule->charset = a_charset;
         cr_statement_set_parent_sheet (result, a_sheet);
 
@@ -1660,13 +1652,12 @@ cr_statement_new_at_font_face_rule (CRStyleSheet * a_sheet,
 {
         CRStatement *result = NULL;
 
-        result = g_try_malloc (sizeof (CRStatement));
+        result = g_try_malloc0 (sizeof (CRStatement));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRStatement));
         result->type = AT_FONT_FACE_RULE_STMT;
 
         result->kind.font_face_rule = g_try_malloc

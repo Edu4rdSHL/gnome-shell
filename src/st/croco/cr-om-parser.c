@@ -33,11 +33,13 @@
  *in cr-parser.h and cr-doc-handler.h
  */
 
-struct _CROMParserPriv {
-        CRParser *parser;
-};
+typedef struct _CROMParserReal {
+        CROMParser parent;
 
-#define PRIVATE(a_this) ((a_this)->priv)
+        CRParser *parser;
+} CROMParserReal;
+
+#define PRIVATE(a_this) ((CROMParserReal *) a_this)
 
 /*
  *Forward declaration of a type defined later
@@ -145,8 +147,7 @@ cr_om_parser_init_default_sac_handler (CROMParser * a_this)
         gboolean created_handler = FALSE;
         enum CRStatus status = CR_OK;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->parser,
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->parser,
                               CR_BAD_PARAM_ERROR);
 
         status = cr_parser_get_sac_handler (PRIVATE (a_this)->parser,
@@ -795,23 +796,12 @@ cr_om_parser_new (CRInput * a_input)
         CROMParser *result = NULL;
         enum CRStatus status = CR_OK;
 
-        result = g_try_malloc (sizeof (CROMParser));
+        result = g_try_malloc0 (sizeof (CROMParserReal));
 
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-
-        memset (result, 0, sizeof (CROMParser));
-        PRIVATE (result) = g_try_malloc (sizeof (CROMParserPriv));
-
-        if (!PRIVATE (result)) {
-                cr_utils_trace_info ("Out of memory");
-                goto error;
-        }
-
-        memset (PRIVATE (result), 0, sizeof (CROMParserPriv));
-
         PRIVATE (result)->parser = cr_parser_new_from_input (a_input);
 
         if (!PRIVATE (result)->parser) {
@@ -1062,13 +1052,12 @@ cr_om_parser_parse_paths_to_cascade (CROMParser * a_this,
                 }
         }
         result = cr_cascade_new (sheets[0], sheets[1], sheets[2]);
-        if (!result) {
-                for (i = 0; i < 3; i++) {
-                        cr_stylesheet_unref (sheets[i]);
-                        sheets[i] = 0;
-                }
+        for (i = 0; i < 3; i++)
+                g_clear_pointer (&sheets[i], cr_stylesheet_unref);
+
+        if (!result)
                 return CR_ERROR;
-        }
+
         *a_result = result;
         return CR_OK;
 }
@@ -1123,20 +1112,8 @@ cr_om_parser_simply_parse_paths_to_cascade (const guchar * a_author_path,
 void
 cr_om_parser_destroy (CROMParser * a_this)
 {
-        g_return_if_fail (a_this && PRIVATE (a_this));
+        g_return_if_fail (a_this);
 
-        if (PRIVATE (a_this)->parser) {
-                cr_parser_destroy (PRIVATE (a_this)->parser);
-                PRIVATE (a_this)->parser = NULL;
-        }
-
-        if (PRIVATE (a_this)) {
-                g_free (PRIVATE (a_this));
-                PRIVATE (a_this) = NULL;
-        }
-
-        if (a_this) {
-                g_free (a_this);
-                a_this = NULL;
-        }
+        g_clear_pointer (&PRIVATE (a_this)->parser, cr_parser_destroy);
+        g_free (a_this);
 }

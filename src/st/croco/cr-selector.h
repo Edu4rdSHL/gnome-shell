@@ -65,7 +65,7 @@ struct _CRSelector
 	CRSelector *next ;
 	CRSelector *prev ;
 	CRParsingLocation location ;
-	glong ref_count ;
+	grefcount ref_count;
 };
 
 CRSelector* cr_selector_new (CRSimpleSel *a_sel_expr) ;

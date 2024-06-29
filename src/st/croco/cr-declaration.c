@@ -86,14 +86,14 @@ cr_declaration_new (CRStatement * a_statement,
                                           || (a_statement->type
                                               == AT_PAGE_RULE_STMT)), NULL);
 
-        result = g_try_malloc (sizeof (CRDeclaration));
+        result = g_try_malloc0 (sizeof (CRDeclaration));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRDeclaration));
         result->property = a_property;
         result->value = a_value;
+        g_ref_count_init (&result->ref_count);
 
         if (a_value) {
                 cr_term_ref (a_value);
@@ -145,7 +145,7 @@ cr_declaration_parse_from_buf (CRStatement * a_statement,
         result = cr_declaration_new (a_statement, property, value);
         if (result) {
                 property = NULL;
-                value = NULL;
+                g_clear_pointer (&value, cr_term_unref);
                 result->important = important;
         }
 
@@ -216,7 +216,7 @@ cr_declaration_parse_list_from_buf (const guchar * a_str,
         result = cr_declaration_new (NULL, property, value);
         if (result) {
                 property = NULL;
-                value = NULL;
+                g_clear_pointer (&value, cr_term_unref);
                 result->important = important;
         }
         /*now, go parse the other declarations */
@@ -248,10 +248,9 @@ cr_declaration_parse_list_from_buf (const guchar * a_str,
                 cur_decl = cr_declaration_new (NULL, property, value);
                 if (cur_decl) {
                         cur_decl->important = important;
-                        result = cr_declaration_append (result, cur_decl);
+                        result = cr_declaration_append (result, g_steal_pointer (&cur_decl));
+                        g_clear_pointer (&value, cr_term_unref);
                         property = NULL;
-                        value = NULL;
-                        cur_decl = NULL;
                 } else {
                         break;
                 }
@@ -727,7 +726,7 @@ cr_declaration_ref (CRDeclaration * a_this)
 {
         g_return_if_fail (a_this);
 
-        a_this->ref_count++;
+        g_ref_count_inc (&a_this->ref_count);
 }
 
 /**
@@ -745,11 +744,7 @@ cr_declaration_unref (CRDeclaration * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        if (a_this->ref_count) {
-                a_this->ref_count--;
-        }
-
-        if (a_this->ref_count == 0) {
+        if (g_ref_count_dec (&a_this->ref_count)) {
                 cr_declaration_destroy (a_this);
                 return TRUE;
         }

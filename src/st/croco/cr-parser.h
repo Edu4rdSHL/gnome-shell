@@ -38,7 +38,6 @@ G_BEGIN_DECLS
  *of the #CRParser class.
  */
 typedef struct _CRParser CRParser ;
-typedef struct _CRParserPriv CRParserPriv ;
 
 
 /**
@@ -49,7 +48,7 @@ typedef struct _CRParserPriv CRParserPriv ;
  *the provided methods.
  */
 struct _CRParser  {
-        CRParserPriv *priv ;
+        gpointer dummy;
 } ;
 
 

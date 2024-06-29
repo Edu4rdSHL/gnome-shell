@@ -33,9 +33,13 @@
  *to custom values.
  */
 
-#define PRIVATE(obj) (obj)->priv
+#define PRIVATE(obj) ((CRDocHandlerReal *) obj)
 
-struct _CRDocHandlerPriv {
+typedef struct _CRDocHandlerReal {
+        CRDocHandler parent;
+
+        grefcount ref_count;
+
 	/**
 	 *This pointer is to hold an application parsing context.
 	 *For example, it used by the Object Model parser to 
@@ -56,7 +60,7 @@ struct _CRDocHandlerPriv {
 	 *the current document.
 	 */
 	CRParser *parser ;
-};
+} CRDocHandlerReal;
 
 /**
  * cr_doc_handler_new:
@@ -71,21 +75,13 @@ cr_doc_handler_new (void)
 {
         CRDocHandler *result = NULL;
 
-        result = g_try_malloc (sizeof (CRDocHandler));
+        result = g_try_malloc0 (sizeof (CRDocHandlerReal));
 
         g_return_val_if_fail (result, NULL);
 
-        memset (result, 0, sizeof (CRDocHandler));
-        result->ref_count++;
-
-        result->priv = g_try_malloc (sizeof (CRDocHandlerPriv));
-        if (!result->priv) {
-                cr_utils_trace_info ("Out of memory exception");
-                g_free (result);
-                return NULL;
-        }
-
         cr_doc_handler_set_default_sac_handler (result);
+
+        g_ref_count_init (&PRIVATE (result)->ref_count);
 
         return result;
 }
@@ -103,9 +99,9 @@ cr_doc_handler_new (void)
 enum CRStatus
 cr_doc_handler_get_ctxt (CRDocHandler const * a_this, gpointer * a_ctxt)
 {
-        g_return_val_if_fail (a_this && a_this->priv, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
-        *a_ctxt = a_this->priv->context;
+        *a_ctxt = PRIVATE (a_this)->context;
 
         return CR_OK;
 }
@@ -122,8 +118,8 @@ cr_doc_handler_get_ctxt (CRDocHandler const * a_this, gpointer * a_ctxt)
 enum CRStatus
 cr_doc_handler_set_ctxt (CRDocHandler * a_this, gpointer a_ctxt)
 {
-        g_return_val_if_fail (a_this && a_this->priv, CR_BAD_PARAM_ERROR);
-        a_this->priv->context = a_ctxt;
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
+        PRIVATE (a_this)->context = a_ctxt;
         return CR_OK;
 }
 
@@ -140,9 +136,9 @@ cr_doc_handler_set_ctxt (CRDocHandler * a_this, gpointer a_ctxt)
 enum CRStatus
 cr_doc_handler_get_result (CRDocHandler const * a_this, gpointer * a_result)
 {
-        g_return_val_if_fail (a_this && a_this->priv, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
-        *a_result = a_this->priv->result;
+        *a_result = PRIVATE (a_this)->result;
 
         return CR_OK;
 }
@@ -160,8 +156,8 @@ cr_doc_handler_get_result (CRDocHandler const * a_this, gpointer * a_result)
 enum CRStatus
 cr_doc_handler_set_result (CRDocHandler * a_this, gpointer a_result)
 {
-        g_return_val_if_fail (a_this && a_this->priv, CR_BAD_PARAM_ERROR);
-        a_this->priv->result = a_result;
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
+        PRIVATE (a_this)->result = a_result;
         return CR_OK;
 }
 
@@ -211,7 +207,7 @@ cr_doc_handler_ref (CRDocHandler * a_this)
 {
         g_return_if_fail (a_this);
 
-        a_this->ref_count++;
+        g_ref_count_inc (&PRIVATE (a_this)->ref_count);
 }
 
 /**
@@ -228,11 +224,7 @@ cr_doc_handler_unref (CRDocHandler * a_this)
 {
         g_return_val_if_fail (a_this, FALSE);
 
-        if (a_this->ref_count > 0) {
-                a_this->ref_count--;
-        }
-
-        if (a_this->ref_count == 0) {
+        if (g_ref_count_dec (&PRIVATE (a_this)->ref_count)) {
                 cr_doc_handler_destroy (a_this);
                 return TRUE;
         }
@@ -251,10 +243,6 @@ cr_doc_handler_destroy (CRDocHandler * a_this)
 {
         g_return_if_fail (a_this);
 
-        if (a_this->priv) {
-                g_free (a_this->priv);
-                a_this->priv = NULL;
-        }
         g_free (a_this);
 }
 
@@ -269,8 +257,7 @@ void
 cr_doc_handler_associate_a_parser (CRDocHandler *a_this,
 				   gpointer a_parser)
 {
-	g_return_if_fail (a_this && PRIVATE (a_this) 
-			  && a_parser) ;
+	g_return_if_fail (a_this && a_parser) ;
 
 	PRIVATE (a_this)->parser = a_parser ;
 }

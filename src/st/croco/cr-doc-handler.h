@@ -39,9 +39,6 @@ G_BEGIN_DECLS
 
 typedef struct _CRDocHandler CRDocHandler ;
 
-struct _CRDocHandlerPriv ;
-typedef struct _CRDocHandlerPriv CRDocHandlerPriv ;
-
 
 /**
  *The SAC document handler.
@@ -52,8 +49,6 @@ typedef struct _CRDocHandlerPriv CRDocHandlerPriv ;
  */
 struct _CRDocHandler
 {
-	CRDocHandlerPriv *priv ;
-
 	/**
 	 *This pointer is to be used by the application for
 	 *it custom needs. It is there to extend the doc handler.
@@ -269,7 +264,6 @@ struct _CRDocHandler
 	void (*unrecoverable_error) (CRDocHandler *a_this) ;
 
 	gboolean resolve_import ;
-	gulong ref_count ;
 } ;
 
 CRDocHandler * cr_doc_handler_new (void) ;

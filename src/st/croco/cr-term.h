@@ -128,7 +128,7 @@ struct _CRTerm
          */
         gpointer app_data ;
 
-        glong ref_count ;
+        grefcount ref_count ;
 
         /**
          *A pointer to the next term, 

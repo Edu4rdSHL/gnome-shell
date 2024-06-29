@@ -31,7 +31,9 @@
 #include "cr-tknzr.h"
 #include "cr-doc-handler.h"
 
-struct _CRTknzrPriv {
+typedef struct _CRTknzrReal {
+        CRTknzr parent;
+
         /**The parser input stream of bytes*/
         CRInput *input;
 
@@ -57,10 +59,10 @@ struct _CRTknzrPriv {
          *of #CRTknzr. Is manipulated by cr_tknzr_ref()
          *and cr_tknzr_unref().
          */
-        glong ref_count;
-};
+        grefcount ref_count;
+} CRTknzrReal;
 
-#define PRIVATE(obj) ((obj)->priv)
+#define PRIVATE(obj) ((CRTknzrReal *) obj)
 
 /**
  *return TRUE if the character is a number ([0-9]), FALSE otherwise
@@ -267,8 +269,7 @@ cr_tknzr_parse_w (CRTknzr * a_this,
         CRInputPos init_pos;
         enum CRStatus status = CR_OK;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_start && a_end, 
                               CR_BAD_PARAM_ERROR);
 
@@ -341,7 +342,7 @@ cr_tknzr_parse_nl (CRTknzr * a_this,
         guchar next_chars[2] = { 0 };
         enum CRStatus status = CR_PARSING_ERROR;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && a_start && a_end, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -395,8 +396,7 @@ cr_tknzr_try_to_skip_spaces (CRTknzr * a_this)
         enum CRStatus status = CR_ERROR;
         guint32 cur_char = 0;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
 
         status = cr_input_peek_char (PRIVATE (a_this)->input, &cur_char);
 
@@ -435,8 +435,7 @@ cr_tknzr_parse_comment (CRTknzr * a_this,
         CRString *comment = NULL;
         CRParsingLocation loc = {0} ;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, 
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input, 
                               CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);        
@@ -538,8 +537,7 @@ cr_tknzr_parse_unicode_escape (CRTknzr * a_this,
                 *tmp_char_ptr2 = NULL;
         enum CRStatus status = CR_OK;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && a_unicode, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && a_unicode, CR_BAD_PARAM_ERROR);
 
         /*first, let's backup the current position pointer */
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -607,8 +605,7 @@ cr_tknzr_parse_escape (CRTknzr * a_this, guint32 * a_esc_code,
         CRInputPos init_pos;
         guchar next_chars[2];
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && a_esc_code, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && a_esc_code, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -674,8 +671,7 @@ cr_tknzr_parse_string (CRTknzr * a_this, CRString ** a_str)
         enum CRStatus status = CR_OK;
         CRString *str = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_str, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -801,8 +797,7 @@ cr_tknzr_parse_nmstart (CRTknzr * a_this,
         guint32 cur_char = 0,
                 next_char = 0;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_char, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -867,7 +862,7 @@ cr_tknzr_parse_nmchar (CRTknzr * a_this, guint32 * a_char,
         enum CRStatus status = CR_OK;
         CRInputPos init_pos;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this) && a_char,
+        g_return_val_if_fail (a_this && a_char,
                               CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -934,8 +929,7 @@ cr_tknzr_parse_ident (CRTknzr * a_this, CRString ** a_str)
         enum CRStatus status = CR_OK;
         gboolean location_is_set = FALSE ;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_str, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -1024,9 +1018,7 @@ cr_tknzr_parse_name (CRTknzr * a_this,
         glong i = 0;
         CRParsingLocation loc = {0} ;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
-                              && a_str,
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input && a_str,
                               CR_BAD_PARAM_ERROR) ;
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -1076,8 +1068,7 @@ cr_tknzr_parse_hash (CRTknzr * a_this, CRString ** a_str)
         gboolean str_needs_free = FALSE;
         CRParsingLocation loc = {0} ;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input,
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input,
                               CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -1130,8 +1121,7 @@ cr_tknzr_parse_uri (CRTknzr * a_this,
         CRParsingLocation location = {0} ;
 
         g_return_val_if_fail (a_this 
-                              && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+                         && PRIVATE (a_this)->input
                               && a_str, 
                               CR_BAD_PARAM_ERROR);
 
@@ -1254,7 +1244,7 @@ cr_tknzr_parse_rgb (CRTknzr * a_this, CRRgb ** a_rgb)
         gboolean is_percentage = FALSE;
         CRParsingLocation location = {0} ;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
 
@@ -1389,8 +1379,7 @@ cr_tknzr_parse_atkeyword (CRTknzr * a_this,
         gboolean str_needs_free = FALSE;
         enum CRStatus status = CR_OK;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_str, CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -1429,8 +1418,7 @@ cr_tknzr_parse_important (CRTknzr * a_this,
         CRInputPos init_pos;
         enum CRStatus status = CR_OK;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input,
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input,
                               CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -1497,8 +1485,7 @@ cr_tknzr_parse_num (CRTknzr * a_this,
         CRParsingLocation location = {0} ;
         int sign = 1;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, 
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input,
                               CR_BAD_PARAM_ERROR);
 
         RECORD_INITIAL_POS (a_this, &init_pos);
@@ -1596,28 +1583,15 @@ cr_tknzr_new (CRInput * a_input)
 {
         CRTknzr *result = NULL;
 
-        result = g_try_malloc (sizeof (CRTknzr));
+        result = g_try_malloc0 (sizeof (CRTknzrReal));
 
         if (result == NULL) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
 
-        memset (result, 0, sizeof (CRTknzr));
+        g_ref_count_init (&PRIVATE (result)->ref_count);
 
-        result->priv = g_try_malloc (sizeof (CRTknzrPriv));
-
-        if (result->priv == NULL) {
-                cr_utils_trace_info ("Out of memory");
-
-                if (result) {
-                        g_free (result);
-                        result = NULL;
-                }
-
-                return NULL;
-        }
-        memset (result->priv, 0, sizeof (CRTknzrPriv));
         if (a_input)
                 cr_tknzr_set_input (result, a_input);
         return result;
@@ -1637,6 +1611,7 @@ cr_tknzr_new_from_buf (guchar * a_buf, gulong a_len,
         g_return_val_if_fail (input != NULL, NULL);
 
         result = cr_tknzr_new (input);
+        g_clear_pointer (&input, cr_input_unref);
 
         return result;
 }
@@ -1652,6 +1627,7 @@ cr_tknzr_new_from_uri (const guchar * a_file_uri,
         g_return_val_if_fail (input != NULL, NULL);
 
         result = cr_tknzr_new (input);
+        g_clear_pointer (&input, cr_input_unref);
 
         return result;
 }
@@ -1659,21 +1635,17 @@ cr_tknzr_new_from_uri (const guchar * a_file_uri,
 void
 cr_tknzr_ref (CRTknzr * a_this)
 {
-        g_return_if_fail (a_this && PRIVATE (a_this));
+        g_return_if_fail (a_this);
 
-        PRIVATE (a_this)->ref_count++;
+        g_ref_count_inc (&PRIVATE (a_this)->ref_count);
 }
 
 gboolean
 cr_tknzr_unref (CRTknzr * a_this)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this), FALSE);
+        g_return_val_if_fail (a_this, FALSE);
 
-        if (PRIVATE (a_this)->ref_count > 0) {
-                PRIVATE (a_this)->ref_count--;
-        }
-
-        if (PRIVATE (a_this)->ref_count == 0) {
+        if (g_ref_count_dec (&PRIVATE (a_this)->ref_count)) {
                 cr_tknzr_destroy (a_this);
                 return TRUE;
         }
@@ -1684,7 +1656,7 @@ cr_tknzr_unref (CRTknzr * a_this)
 enum CRStatus
 cr_tknzr_set_input (CRTknzr * a_this, CRInput * a_input)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->input) {
                 cr_input_unref (PRIVATE (a_this)->input);
@@ -1700,7 +1672,7 @@ cr_tknzr_set_input (CRTknzr * a_this, CRInput * a_input)
 enum CRStatus
 cr_tknzr_get_input (CRTknzr * a_this, CRInput ** a_input)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         *a_input = PRIVATE (a_this)->input;
 
@@ -1723,7 +1695,7 @@ cr_tknzr_get_input (CRTknzr * a_this, CRInput ** a_input)
 enum CRStatus
 cr_tknzr_read_byte (CRTknzr * a_this, guchar * a_byte)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this), CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this, CR_BAD_PARAM_ERROR);
 
         return cr_input_read_byte (PRIVATE (a_this)->input, a_byte);
 
@@ -1739,8 +1711,7 @@ cr_tknzr_read_byte (CRTknzr * a_this, guchar * a_byte)
 enum CRStatus
 cr_tknzr_read_char (CRTknzr * a_this, guint32 * a_char)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_char, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
@@ -1764,8 +1735,7 @@ cr_tknzr_read_char (CRTknzr * a_this, guint32 * a_char)
 enum CRStatus
 cr_tknzr_peek_char (CRTknzr * a_this, guint32 * a_char)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_char, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
@@ -1790,8 +1760,7 @@ cr_tknzr_peek_char (CRTknzr * a_this, guint32 * a_char)
 enum CRStatus
 cr_tknzr_peek_byte (CRTknzr * a_this, gulong a_offset, guchar * a_byte)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input && a_byte,
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input && a_byte,
                               CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
@@ -1818,8 +1787,7 @@ cr_tknzr_peek_byte (CRTknzr * a_this, gulong a_offset, guchar * a_byte)
 guchar
 cr_tknzr_peek_byte2 (CRTknzr * a_this, gulong a_offset, gboolean * a_eof)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, 0);
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input, 0);
 
         return cr_input_peek_byte2 (PRIVATE (a_this)->input, a_offset, a_eof);
 }
@@ -1833,8 +1801,7 @@ cr_tknzr_peek_byte2 (CRTknzr * a_this, gulong a_offset, gboolean * a_eof)
 glong
 cr_tknzr_get_nb_bytes_left (CRTknzr * a_this)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
                 cr_input_set_cur_pos (PRIVATE (a_this)->input,
@@ -1849,8 +1816,7 @@ cr_tknzr_get_nb_bytes_left (CRTknzr * a_this)
 enum CRStatus
 cr_tknzr_get_cur_pos (CRTknzr * a_this, CRInputPos * a_pos)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_pos, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
@@ -1867,10 +1833,7 @@ enum CRStatus
 cr_tknzr_get_parsing_location (CRTknzr *a_this,
                                CRParsingLocation *a_loc)
 {
-        g_return_val_if_fail (a_this 
-                              && PRIVATE (a_this)
-                              && a_loc,
-                              CR_BAD_PARAM_ERROR) ;
+        g_return_val_if_fail (a_this && a_loc, CR_BAD_PARAM_ERROR) ;
 
         return cr_input_get_parsing_location 
                 (PRIVATE (a_this)->input, a_loc) ;
@@ -1879,8 +1842,7 @@ cr_tknzr_get_parsing_location (CRTknzr *a_this,
 enum CRStatus
 cr_tknzr_get_cur_byte_addr (CRTknzr * a_this, guchar ** a_addr)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
         if (PRIVATE (a_this)->token_cache) {
                 cr_input_set_cur_pos (PRIVATE (a_this)->input,
                                       &PRIVATE (a_this)->prev_pos);
@@ -1894,8 +1856,7 @@ cr_tknzr_get_cur_byte_addr (CRTknzr * a_this, guchar ** a_addr)
 enum CRStatus
 cr_tknzr_seek_index (CRTknzr * a_this, enum CRSeekPos a_origin, gint a_pos)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
                 cr_input_set_cur_pos (PRIVATE (a_this)->input,
@@ -1912,8 +1873,7 @@ cr_tknzr_consume_chars (CRTknzr * a_this, guint32 a_char, glong * a_nb_char)
 {
 	gulong consumed = *(gulong *) a_nb_char;
 	enum CRStatus status;
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
                 cr_input_set_cur_pos (PRIVATE (a_this)->input,
@@ -1931,8 +1891,7 @@ cr_tknzr_consume_chars (CRTknzr * a_this, guint32 a_char, glong * a_nb_char)
 enum CRStatus
 cr_tknzr_set_cur_pos (CRTknzr * a_this, CRInputPos * a_pos)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input, CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
                 cr_token_destroy (PRIVATE (a_this)->token_cache);
@@ -1945,8 +1904,7 @@ cr_tknzr_set_cur_pos (CRTknzr * a_this, CRInputPos * a_pos)
 enum CRStatus
 cr_tknzr_unget_token (CRTknzr * a_this, CRToken * a_token)
 {
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->token_cache == NULL,
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->token_cache == NULL,
                               CR_BAD_PARAM_ERROR);
 
         PRIVATE (a_this)->token_cache = a_token;
@@ -1979,9 +1937,9 @@ cr_tknzr_get_next_token (CRTknzr * a_this, CRToken ** a_tk)
         CRRgb *rgb = NULL;
         CRParsingLocation location = {0} ;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
+        g_return_val_if_fail (a_this
                               && a_tk && *a_tk == NULL
-                              && PRIVATE (a_this)->input, 
+                              && PRIVATE (a_this)->input,
                               CR_BAD_PARAM_ERROR);
 
         if (PRIVATE (a_this)->token_cache) {
@@ -2633,8 +2591,7 @@ cr_tknzr_parse_token (CRTknzr * a_this, enum CRTokenType a_type,
         enum CRStatus status = CR_OK;
         CRToken *token = NULL;
 
-        g_return_val_if_fail (a_this && PRIVATE (a_this)
-                              && PRIVATE (a_this)->input
+        g_return_val_if_fail (a_this && PRIVATE (a_this)->input
                               && a_res, CR_BAD_PARAM_ERROR);
 
         status = cr_tknzr_get_next_token (a_this, &token);
@@ -2741,7 +2698,7 @@ cr_tknzr_destroy (CRTknzr * a_this)
 {
         g_return_if_fail (a_this);
 
-        if (PRIVATE (a_this) && PRIVATE (a_this)->input) {
+        if (PRIVATE (a_this)->input) {
                 if (cr_input_unref (PRIVATE (a_this)->input)
                     == TRUE) {
                         PRIVATE (a_this)->input = NULL;
@@ -2751,11 +2708,6 @@ cr_tknzr_destroy (CRTknzr * a_this)
         if (PRIVATE (a_this)->token_cache) {
                 cr_token_destroy (PRIVATE (a_this)->token_cache);
                 PRIVATE (a_this)->token_cache = NULL;
-        }
-
-        if (PRIVATE (a_this)) {
-                g_free (PRIVATE (a_this));
-                PRIVATE (a_this) = NULL;
         }
 
         g_free (a_this);

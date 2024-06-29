@@ -64,7 +64,7 @@ struct _CRDeclaration
 	/*does the declaration have the important keyword ?*/
 	gboolean important ;
 
-	glong ref_count ;
+	grefcount ref_count ;
 
 	CRParsingLocation location ;
 	/*reserved for future usage*/	

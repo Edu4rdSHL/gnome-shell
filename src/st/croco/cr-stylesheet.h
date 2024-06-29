@@ -34,7 +34,6 @@ G_BEGIN_DECLS
  *The declaration of the #CRStyleSheet class.
  */
 
-
 enum CRStyleOrigin
 {
         /*Please don't change the order of
@@ -66,20 +65,6 @@ struct _CRStyleSheet
 
 	/**custom data used by libcroco*/
 	gpointer croco_data ;
-
-	/**
-	 *custom application data pointer
-	 *Can be used by applications.
-	 */
-	gpointer app_data ;
-
-	/**
-	 *the reference count of this instance
-	 *Please, don't never ever modify it
-	 *directly. Use cr_stylesheet_ref()
-	 *and cr_stylesheet_unref() instead.
-	 */
-	gulong ref_count ;
 } ;
 
 CRStyleSheet * cr_stylesheet_new (CRStatement *a_stmts) ;
@@ -91,11 +76,16 @@ gint cr_stylesheet_nr_rules (CRStyleSheet const *a_this) ;
 
 CRStatement * cr_stylesheet_statement_get_from_list (CRStyleSheet *a_this, int itemnr) ;
 
-void cr_stylesheet_ref (CRStyleSheet *a_this) ;
+CRStyleSheet * cr_stylesheet_ref (CRStyleSheet *a_this) ;
 
 gboolean cr_stylesheet_unref (CRStyleSheet *a_this) ;
 
 void cr_stylesheet_destroy (CRStyleSheet *a_this) ;
+
+void cr_stylesheet_set_app_data (CRStyleSheet *a_this, gpointer app_data, GDestroyNotify app_data_destroy_func);
+gpointer cr_stylesheet_get_app_data (CRStyleSheet *a_this);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (CRStyleSheet, cr_stylesheet_unref);
 
 G_END_DECLS
 

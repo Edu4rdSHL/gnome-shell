@@ -29,9 +29,11 @@
 #include <string.h>
 #include "cr-cascade.h"
 
-#define PRIVATE(a_this) ((a_this)->priv)
+#define PRIVATE(a_this) ((CRCascadeReal *) a_this)
 
-struct _CRCascadePriv {
+typedef struct _CRCascadeReal {
+        CRCascade parent;
+
  /**
 	 *the 3 style sheets of the cascade:
 	 *author, user, and useragent sheet.
@@ -40,8 +42,8 @@ struct _CRCascadePriv {
 	 *of sheets[ORIGIN_UA] ;
 	 */
         CRStyleSheet *sheets[3];
-        guint ref_count;
-};
+        grefcount ref_count;
+} CRCascadeReal;
 
 /**
  * cr_cascade_new:
@@ -66,20 +68,13 @@ cr_cascade_new (CRStyleSheet * a_author_sheet,
 {
         CRCascade *result = NULL;
 
-        result = g_try_malloc (sizeof (CRCascade));
+        result = g_try_malloc0 (sizeof (CRCascadeReal));
         if (!result) {
                 cr_utils_trace_info ("Out of memory");
                 return NULL;
         }
-        memset (result, 0, sizeof (CRCascade));
 
-        PRIVATE (result) = g_try_malloc (sizeof (CRCascadePriv));
-        if (!PRIVATE (result)) {
-                cr_utils_trace_info ("Out of memory");
-                g_free (result);
-                return NULL;
-        }
-        memset (PRIVATE (result), 0, sizeof (CRCascadePriv));
+        g_ref_count_init (&PRIVATE (result)->ref_count);
 
         if (a_author_sheet) {
                 cr_cascade_set_sheet (result, a_author_sheet, ORIGIN_AUTHOR);
@@ -142,8 +137,7 @@ cr_cascade_set_sheet (CRCascade * a_this,
 
         if (PRIVATE (a_this)->sheets[a_origin])
                 cr_stylesheet_unref (PRIVATE (a_this)->sheets[a_origin]);
-        PRIVATE (a_this)->sheets[a_origin] = a_sheet;
-        cr_stylesheet_ref (a_sheet);
+        PRIVATE (a_this)->sheets[a_origin] = cr_stylesheet_ref (a_sheet);
         a_sheet->origin = a_origin;
         return CR_OK;
 }
@@ -160,7 +154,7 @@ cr_cascade_ref (CRCascade * a_this)
 {
         g_return_if_fail (a_this && PRIVATE (a_this));
 
-        PRIVATE (a_this)->ref_count++;
+        g_ref_count_inc (&PRIVATE (a_this)->ref_count);
 }
 
 /**
@@ -178,9 +172,7 @@ cr_cascade_unref (CRCascade * a_this)
 {
         g_return_if_fail (a_this && PRIVATE (a_this));
 
-        if (PRIVATE (a_this)->ref_count)
-                PRIVATE (a_this)->ref_count--;
-        if (!PRIVATE (a_this)->ref_count) {
+        if (g_ref_count_dec (&PRIVATE (a_this)->ref_count)) {
                 cr_cascade_destroy (a_this);
         }
 }
@@ -196,20 +188,14 @@ cr_cascade_destroy (CRCascade * a_this)
 {
         g_return_if_fail (a_this);
 
-        if (PRIVATE (a_this)) {
-                gulong i = 0;
-
-                for (i = 0; i < NB_ORIGINS; i++) {
-                        if (PRIVATE (a_this)->sheets[i]) {
-                                if (cr_stylesheet_unref
-                                    (PRIVATE (a_this)->sheets[i])
-                                    == TRUE) {
-                                        PRIVATE (a_this)->sheets[i] = NULL;
-                                }
+        for (int i = 0; i < NB_ORIGINS; i++) {
+                if (PRIVATE (a_this)->sheets[i]) {
+                        if (cr_stylesheet_unref
+                                (PRIVATE (a_this)->sheets[i])
+                                == TRUE) {
+                                PRIVATE (a_this)->sheets[i] = NULL;
                         }
                 }
-                g_free (PRIVATE (a_this));
-                PRIVATE (a_this) = NULL;
         }
         g_free (a_this);
 }
