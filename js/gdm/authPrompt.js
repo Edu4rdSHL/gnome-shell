@@ -493,6 +493,7 @@ export const AuthPrompt = GObject.registerClass({
 
     setQuestion(question) {
         this._entry.hint_text = question;
+        this._entry.set_accessible_name(question);
 
         this._authList.hide();
         this._entry.show();
