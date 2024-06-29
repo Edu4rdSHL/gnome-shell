@@ -206,7 +206,6 @@ class FdoNotificationDaemon {
             gicon,
             useBodyMarkup: true,
             sound: new MessageTray.Sound(soundFile, hints['sound-name']),
-            acknowledged: false,
         });
         notification.clearActions();
 
@@ -357,18 +356,11 @@ class FdoNotificationDaemonSource extends MessageTray.Source {
             this.notify('icon');
         }
 
-        let tracker = Shell.WindowTracker.get_default();
-        // Acknowledge notifications that are resident and their app has the
-        // current focus so that we don't show a banner.
-        if (notification.resident && this.app && tracker.focus_app === this.app)
-            notification.acknowledged = true;
-
         this.addNotification(notification);
     }
 
     open() {
         this.openApp();
-        this.destroyNonResidentNotifications();
     }
 
     openApp() {
