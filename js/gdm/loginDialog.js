@@ -1081,7 +1081,7 @@ export const LoginDialog = GObject.registerClass({
             title: _('Login Attempt Timed Out'),
             body: _('Login took too long, please try again'),
             urgency: MessageTray.Urgency.CRITICAL,
-            isTransient: true,
+            displayHint: MessageTray.DisplayHint.TRANSIENT,
         });
         this._conflictingSessionNotification.connect('destroy', () => {
             this._conflictingSessionNotification = null;

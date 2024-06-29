@@ -2036,7 +2036,7 @@ class Indicator extends SystemIndicator {
             body: _('Activation of network connection failed'),
             iconName: 'network-error-symbolic',
             urgency: MessageTray.Urgency.HIGH,
-            isTransient: true,
+            displayHint: MessageTray.DisplayHint.TRANSIENT,
         });
         this._notification.connect('destroy',
             () => (this._notification = null));

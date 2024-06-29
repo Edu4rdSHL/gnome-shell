@@ -166,7 +166,9 @@ const NotificationsBox = GObject.registerClass({
 
     _shouldShowDetails(source) {
         return source.policy.detailsInLockScreen ||
-               source.narrowestPrivacyScope === MessageTray.PrivacyScope.SYSTEM;
+               source.notifications.every(n =>
+                   n.displayHint & MessageTray.DisplayHint.SHOW_CONTENT_ON_LOCKSCREEN
+               );
     }
 
     _updateSourceBoxStyle(source, obj, box) {

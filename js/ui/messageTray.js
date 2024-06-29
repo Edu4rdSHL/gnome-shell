@@ -78,6 +78,25 @@ export const PrivacyScope = {
     SYSTEM: 1,
 };
 
+/** @enum {number} */
+export const DisplayHint = {
+    NONE: 0,
+    // Only show a banner for the message.
+    TRANSIENT: 1 << 0,
+    // Don't show a banner but keep the message till dismissed.
+    NO_BANNER: 1 << 1,
+    // Show a banner immediately.
+    FORCE_IMMEDIATELY: 1 << 2,
+    // Message that can't be dismissed by the user.
+    PERSISTENT: 1 << 3,
+    // Message that won't automatically dismissed when an action is invoked.
+    RESIDENT: 1 << 4,
+    // Show on the lock screen that a source as a message, but without any content.
+    SHOW_ON_LOCKSCREEN: 1 << 5,
+    // Show the message on the lock screen.
+    SHOW_CONTENT_ON_LOCKSCREEN: 1 << 6,
+};
+
 class FocusGrabber {
     constructor(actor) {
         this._actor = actor;
@@ -314,11 +333,43 @@ export const NotificationApplicationPolicy = GObject.registerClass({
 
 export const Sound = GObject.registerClass(
 class Sound extends GObject.Object {
-    constructor(file, themedName) {
-        super();
+    static newForFile(file) {
+        const sound = new Sound();
+        sound._soundFile = file;
+        return sound;
+    }
 
-        this._soundFile = file;
-        this._soundName = themedName;
+    static newForName(name) {
+        const sound = new Sound();
+        sound._soundName = name;
+        return sound;
+    }
+
+    static newForBytes(bytes) {
+        const sound = new Sound();
+        sound._soundBytes = bytes;
+        return sound;
+    }
+
+    static deserialize(serializedSound) {
+        const sound = serializedSound?.unpack();
+
+        if (!sound || sound === 'silent')
+            return null;
+
+        if (sound === 'default')
+            return Sound.newForName('message');
+
+        if (sound.length !== 2)
+            return null;
+
+        const [type, data] = sound.map(v => v.unpack());
+        if (type === 'file')
+            return Sound.newForFile(Gio.File.new_for_commandline_arg(data.unpack()));
+        if (type === 'bytes')
+            return Sound.newForBytes(data.unpack());
+
+        return null;
     }
 
     play() {
@@ -328,6 +379,22 @@ class Sound extends GObject.Object {
             player.play_from_theme(this._soundName, _('Notification sound'), null);
         else if (this._soundFile)
             player.play_from_file(this._soundFile, _('Notification sound'), null);
+        else if (this._soundBytes)
+            this._playSoundBytes();
+    }
+
+    async _playSoundBytes() {
+        const player = global.display.get_sound_player();
+        const [file, stream] = Gio.File.new_tmp('XXXXXX-notification-sound');
+        await stream.output_stream.write_bytes_async(this._soundBytes,
+            GLib.PRIORITY_DEFAULT, null);
+        stream.close_async(GLib.PRIORITY_DEFAULT, null);
+        player.play_from_file(file, _('Notification sound'), null);
+        this._tempFile = file;
+    }
+
+    cleanupTempFile() {
+        this._tempFile?.delete(null);
     }
 });
 
@@ -408,6 +475,19 @@ export class Notification extends GObject.Object {
         this.notify('privacy-scope');
     }
 
+    get displayHint() {
+        return this._displayHint;
+    }
+
+    set displayHint(displayHint) {
+        // TODO: check if the value is in range
+        if (this._displayHint === displayHint)
+            return;
+
+        this._displayHint = displayHint;
+        this.notify('display-hint');
+    }
+
     get urgency() {
         return this._urgency;
     }
@@ -434,7 +514,7 @@ export class Notification extends GObject.Object {
             // because it is common for such notifications to update themselves with new
             // information based on the action. We'd like to display the updated information
             // in place, rather than pop-up a new notification.
-            if (this.resident)
+            if (this.displayHint & DisplayHint.RESIDENT)
                 return;
 
             this.destroy();
@@ -467,13 +547,14 @@ export class Notification extends GObject.Object {
         // because it is common for such notifications to update themselves with new
         // information based on the action. We'd like to display the updated information
         // in place, rather than pop-up a new notification.
-        if (this.resident)
+        if (this.displayHint & DisplayHint.RESIDENT)
             return;
 
         this.destroy();
     }
 
     destroy(reason = NotificationDestroyedReason.DISMISSED) {
+        this.sound?.cleanupTempFile();
         this.emit('destroy', reason);
 
         if (this._updateDatetimeId)
@@ -570,13 +651,16 @@ export const Source = GObject.registerClass({
             this.countUpdated();
 
             // If acknowledged was set to false try to show the notification again
-            if (!notification.acknowledged)
+            if (!notification.acknowledged && !(notification.displayHint & DisplayHint.NO_BANNER))
                 this.emit('notification-request-banner', notification);
         });
         this.notifications.push(notification);
 
         this.emit('notification-added', notification);
-        this.emit('notification-request-banner', notification);
+
+        if (!(notification.displayHint & DisplayHint.NO_BANNER))
+            this.emit('notification-request-banner', notification);
+
         this.countUpdated();
     }
 
@@ -596,13 +680,6 @@ export const Source = GObject.registerClass({
 
     // To be overridden by subclasses
     open() {
-    }
-
-    destroyNonResidentNotifications() {
-        for (let i = this.notifications.length - 1; i >= 0; i--) {
-            if (!this.notifications[i].resident)
-                this.notifications[i].destroy();
-        }
     }
 });
 SignalTracker.registerDestroyableType(Source);
@@ -669,6 +746,11 @@ GObject.registerClass({
             'is-transient', 'is-transient', 'is-transient',
             GObject.ParamFlags.READWRITE,
             false),
+        'display-hint': GObject.ParamSpec.int(
+            'display-hint', 'display-hint', 'display-hint',
+            GObject.ParamFlags.READWRITE | GObject.ParamFlags.CONSTRUCT,
+            0, GLib.MAXINT32,
+            DisplayHint.NONE),
     },
     Signals: {
         'action-added': {param_types: [Action]},
@@ -1063,7 +1145,9 @@ export const MessageTray = GObject.registerClass({
             let nextNotification = this._notificationQueue[0] || null;
             if (hasNotifications && nextNotification) {
                 let limited = this._busy || Main.layoutManager.primaryMonitor.inFullscreen;
-                let showNextNotification = !limited || nextNotification.forFeedback || nextNotification.urgency === Urgency.CRITICAL;
+                let showNextNotification = !limited ||
+                    nextNotification.displayHint & DisplayHint.FORCE_IMMEDIATELY ||
+                    nextNotification.urgency === Urgency.CRITICAL;
                 if (showNextNotification)
                     this._showNotification();
             }
@@ -1254,7 +1338,7 @@ export const MessageTray = GObject.registerClass({
     _hideNotificationCompleted() {
         let notification = this._notification;
         this._notification = null;
-        if (!this._notificationRemoved && notification.isTransient)
+        if (!this._notificationRemoved && notification.displayHint & DisplayHint.TRANSIENT)
             notification.destroy(NotificationDestroyedReason.EXPIRED);
 
         this._pointerInNotification = false;

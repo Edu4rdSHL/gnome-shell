@@ -197,16 +197,18 @@ class FdoNotificationDaemon {
 
         const gicon = this._imageForNotificationData(hints);
 
-        const soundFile = 'sound-file' in hints
-            ? Gio.File.new_for_path(hints['sound-file']) : null;
+        let sound;
+        if ('sound-file' in hints)
+            sound = MessageTray.Sound.newForFile(Gio.File.new_for_path(hints['sound-file']));
+        else if ('sound-name' in hints)
+            sound = MessageTray.Sound.newForName(hints['sound-name']);
 
         notification.set({
             title: summary,
             body,
             gicon,
             useBodyMarkup: true,
-            sound: new MessageTray.Sound(soundFile, hints['sound-name']),
-            acknowledged: false,
+            sound,
         });
         notification.clearActions();
 
@@ -248,15 +250,20 @@ class FdoNotificationDaemon {
             notification.urgency = MessageTray.Urgency.CRITICAL;
             break;
         }
-        notification.resident = !!hints.resident;
+
+        if (hints.resident)
+            notification.displayHint |= MessageTray.DisplayHint.RESIDENT;
+
         // 'transient' is a reserved keyword in JS, so we have to retrieve the value
         // of the 'transient' hint with hints['transient'] rather than hints.transient
-        notification.isTransient = !!hints['transient'];
+        if (hints['transient'])
+            notification.displayHint |= MessageTray.DisplayHint.TRANSIENT;
 
-        let privacyScope = hints['x-gnome-privacy-scope'] || 'user';
-        notification.privacyScope = privacyScope === 'system'
-            ? MessageTray.PrivacyScope.SYSTEM
-            : MessageTray.PrivacyScope.USER;
+        if (hints['x-gnome-privacy-scope'] === 'system')
+            notification.displayHint |= MessageTray.DisplayHint.SHOW_CONTENT_ON_LOCKSCREEN;
+        else
+            // Always show the notification on the lockscreen but without any content
+            notification.displayHint |= MessageTray.DisplayHint.SHOW_ON_LOCKSCREEN;
 
         // Only fallback to 'app-icon' when the source doesn't have a valid app
         const sourceGIcon = source.app ? null : this._iconForNotificationData(appIcon);
@@ -357,18 +364,11 @@ class FdoNotificationDaemonSource extends MessageTray.Source {
             this.notify('icon');
         }
 
-        let tracker = Shell.WindowTracker.get_default();
-        // Acknowledge notifications that are resident and their app has the
-        // current focus so that we don't show a banner.
-        if (notification.resident && this.app && tracker.focus_app === this.app)
-            notification.acknowledged = true;
-
         this.addNotification(notification);
     }
 
     open() {
         this.openApp();
-        this.destroyNonResidentNotifications();
     }
 
     openApp() {
@@ -409,31 +409,41 @@ const GtkNotificationDaemonNotification = GObject.registerClass(
 class GtkNotificationDaemonNotification extends MessageTray.Notification {
     constructor(source, id, notification) {
         super({source});
-        this._serialized = GLib.Variant.new('a{sv}', notification);
-        this.id = id;
 
+        this.id = id;
+        this.update(notification);
+    }
+
+    update(notification) {
         const {
             title,
             body,
+            'markup-body': markupBody,
             icon: gicon,
             urgent,
             priority,
             buttons,
+            sound,
             'default-action': defaultAction,
             'default-action-target': defaultActionTarget,
+            'display-hint': displayHint,
             timestamp: time,
         } = notification;
 
-        if (priority) {
-            let urgency = PRIORITY_URGENCY_MAP[priority.unpack()];
-            this.urgency = urgency !== undefined ? urgency : MessageTray.Urgency.NORMAL;
-        } else if (urgent) {
-            this.urgency = urgent.unpack()
-                ? MessageTray.Urgency.CRITICAL
-                : MessageTray.Urgency.NORMAL;
-        } else {
-            this.urgency = MessageTray.Urgency.NORMAL;
-        }
+        const urgency = PRIORITY_URGENCY_MAP[priority?.unpack()] ??
+                      urgent?.unpack() ? MessageTray.Urgency.CRITICAL : MessageTray.Urgency.NORMAL;
+
+        this.set({
+            title: title.unpack(),
+            body: markupBody?.unpack() ?? body?.unpack() ?? null,
+            useBodyMarkup: !!markupBody,
+            gicon: gicon
+                ? Gio.icon_deserialize(gicon) : null,
+            sound: sound ? MessageTray.Sound.deserialize(sound) : null,
+            datetime: time
+                ? GLib.DateTime.new_from_unix_local(time.unpack()) : null,
+            urgency,
+        });
 
         if (buttons) {
             buttons.deepUnpack().forEach(button => {
@@ -443,37 +453,55 @@ class GtkNotificationDaemonNotification extends MessageTray.Notification {
             });
         }
 
+        let showOnLockscreen = true;
+        let showContentOnLockscreen = true;
+        if (displayHint) {
+            for (const hint of displayHint.deepUnpack()) {
+                if (hint === 'transient')
+                    this.displayHint |= MessageTray.DisplayHint.TRANSIENT;
+                else if (hint === 'tray')
+                    this.displayHint |= MessageTray.DisplayHint.NO_BANNER;
+                else if (hint === 'persistent')
+                    this.displayHint |= MessageTray.DisplayHint.PERSISTENT;
+                else if (hint === 'resident')
+                    this.displayHint |= MessageTray.DisplayHint.RESIDENT;
+                else if (hint === 'hide-on-lockscreen')
+                    showOnLockscreen = false;
+                else if (hint === 'hide-content-on-lockscreen')
+                    showContentOnLockscreen = false;
+            }
+        }
+
+        if (showOnLockscreen) {
+            if (showContentOnLockscreen)
+                this.displayHint |= MessageTray.DisplayHint.SHOW_CONTENT_ON_LOCKSCREEN;
+            else
+                this.displayHint |= MessageTray.DisplayHint.SHOW_ON_LOCKSCREEN;
+        }
+
+        this._serialized = GLib.Variant.new('a{sv}', notification);
         this._defaultAction = defaultAction?.unpack();
         this._defaultActionTarget = defaultActionTarget;
-
-        this.set({
-            title: title.unpack(),
-            body: body?.unpack(),
-            gicon: gicon
-                ? Gio.icon_deserialize(gicon) : null,
-            datetime: time
-                ? GLib.DateTime.new_from_unix_local(time.unpack()) : null,
-        });
     }
 
-    _activateAction(namespacedActionId, target) {
-        if (namespacedActionId) {
-            if (namespacedActionId.startsWith('app.')) {
-                let actionId = namespacedActionId.slice('app.'.length);
-                this.source.activateAction(actionId, target);
-            }
-        } else {
-            this.source.open();
-        }
+    _activateAction(actionId, target) {
+        if (actionId.startsWith('app.'))
+            this.source.activateAction(actionId.slice('app.'.length), target);
+        else
+            this.source.emitActionInvoked(this.id, actionId, target);
     }
 
     _onButtonClicked(button) {
-        let {action, target} = button;
+        const {action, target} = button;
         this._activateAction(action.unpack(), target);
     }
 
     activate() {
-        this._activateAction(this._defaultAction, this._defaultActionTarget);
+        if (this._defaultAction)
+            this._activateAction(this._defaultAction, this._defaultActionTarget);
+        else
+            this.source.open();
+
         super.activate();
     }
 
@@ -486,7 +514,7 @@ function InvalidAppError() {}
 
 export const GtkNotificationDaemonAppSource = GObject.registerClass(
 class GtkNotificationDaemonAppSource extends MessageTray.Source {
-    constructor(appId) {
+    constructor(appId, dbusImpl) {
         if (!Gio.Application.id_is_valid(appId))
             throw new InvalidAppError();
 
@@ -502,6 +530,7 @@ class GtkNotificationDaemonAppSource extends MessageTray.Source {
 
         this._appId = appId;
         this._app = app;
+        this._dbusImpl = dbusImpl;
 
         this._notifications = {};
         this._notificationPending = false;
@@ -515,6 +544,22 @@ class GtkNotificationDaemonAppSource extends MessageTray.Source {
 
         Main.overview.hide();
         Main.panel.closeCalendar();
+    }
+
+    emitActionInvoked(notificationId, actionId, target) {
+        const context = global.create_app_launch_context(0, -1);
+        const info = this._app.get_app_info();
+        const token = context.get_startup_notify_id(info, []);
+
+        this._dbusImpl.emit_signal('ActionInvoked',
+            GLib.Variant.new('(sssava{sv})', [
+                this._appId,
+                notificationId,
+                actionId,
+                target ? [target] : [],
+                {'activation-token': GLib.Variant.new_string(token)},
+            ])
+        );
     }
 
     open() {
@@ -566,10 +611,10 @@ class GtkNotificationDaemon {
     constructor() {
         this._sources = {};
 
-        this._loadNotifications();
-
         this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(GtkNotificationsIface, this);
         this._dbusImpl.export(Gio.DBus.session, '/org/gtk/Notifications');
+
+        this._loadNotifications();
 
         Gio.DBus.session.own_name('org.gtk.Notifications', Gio.BusNameOwnerFlags.REPLACE, null, null);
     }
@@ -578,7 +623,7 @@ class GtkNotificationDaemon {
         if (this._sources[appId])
             return this._sources[appId];
 
-        let source = new GtkNotificationDaemonAppSource(appId);
+        const source = new GtkNotificationDaemonAppSource(appId, this._dbusImpl);
 
         source.connect('destroy', () => {
             delete this._sources[appId];
@@ -656,13 +701,22 @@ class GtkNotificationDaemon {
             throw e;
         }
 
-        let timestamp = GLib.DateTime.new_now_local().to_unix();
+        const timestamp = GLib.DateTime.new_now_local().to_unix();
         notificationSerialized['timestamp'] = new GLib.Variant('x', timestamp);
+        const showAsNew = notificationSerialized['display-hint']?.deepUnpack().some(hint => hint === 'show-as-new');
+        const oldNotification = source._notifications[notificationId];
 
-        const notification = new GtkNotificationDaemonNotification(source,
-            notificationId,
-            notificationSerialized);
-        source.addNotification(notification);
+        if (showAsNew || !oldNotification) {
+            const notification = new GtkNotificationDaemonNotification(
+                source,
+                notificationId,
+                notificationSerialized
+            );
+
+            source.addNotification(notification);
+        } else {
+            oldNotification.update(notificationSerialized);
+        }
 
         invocation.return_value(null);
     }
