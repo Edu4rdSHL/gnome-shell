@@ -1029,6 +1029,13 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
     }
 });
 
+const WorkspaceWindowContainer = GObject.registerClass(
+class WorkspaceWindowContainer extends St.Widget {
+    vfunc_get_focus_chain() {
+        return this.layout_manager.getFocusChain();
+    }
+});
+
 export const Workspace = GObject.registerClass(
 class Workspace extends St.Widget {
     /**
@@ -1052,13 +1059,9 @@ class Workspace extends St.Widget {
         this.add_child(this._background);
 
         // Window previews
-        this._container = new Clutter.Actor({
-            reactive: true,
-            x_expand: true,
-            y_expand: true,
-        });
-        this._container.layout_manager = layoutManager;
+        this._container = new WorkspaceWindowContainer({layoutManager});
         this.add_child(this._container);
+        global.focus_manager.add_group(this._container);
 
         this.metaWorkspace = metaWorkspace;
 
@@ -1118,8 +1121,8 @@ class Workspace extends St.Widget {
         return overviewState > OverviewControls.ControlsState.WINDOW_PICKER;
     }
 
-    vfunc_get_focus_chain() {
-        return this._container.layout_manager.getFocusChain();
+    vfunc_navigate_focus(from, direction) {
+        return this._container.navigate_focus(from, direction, false);
     }
 
     _lookupIndex(metaWindow) {

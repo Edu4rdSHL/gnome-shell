@@ -38,7 +38,6 @@ const WorkspacesViewBase = GObject.registerClass({
             y_expand: true,
         });
         this.connect('destroy', this._onDestroy.bind(this));
-        global.focus_manager.add_group(this);
 
         this._monitorIndex = monitorIndex;
 
@@ -393,6 +392,10 @@ class WorkspacesView extends WorkspacesViewBase {
         let workspaceManager = global.workspace_manager;
         let active = workspaceManager.get_active_workspace_index();
         return this._workspaces[active];
+    }
+
+    vfunc_navigate_focus(from, direction) {
+        return this.getActiveWorkspace().navigate_focus(from, direction, false);
     }
 
     prepareToLeaveOverview() {

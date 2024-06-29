@@ -1851,8 +1851,10 @@ export class WindowManager {
         if (!Main.sessionMode.hasWorkspaces)
             return;
 
-        if (!workspace.active)
+        if (!workspace.active) {
             workspace.activate(global.get_current_time());
+            global.stage.set_key_focus(null);
+        }
     }
 
     actionMoveWindow(window, workspace) {
