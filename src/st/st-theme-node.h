@@ -172,7 +172,7 @@ struct _StThemeNodePaintState {
   CoglPipeline *box_shadow_pipeline;
   CoglTexture *prerendered_texture;
   CoglPipeline *prerendered_pipeline;
-  CoglPipeline *corner_material[4];
+  CoglPipeline *corner_pipeline[4];
 };
 
 StThemeNode *st_theme_node_new (StThemeContext *context,
@@ -342,6 +342,7 @@ gboolean st_theme_node_paint_equal    (StThemeNode *node,
  */
 void st_theme_node_paint (StThemeNode            *node,
                           StThemeNodePaintState  *state,
+                          ClutterPaintContext    *paint_context,
                           ClutterPaintNode       *root,
                           const ClutterActorBox  *box,
                           guint8                  paint_opacity,
