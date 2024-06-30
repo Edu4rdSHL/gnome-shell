@@ -593,12 +593,14 @@ export const Message = GObject.registerClass({
             duration,
         });
 
-        this._actionBin.scale_y = 0;
-        this._actionBin.ease({
-            scale_y: 1,
-            duration,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        });
+        if (!this._alwaysShowButtons) {
+            this._actionBin.scale_y = 0;
+            this._actionBin.ease({
+                scale_y: 1,
+                duration,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        }
 
         this._header.expandButton.ease({
             rotation_angle_z: 180,
@@ -608,22 +610,32 @@ export const Message = GObject.registerClass({
         this.emit('expanded');
     }
 
+    set alwaysShowButtons(value) {
+        this._actionBin.visible = this._actionBin.child && value;
+        this._actionBin.scale_y = value ? 1 : 0;
+        this._alwaysShowButtons = value;
+    }
+
     unexpand(animate) {
         const duration = animate ? MessageTray.ANIMATION_TIME : 0;
         this._bodyBin.ease_property('@layout.expansion', 0, {
             progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             duration,
-        });
-
-        this._actionBin.ease({
-            scale_y: 0,
-            duration,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
-                this._actionBin.hide();
                 this.expanded = false;
             },
         });
+
+        if (!this._alwaysShowButtons) {
+            this._actionBin.ease({
+                scale_y: 0,
+                duration,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => {
+                    this._actionBin.hide();
+                },
+            });
+        }
 
         this._header.expandButton.ease({
             rotation_angle_z: 0,
