@@ -15,6 +15,7 @@ import * as OverviewControls from './overviewControls.js';
 import * as SwipeTracker from './swipeTracker.js';
 import * as Util from '../misc/util.js';
 import * as Workspace from './workspace.js';
+import {OverviewAdjustment} from './overviewControls.js';
 import {ThumbnailsBox} from './workspaceThumbnail.js';
 
 const WORKSPACE_SWITCH_TIME = 250;
@@ -541,10 +542,25 @@ class WorkspacesView extends WorkspacesViewBase {
 export const ExtraWorkspaceView = GObject.registerClass(
 class ExtraWorkspaceView extends WorkspacesViewBase {
     _init(monitorIndex, overviewAdjustment) {
-        super._init(monitorIndex, overviewAdjustment);
+        this._origOverviewAdjustment = overviewAdjustment;
+        // newOverviewAdjustment is a copy of the original overviewAdjustment
+        // and syncs its value with the original overviewAdjustment, with value clamped
+        // to limit its state not to be app grid
+        const clampedOverviewAdjustment = new OverviewAdjustment(overviewAdjustment.actor);
+        super._init(monitorIndex, clampedOverviewAdjustment);
+        overviewAdjustment.connectObject('notify::value', () => {
+            this._updateFromOrigOverviewAdjustment();
+        }, this);
         this._workspace =
-            new Workspace.Workspace(null, monitorIndex, overviewAdjustment);
+            new Workspace.Workspace(null, monitorIndex, clampedOverviewAdjustment);
         this.add_child(this._workspace);
+    }
+
+    _updateFromOrigOverviewAdjustment() {
+        const value = Math.clamp(this._origOverviewAdjustment.get_value(),
+            OverviewControls.ControlsState.HIDDEN,
+            OverviewControls.ControlsState.WINDOW_PICKER);
+        this._overviewAdjustment.set_value(value);
     }
 
     _updateWorkspaceMode() {
