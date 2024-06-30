@@ -10,6 +10,7 @@ import St from 'gi://St';
 
 import * as Background from './background.js';
 import * as DND from './dnd.js';
+import * as Layout from './layout.js';
 import * as Main from './main.js';
 import * as OverviewControls from './overviewControls.js';
 import * as Params from '../misc/params.js';
@@ -988,6 +989,20 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
             this._updateBorderRadius();
         });
 
+        this._loadedId = 0;
+        if (this._bgManager.isLoading()) {
+            this.opacity = 0;
+            this._loadedId = this._bgManager.connect('loaded', () => {
+                this._bgManager.disconnect(this._loadedId);
+                this._loadedId = 0;
+                this.ease({
+                    opacity: 255,
+                    duration: Layout.STARTUP_ANIMATION_TIME,
+                    mode: Clutter.AnimationMode.LINEAR,
+                });
+            });
+        }
+
         global.display.connectObject('workareas-changed', () => {
             this._workarea = Main.layoutManager.getWorkAreaForMonitor(monitorIndex);
             this._updateRoundedClipBounds();
@@ -1023,9 +1038,13 @@ class WorkspaceBackground extends Shell.WorkspaceBackground {
 
     _onDestroy() {
         if (this._bgManager) {
+            if (this._loadedId)
+                this._bgManager.disconnect(this._loadedId);
+
             this._bgManager.destroy();
             this._bgManager = null;
         }
+        this._loadedId = 0;
     }
 });
 
