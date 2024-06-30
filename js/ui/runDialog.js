@@ -201,7 +201,8 @@ class RunDialog extends ModalDialog.ModalDialog {
                     let execArg = this._terminalSettings.get_string(EXEC_ARG_KEY);
                     command = `${exec} ${execArg} ${input}`;
                 }
-                Util.trySpawnCommandLine(command);
+                const [, argv] = GLib.shell_parse_argv(command);
+                Util.trySpawnApp(argv);
             } catch (e) {
                 // Mmmh, that failed - see if @input matches an existing file
                 let path = null;
@@ -227,6 +228,11 @@ class RunDialog extends ModalDialog.ModalDialog {
                         this._showError(message);
                     }
                 } else {
+                    // Replace "Error invoking GLib.shell_parse_argv: " with something nicer
+                    if (e.message.includes('shell_parse_argv')) {
+                        e.message = e.message.replace(/[^:]*: /,
+                            `${_('Could not parse command:')}\n`);
+                    }
                     this._showError(e.message);
                 }
             }
