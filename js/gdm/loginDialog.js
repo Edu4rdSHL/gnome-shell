@@ -1125,11 +1125,13 @@ export const LoginDialog = GObject.registerClass({
         conflictingSessionDialog.open();
     }
 
-    _startSession(serviceName) {
+    async _startSession(serviceName) {
+        const seat = await LoginManager.getLoginManager().getCurrentSeatProxy();
+
         this._bindOpacity();
         this.ease({
             opacity: 0,
-            duration: _FADE_ANIMATION_TIME,
+            duration: seat.CanTTY ? _FADE_ANIMATION_TIME : 0,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
                 this._greeter.call_start_session_when_ready_sync(serviceName, true, null);

@@ -8,10 +8,12 @@ import * as Signals from './signals.js';
 import {loadInterfaceXML} from './fileUtils.js';
 
 const SystemdLoginManagerIface = loadInterfaceXML('org.freedesktop.login1.Manager');
+const SystemdLoginSeatIface = loadInterfaceXML('org.freedesktop.login1.Seat');
 const SystemdLoginSessionIface = loadInterfaceXML('org.freedesktop.login1.Session');
 const SystemdLoginUserIface = loadInterfaceXML('org.freedesktop.login1.User');
 
 const SystemdLoginManager = Gio.DBusProxy.makeProxyWrapper(SystemdLoginManagerIface);
+const SystemdLoginSeat = Gio.DBusProxy.makeProxyWrapper(SystemdLoginSeatIface);
 const SystemdLoginSession = Gio.DBusProxy.makeProxyWrapper(SystemdLoginSessionIface);
 const SystemdLoginUser = Gio.DBusProxy.makeProxyWrapper(SystemdLoginUserIface);
 
@@ -106,6 +108,22 @@ class LoginManagerSystemd extends Signals.EventEmitter {
             this._sessionRemoved.bind(this));
     }
 
+    async getCurrentSeatProxy() {
+        if (this._currentSeat)
+            return this._currentSeat;
+
+        try {
+            let session = await this.getCurrentSessionProxy();
+            const [seatName_, objectPath] = session.Seat;
+            this._currentSeat = new SystemdLoginSeat(Gio.DBus.system,
+                'org.freedesktop.login1', objectPath);
+            return this._currentSeat;
+        } catch (error) {
+            logError(error, 'Could not get a proxy for the current session');
+            return null;
+        }
+    }
+
     async getCurrentSessionProxy() {
         if (this._currentSession)
             return this._currentSession;
@@ -113,29 +131,15 @@ class LoginManagerSystemd extends Signals.EventEmitter {
         let sessionId = GLib.getenv('XDG_SESSION_ID');
         if (!sessionId) {
             log('Unset XDG_SESSION_ID, getCurrentSessionProxy() called outside a user session. Asking logind directly.');
-            let [session, objectPath] = this._userProxy.Display;
-            if (session) {
-                log(`Will monitor session ${session}`);
-                sessionId = session;
-            } else {
-                log('Failed to find "Display" session; are we the greeter?');
-
-                for ([session, objectPath] of this._userProxy.Sessions) {
-                    let sessionProxy = new SystemdLoginSession(Gio.DBus.system,
-                        'org.freedesktop.login1',
-                        objectPath);
-                    log(`Considering ${session}, class=${sessionProxy.Class}`);
-                    if (sessionProxy.Class === 'greeter') {
-                        log(`Yes, will monitor session ${session}`);
-                        sessionId = session;
-                        break;
-                    }
-                }
-
-                if (!sessionId) {
-                    log('No, failed to get session from logind.');
-                    return null;
-                }
+            try {
+                let session = new SystemdLoginSession(Gio.DBus.system,
+                    'org.freedesktop.login1',
+                    '/org/freedesktop/login1/session/auto');
+                log(`Will monitor session ${session.Id}`);
+                sessionId = session.Id;
+            } catch (error) {
+                logError(error, 'Failed to get session from logind');
+                return null;
             }
         }
 
@@ -225,6 +229,10 @@ class LoginManagerDummy extends Signals.EventEmitter  {
         // expect (at the time of writing: connect() and connectSignal()
         // methods), but just never settling the promise should be safer
         return new Promise(() => {});
+    }
+
+    getCurrentSeatProxy() {
+        return new Promise(resolve => resolve(null));
     }
 
     canSuspend() {

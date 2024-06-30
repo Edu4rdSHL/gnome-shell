@@ -1,0 +1,5 @@
+<node>
+  <interface name="org.freedesktop.login1.Seat">
+    <property name="CanTTY" type="b" access="read"/>
+  </interface>
+</node>
