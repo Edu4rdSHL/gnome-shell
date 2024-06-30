@@ -49,6 +49,9 @@ class MediaMessage extends MessageList.Message {
     }
 
     vfunc_clicked() {
+        if (Main.sessionMode.isLocked)
+            return;
+
         this._player.raise();
         Main.panel.closeCalendar();
     }
@@ -151,7 +154,7 @@ export class MprisPlayer extends Signals.EventEmitter {
             this._mprisProxy.RaiseAsync().catch(logError);
     }
 
-    _close() {
+    close() {
         this._mprisProxy.disconnectObject(this);
         this._mprisProxy = null;
 
@@ -165,13 +168,13 @@ export class MprisPlayer extends Signals.EventEmitter {
         this._mprisProxy.connectObject('notify::g-name-owner',
             () => {
                 if (!this._mprisProxy.g_name_owner)
-                    this._close();
+                    this.close();
             }, this);
         // It is possible for the bus to disappear before the previous signal
         // is connected, so we must ensure that the bus still exists at this
         // point.
         if (!this._mprisProxy.g_name_owner)
-            this._close();
+            this.close();
     }
 
     _onPlayerProxyReady() {
@@ -249,9 +252,15 @@ class MediaSection extends MessageList.MessageListSection {
     _init() {
         super._init();
 
+        this.connect('destroy',
+            () => this._onDestroy());
+
         this._players = new Map();
 
-        this._proxy = new DBusProxy(Gio.DBus.session,
+        this._proxy = null;
+        this._nameOwnerChangedId = 0;
+
+        new DBusProxy(Gio.DBus.session,
             'org.freedesktop.DBus',
             '/org/freedesktop/DBus',
             this._onProxyReady.bind(this));
@@ -283,7 +292,9 @@ class MediaSection extends MessageList.MessageListSection {
         this._players.set(busName, player);
     }
 
-    async _onProxyReady() {
+    async _onProxyReady(proxy) {
+        this._proxy = proxy;
+
         const [names] = await this._proxy.ListNamesAsync();
         names.forEach(name => {
             if (!name.startsWith(MPRIS_PLAYER_PREFIX))
@@ -291,8 +302,9 @@ class MediaSection extends MessageList.MessageListSection {
 
             this._addPlayer(name);
         });
-        this._proxy.connectSignal('NameOwnerChanged',
-            this._onNameOwnerChanged.bind(this));
+        this._nameOwnerChangedId =
+            this._proxy.connectSignal('NameOwnerChanged',
+                this._onNameOwnerChanged.bind(this));
     }
 
     _onNameOwnerChanged(proxy, sender, [name, oldOwner, newOwner]) {
@@ -301,5 +313,12 @@ class MediaSection extends MessageList.MessageListSection {
 
         if (newOwner && !oldOwner)
             this._addPlayer(name);
+    }
+
+    _onDestroy() {
+        for (const player of this._players.values())
+            player.close();
+        this._proxy?.disconnectSignal(this._nameOwnerChangedId);
+        this._proxy = null;
     }
 });

@@ -18,6 +18,7 @@ import * as MessageTray from './messageTray.js';
 import * as SwipeTracker from './swipeTracker.js';
 import {formatDateWithCFormatString} from '../misc/dateUtils.js';
 import * as AuthPrompt from '../gdm/authPrompt.js';
+import {MediaSection} from './mpris.js';
 
 // The timeout before going back automatically to the lock screen (in seconds)
 const IDLE_TIMEOUT = 2 * 60;
@@ -50,6 +51,12 @@ const NotificationsBox = GObject.registerClass({
             child: this._notificationBox,
         });
         this.add_child(this._scrollView);
+
+        const mediaSection = new MediaSection();
+        mediaSection.style_class = 'unlock-dialog-notification-source';
+        mediaSection.connect('notify::visible',
+            () => this._updateVisibility());
+        this._notificationBox.add_child(mediaSection);
 
         this._settings = new Gio.Settings({
             schema_id: 'org.gnome.desktop.notifications',
