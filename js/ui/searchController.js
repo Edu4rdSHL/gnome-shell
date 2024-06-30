@@ -122,7 +122,14 @@ export const SearchController = GObject.registerClass({
     }
 
     vfunc_unmap() {
-        this.reset();
+        // Leave the entry focused when it doesn't have any text;
+        // when replacing a selected search term, Clutter emits
+        // two 'text-changed' signals, one for deleting the previous
+        // text and one for the new one - the second one is handled
+        // incorrectly when we remove focus
+        // (https://bugzilla.gnome.org/show_bug.cgi?id=636341) */
+        if (this._text.text !== '')
+            this.reset();
 
         super.vfunc_unmap();
     }
@@ -162,16 +169,8 @@ export const SearchController = GObject.registerClass({
     }
 
     _searchCancelled() {
+        // vfunc_unmap() is indirectly called by the following line.
         this._setSearchActive(false);
-
-        // Leave the entry focused when it doesn't have any text;
-        // when replacing a selected search term, Clutter emits
-        // two 'text-changed' signals, one for deleting the previous
-        // text and one for the new one - the second one is handled
-        // incorrectly when we remove focus
-        // (https://bugzilla.gnome.org/show_bug.cgi?id=636341) */
-        if (this._text.text !== '')
-            this.reset();
     }
 
     reset() {
