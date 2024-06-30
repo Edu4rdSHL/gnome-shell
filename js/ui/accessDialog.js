@@ -133,9 +133,22 @@ export class AccessDialogDBus {
         this._accessDialog = null;
 
         this._windowTracker = Shell.WindowTracker.get_default();
+        this._appSystem = Shell.AppSystem.get_default();
 
         this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(AccessIface, this);
         this._dbusImpl.export(Gio.DBus.session, '/org/freedesktop/portal/desktop');
+    }
+
+    _allowApp(id) {
+        if (!id)
+            return true; // not sandboxed
+
+        const app = this._appSystem.lookup_app(`${id}.desktop`);
+        if (!app)
+            return false; // non-graphical flatpak?
+
+        return app === this._windowTracker.focus_app ||
+            app.state === Shell.AppState.STARTING;
     }
 
     AccessDialogAsync(params, invocation) {
@@ -150,7 +163,7 @@ export class AccessDialogDBus {
         let [handle, appId, parentWindow_, title, description, body, options] = params;
         // We probably want to use parentWindow and global.display.focus_window
         // for this check in the future
-        if (appId && `${appId}.desktop` !== this._windowTracker.focus_app.id) {
+        if (!this._allowApp(appId)) {
             invocation.return_error_literal(
                 Gio.DBusError,
                 Gio.DBusError.ACCESS_DENIED,
