@@ -78,6 +78,19 @@ const _modes = {
         panelStyle: 'unlock-screen',
     },
 
+    'lock-screen': {
+        isGreeter: true,
+        isPrimary: true,
+        unlockDialog: UnlockDialog,
+        components: ['polkitAgent'],
+        panel: {
+            left: [],
+            center: [],
+            right: ['dwellClick', 'a11y', 'keyboard', 'quickSettings'],
+        },
+        panelStyle: 'unlock-screen',
+    },
+
     'user': {
         hasOverview: true,
         showCalendarEvents: true,

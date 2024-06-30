@@ -20,6 +20,10 @@
     <method name="ListSessions">
       <arg name="sessions" type="a(susso)" direction="out"/>
     </method>
+    <method name="GetUserByPID">
+     <arg type="u" name="pid" direction="in"/>
+     <arg type="o" name="object_path" direction="out"/>
+    </method>
     <method name="CanRebootToBootLoaderMenu">
       <arg type="s" direction="out"/>
     </method>

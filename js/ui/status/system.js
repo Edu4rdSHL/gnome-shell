@@ -192,6 +192,11 @@ class ShutdownItem extends QuickSettingsItem {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
+        this._addSystemAction(_('Secure Lock'), 'can-secure-lock', () => {
+            this._systemActions.activateSecureLock();
+            Main.panel.closeQuickSettings();
+        });
+
         this._addSystemAction(_('Log Out…'), 'can-logout', () => {
             this._systemActions.activateLogout();
             Main.panel.closeQuickSettings();
