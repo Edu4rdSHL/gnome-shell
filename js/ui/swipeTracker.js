@@ -477,19 +477,6 @@ export const SwipeTracker = GObject.registerClass({
         this.bind_property('orientation', this._touchpadGesture, 'orientation',
             GObject.BindingFlags.SYNC_CREATE);
 
-        this._touchGesture = new TouchSwipeGesture(allowedModes,
-            GESTURE_FINGER_COUNT,
-            Clutter.GestureTriggerEdge.AFTER);
-        this._touchGesture.connect('begin', this._beginTouchSwipe.bind(this));
-        this._touchGesture.connect('update', this._updateGesture.bind(this));
-        this._touchGesture.connect('end', this._endTouchGesture.bind(this));
-        this._touchGesture.connect('cancel', this._cancelTouchGesture.bind(this));
-        this.bind_property('enabled', this._touchGesture, 'enabled', 0);
-        this.bind_property('orientation', this._touchGesture, 'orientation',
-            GObject.BindingFlags.SYNC_CREATE);
-        this.bind_property('distance', this._touchGesture, 'distance', 0);
-        global.stage.add_action_full('swipe', Clutter.EventPhase.CAPTURE, this._touchGesture);
-
         if (params.allowDrag) {
             this._dragGesture = new TouchSwipeGesture(allowedModes, 1,
                 Clutter.GestureTriggerEdge.AFTER);
@@ -773,11 +760,6 @@ export const SwipeTracker = GObject.registerClass({
         if (this._touchpadGesture) {
             this._touchpadGesture.destroy();
             delete this._touchpadGesture;
-        }
-
-        if (this._touchGesture) {
-            global.stage.remove_action(this._touchGesture);
-            delete this._touchGesture;
         }
     }
 });
