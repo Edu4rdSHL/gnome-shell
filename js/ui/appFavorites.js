@@ -163,7 +163,7 @@ class AppFavorites extends Signals.EventEmitter {
 
         let app = Shell.AppSystem.get_default().lookup_app(appId);
 
-        let msg = _('%s has been pinned to the dash.').format(app.get_name());
+        let msg = _('%s Pinned to Dash').format(app.get_name());
         Main.overview.setMessage(msg, {
             forFeedback: true,
             undoCallback: () => this._removeFavorite(appId),
@@ -196,7 +196,7 @@ class AppFavorites extends Signals.EventEmitter {
         if (!this._removeFavorite(appId))
             return;
 
-        let msg = _('%s has been unpinned from the dash.').format(app.get_name());
+        let msg = _('%s Unpinned From Dash').format(app.get_name());
         Main.overview.setMessage(msg, {
             forFeedback: true,
             undoCallback: () => this._addFavorite(appId, pos),
